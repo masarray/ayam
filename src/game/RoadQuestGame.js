@@ -735,6 +735,84 @@ export class RoadQuestGame {
     }
   }
 
+  _spawnChickenImpactDebris(x, y, z, direction = 1, reason = 'traffic') {
+    const trainHit = reason === 'train';
+    const featherCount = trainHit ? 26 : 18;
+    const bloodCount = trainHit ? 7 : 5;
+    const forwardPush = direction >= 0 ? 1 : -1;
+
+    for (let i = 0; i < featherCount; i += 1) {
+      const large = i % 4 === 0;
+      const geometry = new THREE.BoxGeometry(
+        large ? 3.6 : 2.7,
+        large ? 12.5 : 9.5,
+        1.2
+      );
+      const material = i % 5 === 0
+        ? this.materials.featherShade
+        : i % 7 === 0
+          ? this.materials.featherTip
+          : this.materials.featherWhite;
+      const feather = new THREE.Mesh(geometry, material);
+      feather.position.set(
+        x + (Math.random() - 0.5) * 11,
+        y + (Math.random() - 0.5) * 9,
+        z + 4 + Math.random() * 8
+      );
+      feather.castShadow = false;
+      feather.receiveShadow = false;
+      feather.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      const side = (Math.random() - 0.5) * (trainHit ? 96 : 70);
+      feather.userData = {
+        kind: 'feather',
+        age: 0,
+        life: 0.95 + Math.random() * 0.58,
+        vx: forwardPush * (trainHit ? 92 : 62) + (Math.random() - 0.5) * 70,
+        vy: side,
+        vz: trainHit ? 112 + Math.random() * 54 : 82 + Math.random() * 42,
+        gravity: trainHit ? 96 : 86,
+        flutter: 22 + Math.random() * 28,
+        flutterRate: 11 + Math.random() * 9,
+        seed: Math.random() * Math.PI * 2,
+        rx: (Math.random() - 0.5) * 14,
+        ry: (Math.random() - 0.5) * 13,
+        rz: (Math.random() - 0.5) * 18,
+        scaleEnd: 0.08
+      };
+      this.fxGroup.add(feather);
+      this.fxItems.push(feather);
+    }
+
+    for (let i = 0; i < bloodCount; i += 1) {
+      const size = 2.2 + Math.random() * 2.3;
+      const geometry = new THREE.BoxGeometry(size, size, Math.max(1.8, size * 0.65));
+      const drop = new THREE.Mesh(geometry, i % 3 === 0 ? this.materials.bloodDark : this.materials.blood);
+      drop.position.set(
+        x + forwardPush * (3 + Math.random() * 6),
+        y + (Math.random() - 0.5) * 8,
+        z + 5 + Math.random() * 7
+      );
+      drop.castShadow = false;
+      drop.receiveShadow = false;
+      drop.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      drop.userData = {
+        kind: 'blood',
+        age: 0,
+        life: 0.42 + Math.random() * 0.25,
+        vx: forwardPush * (46 + Math.random() * 38),
+        vy: (Math.random() - 0.5) * 46,
+        vz: 48 + Math.random() * 38,
+        gravity: 185,
+        rx: (Math.random() - 0.5) * 10,
+        ry: (Math.random() - 0.5) * 10,
+        rz: (Math.random() - 0.5) * 13,
+        scaleEnd: 0.18
+      };
+      this.fxGroup.add(drop);
+      this.fxItems.push(drop);
+    }
+  }
+
   _updateFx(delta) {
     if (!this.fxItems.length) return;
     for (let i = this.fxItems.length - 1; i >= 0; i -= 1) {
@@ -742,12 +820,29 @@ export class RoadQuestGame {
       const data = fx.userData;
       data.age += delta;
       const t = clamp(data.age / data.life, 0, 1);
-      fx.position.x += data.vx * delta;
-      fx.position.y += data.vy * delta;
-      fx.position.z += data.vz * delta - 140 * delta * t;
-      const scale = Math.max(0.05, 1 - t * 0.95);
+      const gravity = data.gravity ?? 140;
+
+      if (data.kind === 'feather') {
+        const flutter = Math.sin(data.age * data.flutterRate + data.seed) * data.flutter;
+        const drift = Math.cos(data.age * (data.flutterRate * 0.72) + data.seed) * data.flutter * 0.42;
+        fx.position.x += (data.vx + drift) * delta;
+        fx.position.y += (data.vy + flutter) * delta;
+        fx.position.z += data.vz * delta - gravity * delta * Math.max(0.18, t);
+        fx.rotation.x += data.rx * delta;
+        fx.rotation.y += data.ry * delta;
+        fx.rotation.z += data.rz * delta;
+      } else {
+        fx.position.x += data.vx * delta;
+        fx.position.y += data.vy * delta;
+        fx.position.z += data.vz * delta - gravity * delta * t;
+        fx.rotation.x += (data.rx ?? 0) * delta;
+        fx.rotation.y += (data.ry ?? 0) * delta;
+        fx.rotation.z += (data.rz ?? 5) * delta;
+      }
+
+      const scaleEnd = data.scaleEnd ?? 0.05;
+      const scale = Math.max(scaleEnd, 1 - t * (1 - scaleEnd));
       fx.scale.setScalar(scale);
-      fx.rotation.z += delta * 5;
       if (t >= 1) {
         this.fxGroup.remove(fx);
         fx.geometry.dispose?.();
@@ -863,17 +958,25 @@ export class RoadQuestGame {
     this.moveQueue = [];
     this.movement = null;
 
-    if (reason === 'water' && this.player) {
-      this.waterImpactOrigin.copy(this.player.position);
-      this.lastWaterStruggleFx = performance.now();
-      this._spawnSplash(this.player.position.x, this.player.position.y);
-    }
-
     if (obstacle) {
       const direction = obstacle.userData.direction || 1;
       this.impactVector.set(direction, reason === 'train' ? 1 : reason === 'water' ? 0.38 : 0.55);
     } else {
       this.impactVector.set(0.8, 0.5);
+    }
+
+    if (reason === 'water' && this.player) {
+      this.waterImpactOrigin.copy(this.player.position);
+      this.lastWaterStruggleFx = performance.now();
+      this._spawnSplash(this.player.position.x, this.player.position.y);
+    } else if (this.player) {
+      this._spawnChickenImpactDebris(
+        this.player.position.x,
+        this.player.position.y,
+        this.player.position.z + 14,
+        this.impactVector.x || 1,
+        reason
+      );
     }
 
     this.callbacks.onImpact({ score: this.score, highScore: this.highScore, reason });
