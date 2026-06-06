@@ -5,6 +5,8 @@ import './VoxelCrossing.css';
 
 const SETTINGS_KEY = 'voxel-crossing-settings';
 const QUIZ_SIZE = 5;
+const GAME_OVERS_BEFORE_QUIZ = 3;
+const QUIZ_APPEAR_DELAY_MS = 300;
 const PLAY_KEYS = new Set([' ', 'spacebar', 'enter', 'w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 const ACTIVE_QUIZ_STATES = new Set(['loading', 'running', 'complete']);
 
@@ -147,6 +149,8 @@ export default function VoxelCrossing({
   const questionPoolRef = useRef(null);
   const seenQuestionIdsRef = useRef(new Set());
   const quizStartingRef = useRef(false);
+  const gameOverCycleRef = useRef(0);
+  const quizActiveMountedRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -160,6 +164,9 @@ export default function VoxelCrossing({
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(() => loadSettings());
+  const [quizDue, setQuizDue] = useState(false);
+  const [quizReveal, setQuizReveal] = useState(false);
+  const [gameOversUntilQuiz, setGameOversUntilQuiz] = useState(GAME_OVERS_BEFORE_QUIZ);
   const [quiz, setQuiz] = useState(QUIZ_INITIAL);
 
   useEffect(() => {
@@ -252,6 +259,10 @@ export default function VoxelCrossing({
         if (kind === 'trainHorn') audioRef.current?.trainHorn();
       },
       onGameOver: (nextResult) => {
+        const nextCycleCount = gameOverCycleRef.current + 1;
+        const shouldStartQuiz = nextCycleCount >= GAME_OVERS_BEFORE_QUIZ;
+        gameOverCycleRef.current = shouldStartQuiz ? 0 : nextCycleCount;
+
         setImpacting(false);
         setGameOver(true);
         setStarted(false);
@@ -260,6 +271,9 @@ export default function VoxelCrossing({
         setResult(nextResult);
         setScore(nextResult.score);
         setLastRunScore(nextResult.score);
+        setQuizDue(shouldStartQuiz);
+        setQuizReveal(false);
+        setGameOversUntilQuiz(shouldStartQuiz ? 0 : GAME_OVERS_BEFORE_QUIZ - nextCycleCount);
         onGameOver?.(nextResult);
       },
       onMilestone: (payload) => onQuestionGate?.(payload)
@@ -281,10 +295,34 @@ export default function VoxelCrossing({
   }, [enableMilestoneCallback, milestoneEvery, onGameOver, onQuestionGate]);
 
   useEffect(() => {
-    if (!gameOver || !result || menuOpen) return;
-    if (quiz.status === 'idle') beginQuizSession();
+    if (!gameOver || !result || menuOpen || !quizDue) return undefined;
+    if (quiz.status !== 'idle') return undefined;
+
+    const timer = window.setTimeout(() => {
+      beginQuizSession();
+    }, QUIZ_APPEAR_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameOver, result, menuOpen, quiz.status]);
+  }, [gameOver, result, menuOpen, quizDue, quiz.status]);
+
+  useEffect(() => {
+    const quizIsActive = ACTIVE_QUIZ_STATES.has(quiz.status);
+
+    if (quizIsActive && !quizActiveMountedRef.current) {
+      quizActiveMountedRef.current = true;
+      setQuizReveal(false);
+      const frame = window.requestAnimationFrame(() => setQuizReveal(true));
+      return () => window.cancelAnimationFrame(frame);
+    }
+
+    if (!quizIsActive) {
+      quizActiveMountedRef.current = false;
+      setQuizReveal(false);
+    }
+
+    return undefined;
+  }, [quiz.status]);
 
   const startGame = () => {
     unlockAudio();
@@ -295,6 +333,8 @@ export default function VoxelCrossing({
     setImpacting(false);
     setGameOver(false);
     setResult(null);
+    setQuizDue(false);
+    setQuizReveal(false);
     setQuiz(QUIZ_INITIAL);
     setStarted(true);
     setScore(0);
@@ -389,7 +429,7 @@ export default function VoxelCrossing({
       const tag = document.activeElement?.tagName?.toLowerCase();
       const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select';
       if (isTyping || menuOpen || !ready || impacting) return;
-      if (gameOver && ACTIVE_QUIZ_STATES.has(quiz.status)) return;
+      if (gameOver && (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status))) return;
       if ((gameOver || !started) && isPlayKey(event)) {
         event.preventDefault();
         startGame();
@@ -397,7 +437,7 @@ export default function VoxelCrossing({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [gameOver, impacting, menuOpen, quiz.status, ready, started]);
+  }, [gameOver, impacting, menuOpen, quiz.status, quizDue, ready, started]);
 
   useEffect(() => {
     if (!gameOver || !result?.isNewHighScore) return undefined;
@@ -417,6 +457,9 @@ export default function VoxelCrossing({
       : 'Tertabrak kendaraan. Perhatikan jarak dan kecepatan lane sebelum melompat.';
 
   const restartHint = 'Tekan Space, Enter, WASD, atau Arrow untuk mulai lagi.';
+  const quizCountdownText = gameOversUntilQuiz <= 1
+    ? 'Quiz latihan muncul setelah game berikutnya.'
+    : `Quiz latihan muncul setelah ${gameOversUntilQuiz} game lagi.`;
   const currentQuizQuestion = quiz.questions[quiz.index];
   const quizAnswered = Boolean(quiz.selectedKey);
   const quizTotal = quiz.questions.length || QUIZ_SIZE;
@@ -542,7 +585,7 @@ export default function VoxelCrossing({
       )}
 
       {gameOver && !menuOpen && ACTIVE_QUIZ_STATES.has(quiz.status) && (
-        <div className={`vc-overlay quiz ${quiz.status} ${result?.isNewHighScore ? 'new-record' : ''}`}>
+        <div className={`vc-overlay quiz ${quiz.status} ${quizReveal ? 'reveal' : ''} ${result?.isNewHighScore ? 'new-record' : ''}`}>
           <div className="quiz-card" role="dialog" aria-label="Quiz latihan">
             <div className="quiz-glow" aria-hidden="true" />
             <div className="quiz-topline">
@@ -638,6 +681,33 @@ export default function VoxelCrossing({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {gameOver && !menuOpen && !quizDue && quiz.status === 'idle' && (
+        <div className={`vc-overlay result ${result?.isNewHighScore ? 'new-record' : ''}`}>
+          <div className="glass-card compact result-card">
+            {result?.isNewHighScore ? (
+              <>
+                <div className="reward-aura" aria-hidden="true" />
+                <div className="mini-badge gold">Rekor Baru</div>
+                <div className="star-reward" aria-hidden="true">
+                  <span className="gold-star s1">★</span>
+                  <span className="gold-star s2">★</span>
+                  <span className="gold-star s3">★</span>
+                </div>
+                <h2>Score {resultScore}</h2>
+                <p className="reward-copy">Tiga bintang untuk rekor terbaikmu. {quizCountdownText}</p>
+              </>
+            ) : (
+              <>
+                <div className="mini-badge danger">Game Over</div>
+                <h2>Score {resultScore}</h2>
+                <p>{resultReasonText} {quizCountdownText} {restartHint}</p>
+              </>
+            )}
+            <button type="button" className="start-button" onClick={startGame}>Main Lagi</button>
           </div>
         </div>
       )}
