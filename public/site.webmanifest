@@ -1,0 +1,17 @@
+{
+  "name": "Voxel Crossing Game",
+  "short_name": "Voxel Crossing",
+  "description": "A lightweight Three.js voxel road-crossing game with cars, trains, rivers, and mobile controls.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#eef6e7",
+  "theme_color": "#9fd044",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

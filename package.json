@@ -1,14 +1,38 @@
 {
   "name": "voxel-crossing-game",
-  "version": "1.8.0",
-  "private": true,
+  "version": "1.9.0",
   "type": "module",
-  "description": "Lightweight Three.js voxel crossing mini game with smart traffic, multi-lane roads, trains, river planks, high-score rewards, in-game menu, lazy-loaded background music, splash impact, feather burst, light cartoon hit particles, and dynamic shadows.",
+  "description": "A lightweight Three.js voxel crossing browser game with smart traffic, multi-lane roads, trains, rivers, sinking planks, lazy-loaded music, mobile controls, and GitHub Pages deployment.",
+  "license": "Apache-2.0",
+  "author": "Ari Sulistiono",
+  "homepage": "https://masarray.github.io/voxel-crossing-game/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/masarray/voxel-crossing-game.git"
+  },
+  "bugs": {
+    "url": "https://github.com/masarray/voxel-crossing-game/issues"
+  },
+  "keywords": [
+    "threejs",
+    "react",
+    "vite",
+    "web-game",
+    "voxel-game",
+    "browser-game",
+    "github-pages",
+    "educational-game",
+    "mobile-game"
+  ],
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "clean": "node -e \"import('fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
+    "clean": "node -e \"import('fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\"",
+    "verify": "node scripts/verify-repo.mjs"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.2",
