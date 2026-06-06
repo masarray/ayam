@@ -1,8 +1,8 @@
 {
   "name": "voxel-crossing-game",
-  "version": "2.2.0",
+  "version": "2.6.0",
   "type": "module",
-  "description": "A lightweight Three.js voxel crossing browser game with smart traffic, trains, rivers, lazy-loaded music, and a fullscreen learning quiz that appears after every third game over.",
+  "description": "A lightweight Three.js voxel crossing browser game with smart traffic, trains, rivers, lazy-loaded music, celebratory rewards, and a fullscreen learning quiz that appears after every third game over.",
   "license": "Apache-2.0",
   "author": "Ari Sulistiono",
   "homepage": "https://masarray.github.io/voxel-crossing-game/",

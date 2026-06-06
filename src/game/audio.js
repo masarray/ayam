@@ -28,14 +28,16 @@ export class GameAudio {
     this.sfxEnabled = sfxEnabled;
     this.musicEnabled = musicEnabled;
     this.volume = volume;
-    this.musicVolume = 0.48;
+    this.musicVolume = 0.46;
     this.last = new Map();
     this.musicTimer = null;
     this.musicStep = 0;
     this.nextMusicTime = 0;
     const baseUrl = (import.meta.env?.BASE_URL || '/').replace(/\/?$/, '/');
     this.musicUrl = musicUrl || `${baseUrl}audio/mushroom-dance.ogg`;
+    this.kidsYayUrl = `${baseUrl}audio/kids-yay.mp3`;
     this.bgm = null;
+    this.kidsYay = null;
     this.bgmRequested = false;
     this.bgmReady = false;
     this.bgmError = false;
@@ -70,6 +72,7 @@ export class GameAudio {
       try { await this.ctx.resume(); } catch { /* ignore */ }
     }
 
+    if (this.sfxEnabled) this._ensureKidsYay();
     if (this.musicEnabled) this.startMusic();
   }
 
@@ -97,6 +100,34 @@ export class GameAudio {
     this.startMusic();
   }
 
+  pauseMusic(fadeMs = 160) {
+    this.stopMusicTimer();
+    if (!this.bgm) return;
+    const audio = this.bgm;
+    const startVolume = audio.volume || 0;
+    if (fadeMs <= 0 || startVolume <= 0.01) {
+      audio.pause();
+      audio.volume = 0;
+      return;
+    }
+    const started = performance.now();
+    const tick = () => {
+      const t = Math.min(1, (performance.now() - started) / fadeMs);
+      audio.volume = startVolume * (1 - t);
+      if (t < 1 && !audio.paused) window.requestAnimationFrame(tick);
+      else {
+        audio.pause();
+        audio.volume = 0;
+      }
+    };
+    window.requestAnimationFrame(tick);
+  }
+
+  resumeMusic() {
+    if (!this.musicEnabled) return;
+    this.startMusic();
+  }
+
   stopAll() {
     this.stopMusicTimer();
     if (this.bgm) {
@@ -104,6 +135,12 @@ export class GameAudio {
       this.bgm.src = '';
       this.bgm.load?.();
       this.bgm = null;
+    }
+    if (this.kidsYay) {
+      this.kidsYay.pause();
+      this.kidsYay.src = '';
+      this.kidsYay.load?.();
+      this.kidsYay = null;
     }
     if (this.ctx && this.ctx.state === 'running') {
       try { this.ctx.suspend(); } catch { /* ignore */ }
@@ -128,6 +165,17 @@ export class GameAudio {
     audio.addEventListener('error', () => { this.bgmError = true; }, { once: true });
     this.bgm = audio;
     return this.bgm;
+  }
+
+  _ensureKidsYay() {
+    if (this.kidsYay || typeof window === 'undefined') return this.kidsYay;
+    const audio = new Audio();
+    audio.src = this.kidsYayUrl;
+    audio.loop = false;
+    audio.preload = 'auto';
+    audio.volume = 0;
+    this.kidsYay = audio;
+    return this.kidsYay;
   }
 
   _cooldown(key, ms) {
@@ -254,6 +302,14 @@ export class GameAudio {
     }
   }
 
+
+  nearMiss() {
+    if (!this._cooldown('near-miss', 650)) return;
+    this._noise({ duration: 0.11, gain: 0.048, frequency: 2600, type: 'highpass' });
+    this._tone({ type: 'triangle', frequency: 640, endFrequency: 980, duration: 0.08, gain: 0.038, attack: 0.004, decay: 0.055, delay: 0.015 });
+    this._tone({ type: 'sine', frequency: 980, endFrequency: 760, duration: 0.09, gain: 0.03, attack: 0.004, decay: 0.055, delay: 0.08 });
+  }
+
   jump() {
     if (!this._cooldown('jump', 55)) return;
     this._tone({ type: 'square', frequency: 380, endFrequency: 720, duration: 0.075, gain: 0.065, decay: 0.05 });
@@ -261,12 +317,14 @@ export class GameAudio {
   }
 
   carHorn() {
-    if (!this._cooldown('horn', 760)) return;
-    this._tone({ type: 'square', frequency: 390, endFrequency: 382, duration: 0.22, gain: 0.12, attack: 0.002, decay: 0.055 });
-    this._tone({ type: 'square', frequency: 495, endFrequency: 484, duration: 0.22, gain: 0.1, attack: 0.002, decay: 0.055, delay: 0.002 });
-    this._tone({ type: 'sawtooth', frequency: 195, endFrequency: 188, duration: 0.18, gain: 0.035, attack: 0.004, decay: 0.06 });
-    this._tone({ type: 'square', frequency: 390, endFrequency: 382, duration: 0.12, gain: 0.082, attack: 0.002, decay: 0.045, delay: 0.27 });
-    this._tone({ type: 'square', frequency: 495, endFrequency: 484, duration: 0.12, gain: 0.066, attack: 0.002, decay: 0.045, delay: 0.272 });
+    if (!this._cooldown('horn', 620)) return;
+    // Short dual-tone car horn: two close square-wave notes, slight tremolo bite, fast attack.
+    this._tone({ type: 'square', frequency: 372, endFrequency: 368, duration: 0.18, gain: 0.15, attack: 0.0015, decay: 0.035 });
+    this._tone({ type: 'square', frequency: 468, endFrequency: 462, duration: 0.18, gain: 0.13, attack: 0.0015, decay: 0.035, delay: 0.002 });
+    this._tone({ type: 'sawtooth', frequency: 186, endFrequency: 180, duration: 0.16, gain: 0.035, attack: 0.003, decay: 0.04 });
+    this._noise({ duration: 0.038, gain: 0.018, frequency: 1800, type: 'bandpass', delay: 0.006 });
+    this._tone({ type: 'square', frequency: 372, endFrequency: 366, duration: 0.09, gain: 0.09, attack: 0.0015, decay: 0.03, delay: 0.22 });
+    this._tone({ type: 'square', frequency: 468, endFrequency: 460, duration: 0.09, gain: 0.075, attack: 0.0015, decay: 0.03, delay: 0.222 });
   }
 
   trainHorn() {
@@ -325,6 +383,24 @@ export class GameAudio {
     this._tone({ type: 'triangle', frequency: 523.25, endFrequency: 659.25, duration: 0.13, gain: 0.058, delay: 0.11, decay: 0.07 });
     this._tone({ type: 'triangle', frequency: 659.25, endFrequency: strong ? 1046.5 : 783.99, duration: 0.18, gain: 0.066, delay: 0.23, decay: 0.1 });
     this._noise({ duration: 0.18, gain: strong ? 0.042 : 0.028, frequency: 4600, type: 'highpass', delay: 0.18 });
+  }
+
+  kidsYayReward(stars = 3) {
+    if (!this.sfxEnabled || !this._cooldown(`kids-yay-${stars}`, 1200)) return;
+    const audio = this._ensureKidsYay();
+    if (!audio) return;
+    const volume = stars >= 3 ? 0.34 : stars >= 2 ? 0.2 : 0.16;
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = volume;
+      const playPromise = audio.play();
+      playPromise?.catch?.(() => {
+        // Browser can block media until a trusted interaction; procedural reward tones still play.
+      });
+    } catch {
+      // The game remains playable even if media playback is unavailable.
+    }
   }
 
   rewardStar(index = 0) {

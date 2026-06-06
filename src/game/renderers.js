@@ -23,8 +23,8 @@ export function createMaterials() {
     water: make(COLORS.water),
     waterAlt: make(COLORS.waterAlt),
     waterDeep: make(COLORS.waterDeep),
-    waterBright: make(COLORS.waterBright),
-    waterFoam: make(COLORS.waterFoam),
+    waterBright: make(COLORS.waterBright, { transparent: true, opacity: 0.62, depthWrite: false }),
+    waterFoam: make(COLORS.waterFoam, { transparent: true, opacity: 0.72, depthWrite: false }),
     plank: make(COLORS.plank),
     plankDark: make(COLORS.plankDark),
     plankEdge: make(COLORS.plankEdge),
@@ -141,6 +141,7 @@ export function createGeometryCache() {
     bulletRoof: new THREE.BoxGeometry(104, 29, 5),
     bulletCarriage: new THREE.BoxGeometry(112, 35, 28),
     bulletWindowStrip: new THREE.BoxGeometry(78, 3.5, 7),
+    bulletStripe: new THREE.BoxGeometry(96, 3, 4),
     modernLoco: new THREE.BoxGeometry(104, 38, 31),
     modernNose: new THREE.BoxGeometry(30, 34, 23),
     modernCabinGlass: new THREE.BoxGeometry(4, 24, 11),
@@ -455,54 +456,81 @@ function addCoupler(group, geometries, materials, x) {
 }
 
 
-function createBulletTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial) {
-  const locoLength = train.locomotiveWidth;
+function createBulletTrain(group, train, geometries, materials, bodyMaterial, accentMaterial) {
+  const headLength = Math.max(136, train.locomotiveWidth);
   const carLength = train.carriageWidth;
-  let frontX = train.width / 2 - 12;
-  let centerX = frontX - locoLength / 2;
+  const frontX = train.width / 2 - 10;
+  const rearX = -train.width / 2 + 10;
+  const noseOffset = 30;
 
-  // Bullet/high-speed profile: long body, pointed nose, low roof, continuous window strip.
-  box(group, geometries.bulletLoco, bodyMaterial, centerX - 6, 0, 15.5, { scale: { x: locoLength / 126, y: 1, z: 1 } });
-  const nose = setupMesh(new THREE.Mesh(geometries.bulletNose, darkerBodyMaterial));
-  nose.position.set(frontX + 5, 0, 16);
-  group.add(nose);
-  box(group, geometries.bulletRoof, materials.trimLight, centerX - 12, 0, 32, { scale: { x: locoLength / 126, y: 1, z: 0.58 }, castShadow: false });
-  box(group, geometries.bulletWindowStrip, materials.glassDark, centerX + 8, -19.5, 27, { scale: { x: 1.05, y: 1, z: 1 }, castShadow: false });
-  box(group, geometries.bulletWindowStrip, materials.glassDark, centerX + 8, 19.5, 27, { scale: { x: 1.05, y: 1, z: 1 }, castShadow: false });
-  box(group, geometries.carFrontLight, materials.headlight, frontX + 18, -8, 18, { scale: { x: 1, y: 0.8, z: 1 }, castShadow: false });
-  box(group, geometries.carFrontLight, materials.headlight, frontX + 18, 8, 18, { scale: { x: 1, y: 0.8, z: 1 }, castShadow: false });
-  addTrainBogie(group, geometries, materials, centerX - 12, locoLength, 19);
+  function addBulletHead(anchorX, isFront) {
+    const dir = isFront ? 1 : -1;
+    const centerX = anchorX - dir * (headLength * 0.34);
 
-  let cursor = centerX - locoLength / 2 - 6;
+    box(group, geometries.bulletLoco, bodyMaterial, centerX, 0, 14.8, { scale: { x: headLength / 126, y: 1, z: 1 } });
+    box(group, geometries.bulletRoof, materials.trimLight, centerX - dir * 8, 0, 31.6, { scale: { x: headLength / 126, y: 1, z: 0.52 }, castShadow: false });
+    box(group, geometries.bulletWindowStrip, materials.glassDark, centerX - dir * 2, -18.8, 26.2, { scale: { x: headLength / 134, y: 1, z: 1 }, castShadow: false });
+    box(group, geometries.bulletWindowStrip, materials.glassDark, centerX - dir * 2, 18.8, 26.2, { scale: { x: headLength / 134, y: 1, z: 1 }, castShadow: false });
+    box(group, geometries.bulletStripe, accentMaterial, centerX - dir * 1, -20.6, 20.5, { scale: { x: headLength / 102, y: 1, z: 0.75 }, castShadow: false });
+    box(group, geometries.bulletStripe, accentMaterial, centerX - dir * 1, 20.6, 20.5, { scale: { x: headLength / 102, y: 1, z: 0.75 }, castShadow: false });
+
+    const nose = setupMesh(new THREE.Mesh(geometries.bulletNose, accentMaterial));
+    nose.position.set(anchorX + dir * noseOffset, 0, 16);
+    if (!isFront) nose.rotation.z = Math.PI;
+    group.add(nose);
+
+    // Cockpit glass wedge, inspired by modern high-speed trains with pointed nose at both ends.
+    box(group, geometries.truckWindshield, materials.glassDark, anchorX + dir * 12, 0, 24.5, { scale: { x: 0.78, y: 0.88, z: 0.9 }, castShadow: false });
+    box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 24, -9, 17.8, { scale: { x: 0.9, y: 0.76, z: 0.95 }, castShadow: false });
+    box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 24, 9, 17.8, { scale: { x: 0.9, y: 0.76, z: 0.95 }, castShadow: false });
+    addTrainBogie(group, geometries, materials, centerX, headLength, 19);
+
+    return { centerX };
+  }
+
+  const frontHead = addBulletHead(frontX, true);
+  let cursor = frontHead.centerX - headLength / 2 - 8;
   for (let i = 0; i < train.carriageCount; i += 1) {
     cursor -= carLength / 2;
-    const material = i % 2 ? darkerBodyMaterial : bodyMaterial;
-    box(group, geometries.bulletCarriage, material, cursor, 0, 14.5, { scale: { x: carLength / 112, y: 1, z: 1 } });
-    box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, -19.5, 27, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
-    box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, 19.5, 27, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
-    box(group, geometries.bulletRoof, materials.trimLight, cursor, 0, 31.8, { scale: { x: carLength / 126, y: 1, z: 0.5 }, castShadow: false });
+    box(group, geometries.bulletCarriage, bodyMaterial, cursor, 0, 14.5, { scale: { x: carLength / 112, y: 1, z: 1 } });
+    box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, -19.5, 26.8, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
+    box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, 19.5, 26.8, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
+    box(group, geometries.bulletStripe, accentMaterial, cursor, -20.8, 20.8, { scale: { x: carLength / 98, y: 1, z: 0.74 }, castShadow: false });
+    box(group, geometries.bulletStripe, accentMaterial, cursor, 20.8, 20.8, { scale: { x: carLength / 98, y: 1, z: 0.74 }, castShadow: false });
+    box(group, geometries.bulletRoof, materials.trimLight, cursor, 0, 31.7, { scale: { x: carLength / 126, y: 1, z: 0.46 }, castShadow: false });
     addTrainBogie(group, geometries, materials, cursor, carLength, 19);
     addCoupler(group, geometries, materials, cursor + carLength / 2 + 3);
-    cursor -= carLength / 2 + 6;
+    cursor -= carLength / 2 + 8;
   }
+
+  addBulletHead(rearX, false);
 }
-
 function createModernTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial) {
-  const locoLength = train.locomotiveWidth;
+  const cabLength = Math.max(108, train.locomotiveWidth);
   const carLength = train.carriageWidth;
-  let frontX = train.width / 2 - 16;
-  let centerX = frontX - locoLength / 2;
+  const frontX = train.width / 2 - 14;
+  const rearX = -train.width / 2 + 14;
 
-  box(group, geometries.modernLoco, bodyMaterial, centerX, 0, 15.5, { scale: { x: locoLength / 104, y: 1, z: 1 } });
-  box(group, geometries.modernNose, darkerBodyMaterial, frontX - 12, 0, 13.5, { castShadow: true });
-  box(group, geometries.modernCabinGlass, materials.glassDark, frontX - 5, 0, 28, { castShadow: false });
-  box(group, geometries.modernRoof, materials.trimLight, centerX - 4, 0, 33, { scale: { x: locoLength / 104, y: 1, z: 1 }, castShadow: false });
-  box(group, geometries.carFrontLight, materials.headlight, frontX + 2, -9, 18, { castShadow: false });
-  box(group, geometries.carFrontLight, materials.headlight, frontX + 2, 9, 18, { castShadow: false });
-  addTrainWindows(group, geometries, materials, centerX - 12, 3, 18, -20, 27);
-  addTrainBogie(group, geometries, materials, centerX, locoLength, 20);
+  function addCommuterCab(anchorX, isFront) {
+    const dir = isFront ? 1 : -1;
+    const centerX = anchorX - dir * (cabLength * 0.3);
+    box(group, geometries.modernLoco, bodyMaterial, centerX, 0, 15.2, { scale: { x: cabLength / 104, y: 1, z: 1 } });
+    box(group, geometries.modernRoof, materials.trimLight, centerX - dir * 2, 0, 33.2, { scale: { x: cabLength / 104, y: 1, z: 0.92 }, castShadow: false });
 
-  let cursor = centerX - locoLength / 2 - 8;
+    // Front face and destination-panel feel, like commuter/metro train with symmetrical cab ends.
+    box(group, geometries.modernNose, darkerBodyMaterial, anchorX - dir * 10, 0, 15.5, { scale: { x: 0.96, y: 1.04, z: 1.14 } });
+    box(group, geometries.truckWindshield, materials.glassDark, anchorX + dir * 1, 0, 28.5, { scale: { x: 0.78, y: 1.35, z: 1.15 }, castShadow: false });
+    box(group, geometries.roadStripe, darkerBodyMaterial, anchorX + dir * 2, 0, 8.2, { scale: { x: 1.1, y: 8.7, z: 1.2 }, castShadow: false });
+    box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 7, -12, 18.4, { castShadow: false });
+    box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 7, 12, 18.4, { castShadow: false });
+    addTrainWindows(group, geometries, materials, centerX - dir * 10, 3, 17.5, -20.2, 27.2);
+    addTrainWindows(group, geometries, materials, centerX - dir * 10, 3, 17.5, 20.2, 27.2);
+    addTrainBogie(group, geometries, materials, centerX, cabLength, 20);
+    return centerX;
+  }
+
+  const frontCenter = addCommuterCab(frontX, true);
+  let cursor = frontCenter - cabLength / 2 - 8;
   for (let i = 0; i < train.carriageCount; i += 1) {
     cursor -= carLength / 2;
     const material = i % 2 ? darkerBodyMaterial : bodyMaterial;
@@ -514,19 +542,20 @@ function createModernTrain(group, train, geometries, materials, bodyMaterial, da
     addCoupler(group, geometries, materials, cursor + carLength / 2 + 4);
     cursor -= carLength / 2 + 8;
   }
+  addCommuterCab(rearX, false);
 }
-
 function createClassicTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial) {
   const locoLength = train.locomotiveWidth;
   const tenderLength = train.tenderWidth || 54;
   const carLength = train.carriageWidth;
-  let frontX = train.width / 2 - 18;
-  let locoCenter = frontX - locoLength / 2;
+  const frontX = train.width / 2 - 18;
+  const locoCenter = frontX - locoLength / 2;
 
+  // Steam locomotive head at the front only.
   const boiler = setupMesh(new THREE.Mesh(geometries.classicBoiler, bodyMaterial));
   boiler.position.set(locoCenter + 10, 0, 22);
   group.add(boiler);
-  box(group, geometries.classicPilot, darkerBodyMaterial, frontX - 8, 0, 11, { castShadow: false });
+  box(group, geometries.classicPilot, darkerBodyMaterial, frontX - 8, 0, 11, { castShadow: false, scale: { x: 1.1, y: 1.02, z: 1 } });
   box(group, geometries.classicCabin, darkerBodyMaterial, locoCenter - 28, 0, 23);
   box(group, geometries.trainWindow, materials.glassDark, locoCenter - 28, -18, 30, { castShadow: false });
   box(group, geometries.trainWindow, materials.glassDark, locoCenter - 28, 18, 30, { castShadow: false });
@@ -542,18 +571,26 @@ function createClassicTrain(group, train, geometries, materials, bodyMaterial, d
   addCoupler(group, geometries, materials, cursor + tenderLength / 2 + 4);
   cursor -= tenderLength / 2 + 8;
 
+  // Rear is made of passenger carriages, not another locomotive head.
   for (let i = 0; i < train.carriageCount; i += 1) {
     cursor -= carLength / 2;
     const material = i % 2 ? darkerBodyMaterial : bodyMaterial;
     box(group, geometries.classicCarriage, material, cursor, 0, 14.5, { scale: { x: carLength / 78, y: 1, z: 1 } });
     addTrainWindows(group, geometries, materials, cursor, 3, 18, -19.5, 27);
     addTrainWindows(group, geometries, materials, cursor, 3, 18, 19.5, 27);
+    // Carriage rear cap so the tail reads as passenger carriage instead of a duplicate front.
+    if (i === train.carriageCount - 1) {
+      const tailX = cursor - carLength / 2 + 4;
+      box(group, geometries.classicCabin, material, tailX, 0, 18, { scale: { x: 0.24, y: 1.04, z: 0.76 } });
+      box(group, geometries.trainWindowWide, materials.glassDark, tailX - 1, 0, 28.5, { scale: { x: 0.42, y: 1.12, z: 0.9 }, castShadow: false });
+      box(group, geometries.carRearLight, materials.tailLight, tailX - 5, -10, 17, { castShadow: false });
+      box(group, geometries.carRearLight, materials.tailLight, tailX - 5, 10, 17, { castShadow: false });
+    }
     addTrainBogie(group, geometries, materials, cursor, carLength, 20);
     addCoupler(group, geometries, materials, cursor + carLength / 2 + 4);
     cursor -= carLength / 2 + 8;
   }
 }
-
 function createFreightTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial) {
   const locoLength = train.locomotiveWidth;
   const carLength = train.carriageWidth;
@@ -632,8 +669,8 @@ export function createTrain(train, row, geometries, materials) {
     trainClass: train.trainClass || 'modern'
   };
 
-  const bodyMaterial = dynamicMaterial(train.color);
-  const darkerBodyMaterial = dynamicMaterial(train.color, 0.76);
+  const bodyMaterial = train.trainClass === 'bullet' ? dynamicMaterial(0xf4f0e8) : dynamicMaterial(train.color);
+  const darkerBodyMaterial = train.trainClass === 'bullet' ? dynamicMaterial(0xd92d34) : dynamicMaterial(train.color, 0.76);
 
   if (train.trainClass === 'bullet') {
     createBulletTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
@@ -657,13 +694,16 @@ export function createRoadStripe(tileIndex, rowIndex, geometries, material) {
 }
 
 
-function createWaterSurface(rowIndex, geometries, materials) {
+function createWaterSurface(row, geometries, materials) {
+  const rowIndex = row.index;
+  const direction = row.direction || 1;
   const group = new THREE.Group();
   group.name = `Water surface ${rowIndex}`;
   const y = rowToY(rowIndex, TILE_SIZE);
 
   const deepBand = new THREE.Mesh(geometries.rowWide, materials.waterDeep);
   deepBand.position.set(0, y, -1.2);
+  deepBand.userData.waterFlowBaseY = y;
   deepBand.scale.set(1, 0.78, 1);
   deepBand.castShadow = false;
   deepBand.receiveShadow = true;
@@ -683,6 +723,16 @@ function createWaterSurface(rowIndex, geometries, materials) {
     const phase = (rowIndex * 17 + tile * 11) % 7;
     const wave = new THREE.Mesh(phase % 3 === 0 ? geometries.waterWave : geometries.waterRipple, phase % 2 ? materials.waterBright : materials.waterFoam);
     wave.position.set(tileToX(tile, TILE_SIZE) + (phase - 3) * 3, y + ((phase % 5) - 2) * 4, 2.8 + (phase % 2) * 0.4);
+    wave.userData.waterFlow = {
+      baseX: wave.position.x,
+      baseY: wave.position.y,
+      direction,
+      speed: direction * (18 + (phase % 5) * 7),
+      phase: phase * 1.37,
+      amp: 1.6 + (phase % 3) * 0.9,
+      rate: 2.4 + (phase % 4) * 0.34,
+      wrap: BOARD_WIDTH * 0.62
+    };
     wave.castShadow = false;
     wave.receiveShadow = false;
     wave.rotation.z = (phase - 3) * 0.035;
@@ -693,6 +743,16 @@ function createWaterSurface(rowIndex, geometries, materials) {
   for (let tile = MIN_TILE - 4; tile <= MAX_TILE + 4; tile += 4) {
     const sparkle = new THREE.Mesh(geometries.waterSparkle, materials.waterFoam);
     sparkle.position.set(tileToX(tile, TILE_SIZE) + ((rowIndex + tile) % 3) * 8, y + (((rowIndex + tile) % 5) - 2) * 5, 3.2);
+    sparkle.userData.waterFlow = {
+      baseX: sparkle.position.x,
+      baseY: sparkle.position.y,
+      direction,
+      speed: direction * (26 + ((rowIndex + tile) % 4) * 8),
+      phase: (rowIndex + tile) * 0.7,
+      amp: 1.2,
+      rate: 3.1,
+      wrap: BOARD_WIDTH * 0.62
+    };
     sparkle.castShadow = false;
     sparkle.receiveShadow = false;
     sparkle.rotation.z = ((rowIndex + tile) % 4) * 0.4;
@@ -784,7 +844,7 @@ export function createRowGroup(row, geometries, materials) {
   }
 
   if (isWater) {
-    group.add(createWaterSurface(row.index, geometries, materials));
+    group.add(createWaterSurface(row, geometries, materials));
   }
 
   if (row.type === 'forest') {

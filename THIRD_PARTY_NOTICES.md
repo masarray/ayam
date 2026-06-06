@@ -6,6 +6,7 @@ This project uses open-source packages:
 - Three.js — MIT License — https://threejs.org/
 - Vite — MIT License — https://vite.dev/
 - @vitejs/plugin-react — MIT License — https://vite.dev/
+- Sniglet font — Google Fonts / Open Font License. Loaded from Google Fonts CSS at runtime; no font files are bundled in this repository.
 
 Design and technical inspiration:
 
@@ -15,7 +16,8 @@ Design and technical inspiration:
 Audio:
 
 - `public/audio/mushroom-dance.ogg` is a user-supplied background music file for this project. Verify and keep the correct license/credit for this track before publishing the app publicly.
-- Sound effects are generated at runtime using original Web Audio synthesis code in `src/game/audio.js`.
+- `public/audio/kids-yay.mp3` is a user-supplied celebratory sound effect. Verify and keep the correct license/credit for this file before publishing the app publicly.
+- Most sound effects are generated at runtime using original Web Audio synthesis code in `src/game/audio.js`.
 - Future optional sound generators or asset packs should be added only when their license is documented here.
 
 Trademark note:

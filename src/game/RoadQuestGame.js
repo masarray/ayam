@@ -125,7 +125,8 @@ export class RoadQuestGame {
       onReady: options.onReady || (() => {}),
       onMilestone: options.onMilestone || (() => {}),
       onMoveStart: options.onMoveStart || (() => {}),
-      onHazardSound: options.onHazardSound || (() => {})
+      onHazardSound: options.onHazardSound || (() => {}),
+      onNearMiss: options.onNearMiss || (() => {})
     };
 
     this.scene = new THREE.Scene();
@@ -153,6 +154,7 @@ export class RoadQuestGame {
     this.planks = [];
     this.trafficRows = new Map();
     this.waterRows = new Map();
+    this.waterFlowItems = [];
     this.fxItems = [];
     this.moveQueue = [];
     this.player = null;
@@ -178,6 +180,7 @@ export class RoadQuestGame {
     this.cameraTarget = new THREE.Vector3(0, 0, 0);
     this.renderRequested = null;
     this.lastMilestone = 0;
+    this.lastNearMissAt = 0;
     this.touchStart = null;
 
     this._handleKeyDown = this._handleKeyDown.bind(this);
@@ -242,6 +245,7 @@ export class RoadQuestGame {
     this.highestRow = 0;
     this.score = 0;
     this.lastMilestone = 0;
+    this.lastNearMissAt = 0;
     this.runStartingHighScore = this.highScore;
     this.newRecordThisRun = false;
     this.newRecordScore = 0;
@@ -258,6 +262,7 @@ export class RoadQuestGame {
     this.fxItems = [];
     this.trafficRows.clear();
     this.waterRows.clear();
+    this.waterFlowItems = [];
     this.rowGroups.clear();
 
     if (this.player) {
@@ -337,6 +342,12 @@ export class RoadQuestGame {
     const rowGroup = createRowGroup(row, this.geometries, this.materials);
     this.rowGroups.set(row.index, rowGroup);
     this.worldGroup.add(rowGroup);
+
+    if (row.type === 'water') {
+      rowGroup.traverse((child) => {
+        if (child.userData?.waterFlow) this.waterFlowItems.push(child);
+      });
+    }
 
     if (row.type === 'traffic') {
       const laneVehicles = [];
@@ -489,11 +500,13 @@ export class RoadQuestGame {
       this._updatePlayerMovement();
       this._updateWaterState(delta);
       this._checkTrafficCollision();
+      if (!this.isImpacting) this._checkNearMiss();
       this._checkHazardSound();
     } else {
       this._updateVehicles(delta * 0.32);
     }
 
+    this._updateWaterFlow(delta);
     this._updateFx(delta);
     this._updateCamera(false);
     if (this.isImpacting) this._applyCameraShake();
@@ -537,6 +550,23 @@ export class RoadQuestGame {
 
     this.trafficRows.forEach((items) => {
       this._updateSmartTrafficLane(items, delta);
+    });
+  }
+
+  _updateWaterFlow(delta) {
+    if (!this.waterFlowItems.length) return;
+    const boardWrap = (MAX_TILE - MIN_TILE + 12) * TILE_SIZE;
+    this.waterFlowItems.forEach((item) => {
+      const data = item.userData.waterFlow;
+      if (!data) return;
+      data.age = (data.age || 0) + delta;
+      item.position.x += data.speed * delta;
+      item.position.y = data.baseY + Math.sin(data.age * data.rate + data.phase) * data.amp;
+      const wrap = data.wrap || boardWrap;
+      if (item.position.x > wrap) item.position.x -= wrap * 2;
+      if (item.position.x < -wrap) item.position.x += wrap * 2;
+      const pulse = 0.84 + Math.sin(data.age * 4.5 + data.phase) * 0.12;
+      item.scale.y = Math.max(0.72, pulse);
     });
   }
 
@@ -687,38 +717,47 @@ export class RoadQuestGame {
   }
 
   _spawnSplash(x, y) {
-    const material = this.materials.waterFoam;
-    const makeDrop = (index) => {
-      const geometry = new THREE.BoxGeometry(5 + (index % 3) * 2, 3, 4 + (index % 2) * 2);
-      const drop = new THREE.Mesh(geometry, material);
-      drop.position.set(x, y, 8 + (index % 4));
+    const foam = this.materials.waterFoam;
+    const bright = this.materials.waterBright;
+    const makeDrop = (index, ring = 0) => {
+      const geometry = new THREE.BoxGeometry(4 + (index % 4) * 1.8, 2.5 + ring, 3.5 + (index % 3) * 1.4);
+      const drop = new THREE.Mesh(geometry, index % 3 === 0 ? bright : foam);
+      drop.position.set(
+        x + (Math.random() - 0.5) * 12,
+        y + (Math.random() - 0.5) * 9,
+        3 + ring * 2 + Math.random() * 5
+      );
       drop.castShadow = false;
       drop.receiveShadow = false;
-      const angle = (Math.PI * 2 * index) / 13;
-      const radius = 28 + (index % 5) * 8;
+      const angle = (Math.PI * 2 * index) / 27 + ring * 0.21;
+      const radius = 42 + ring * 20 + (index % 6) * 7;
       drop.userData = {
         age: 0,
-        life: 0.56 + (index % 4) * 0.045,
+        life: 0.68 + Math.random() * 0.22,
         vx: Math.cos(angle) * radius,
-        vy: Math.sin(angle) * radius * 0.55,
-        vz: 58 + (index % 5) * 12
+        vy: Math.sin(angle) * radius * 0.62,
+        vz: 86 + ring * 20 + Math.random() * 45,
+        gravity: 220,
+        rx: (Math.random() - 0.5) * 8,
+        ry: (Math.random() - 0.5) * 8,
+        rz: (Math.random() - 0.5) * 12,
+        scaleEnd: 0.05
       };
       this.fxGroup.add(drop);
       this.fxItems.push(drop);
     };
 
-    for (let i = 0; i < 13; i += 1) makeDrop(i);
+    for (let i = 0; i < 34; i += 1) makeDrop(i, i % 2);
   }
-
 
   _spawnWaterBubbles(x, y) {
     const material = this.materials.waterFoam;
-    for (let i = 0; i < 5; i += 1) {
-      const geometry = new THREE.BoxGeometry(3 + (i % 2), 2, 2 + (i % 3));
+    for (let i = 0; i < 14; i += 1) {
+      const geometry = new THREE.BoxGeometry(3 + (i % 3), 2, 2 + (i % 4));
       const bubble = new THREE.Mesh(geometry, material);
       bubble.position.set(
-        x + (Math.random() - 0.5) * 26,
-        y + (Math.random() - 0.5) * 18,
+        x + (Math.random() - 0.5) * 42,
+        y + (Math.random() - 0.5) * 28,
         -6 + Math.random() * 5
       );
       bubble.castShadow = false;
@@ -737,8 +776,8 @@ export class RoadQuestGame {
 
   _spawnChickenImpactDebris(x, y, z, direction = 1, reason = 'traffic') {
     const trainHit = reason === 'train';
-    const featherCount = trainHit ? 26 : 18;
-    const bloodCount = trainHit ? 7 : 5;
+    const featherCount = trainHit ? 30 : 22;
+    const bloodCount = trainHit ? 20 : 13;
     const forwardPush = direction >= 0 ? 1 : -1;
 
     for (let i = 0; i < featherCount; i += 1) {
@@ -784,13 +823,13 @@ export class RoadQuestGame {
     }
 
     for (let i = 0; i < bloodCount; i += 1) {
-      const size = 2.2 + Math.random() * 2.3;
+      const size = 3.2 + Math.random() * 4.2;
       const geometry = new THREE.BoxGeometry(size, size, Math.max(1.8, size * 0.65));
       const drop = new THREE.Mesh(geometry, i % 3 === 0 ? this.materials.bloodDark : this.materials.blood);
       drop.position.set(
         x + forwardPush * (3 + Math.random() * 6),
         y + (Math.random() - 0.5) * 8,
-        z + 5 + Math.random() * 7
+        z + 4 + Math.random() * 10
       );
       drop.castShadow = false;
       drop.receiveShadow = false;
@@ -798,10 +837,10 @@ export class RoadQuestGame {
       drop.userData = {
         kind: 'blood',
         age: 0,
-        life: 0.42 + Math.random() * 0.25,
-        vx: forwardPush * (46 + Math.random() * 38),
-        vy: (Math.random() - 0.5) * 46,
-        vz: 48 + Math.random() * 38,
+        life: 0.72 + Math.random() * 0.32,
+        vx: forwardPush * (62 + Math.random() * 64),
+        vy: (Math.random() - 0.5) * 72,
+        vz: 58 + Math.random() * 58,
         gravity: 185,
         rx: (Math.random() - 0.5) * 10,
         ry: (Math.random() - 0.5) * 10,
@@ -810,6 +849,33 @@ export class RoadQuestGame {
       };
       this.fxGroup.add(drop);
       this.fxItems.push(drop);
+    }
+
+    for (let i = 0; i < (trainHit ? 9 : 6); i += 1) {
+      const sizeX = 5 + Math.random() * 10;
+      const sizeY = 3 + Math.random() * 7;
+      const geometry = new THREE.BoxGeometry(sizeX, sizeY, 1.2);
+      const splat = new THREE.Mesh(geometry, i % 2 ? this.materials.blood : this.materials.bloodDark);
+      splat.position.set(
+        x + forwardPush * (8 + Math.random() * 34),
+        y + (Math.random() - 0.5) * 34,
+        3.2
+      );
+      splat.castShadow = false;
+      splat.receiveShadow = false;
+      splat.rotation.z = Math.random() * Math.PI;
+      splat.userData = {
+        kind: 'blood-splat',
+        age: 0,
+        life: 1.18 + Math.random() * 0.45,
+        vx: forwardPush * (5 + Math.random() * 10),
+        vy: (Math.random() - 0.5) * 8,
+        vz: 0,
+        gravity: 0,
+        scaleEnd: 0.28
+      };
+      this.fxGroup.add(splat);
+      this.fxItems.push(splat);
     }
   }
 
@@ -926,9 +992,42 @@ export class RoadQuestGame {
         this.callbacks.onHazardSound({ kind: trainClass === 'bullet' ? 'bulletTrain' : 'train', speed, direction });
         if (trainClass !== 'bullet') this.callbacks.onHazardSound({ kind: 'trainHorn', speed, direction });
       }
-      if (type === 'vehicle' && distance < width * 0.5 + 56 && (!obstacle.userData.lastSoundAt || now - obstacle.userData.lastSoundAt > 1800)) {
-        obstacle.userData.lastSoundAt = now;
-        this.callbacks.onHazardSound({ kind: 'carHorn', speed, direction });
+      if (type === 'vehicle' && rowIndex === playerRow) {
+        const leadDistance = direction * (playerX - obstacle.position.x);
+        const frontClearance = width * 0.5 + PLAYER_WIDTH * 0.5;
+        const hornRange = frontClearance + 54;
+        const chickenIsDirectlyAhead = leadDistance > frontClearance && leadDistance < hornRange;
+        if (chickenIsDirectlyAhead && (!obstacle.userData.lastSoundAt || now - obstacle.userData.lastSoundAt > 1750)) {
+          obstacle.userData.lastSoundAt = now;
+          this.callbacks.onHazardSound({ kind: 'carHorn', speed, direction });
+        }
+      }
+    }
+  }
+
+  _checkNearMiss() {
+    if (!this.player || this.isImpacting || this.isGameOver || this.movement) return;
+    const nowMs = performance.now();
+    if (nowMs - this.lastNearMissAt < 1250) return;
+
+    const row = this.rows[this.playerPosition.row];
+    if (!row || row.type !== 'traffic') return;
+
+    const playerX = this.player.position.x;
+    for (const obstacle of this.vehicles) {
+      const { rowIndex, width, type, direction, currentSpeed, baseSpeed } = obstacle.userData;
+      if (type !== 'vehicle' || rowIndex !== this.playerPosition.row) continue;
+
+      const speed = currentSpeed || baseSpeed || 0;
+      const frontClearance = width * 0.5 + PLAYER_WIDTH * 0.5;
+      const leadDistance = direction * (playerX - obstacle.position.x);
+      const nearWindow = Math.min(44, Math.max(28, speed * 0.18));
+      const almostHit = leadDistance > frontClearance && leadDistance < frontClearance + nearWindow;
+
+      if (almostHit) {
+        this.lastNearMissAt = nowMs;
+        this.callbacks.onNearMiss({ score: this.score, row: this.playerPosition.row, speed });
+        break;
       }
     }
   }
@@ -954,7 +1053,7 @@ export class RoadQuestGame {
     this.isPlaying = false;
     this.impactStartedAt = performance.now();
     this.impactReason = reason;
-    this.impactDuration = reason === 'train' ? 1120 : reason === 'water' ? 980 : 880;
+    this.impactDuration = reason === 'train' ? 2120 : reason === 'water' ? 1980 : 1880;
     this.moveQueue = [];
     this.movement = null;
 
@@ -991,22 +1090,23 @@ export class RoadQuestGame {
     const recoil = easeOutCubic(1 - t);
 
     if (this.impactReason === 'water') {
-      const struggle = Math.sin(elapsed * 0.065) * (1 - t);
-      const wobbleX = Math.sin(elapsed * 0.043) * 5.5 * (1 - t);
-      const wobbleY = Math.cos(elapsed * 0.052) * 3.8 * (1 - t);
+      const struggle = Math.sin(elapsed * 0.095) * (1 - t);
+      const wobbleX = Math.sin(elapsed * 0.072) * 8.2 * (1 - t);
+      const wobbleY = Math.cos(elapsed * 0.083) * 6.4 * (1 - t);
       const sink = easeInOutQuad(t);
       this.player.position.x = this.waterImpactOrigin.x + wobbleX;
       this.player.position.y = this.waterImpactOrigin.y + wobbleY;
-      this.player.position.z = lerp(2, -26, sink) + struggle * 2.8;
+      this.player.position.z = lerp(0, -30, sink) + struggle * 3.6;
       this.player.scale.setScalar(baseScale * (1 - 0.22 * sink + 0.06 * Math.abs(struggle)));
       this.player.rotation.x = 0.08 + struggle * 0.16;
       this.player.rotation.y = Math.sin(elapsed * 0.071) * 0.22 * (1 - t);
       this.player.rotation.z = Math.sin(elapsed * 0.084) * 0.18 * (1 - t);
 
       const nowMs = performance.now();
-      if (t < 0.82 && nowMs - this.lastWaterStruggleFx > 105) {
+      if (t < 0.82 && nowMs - this.lastWaterStruggleFx > 95) {
         this.lastWaterStruggleFx = nowMs;
         this._spawnWaterBubbles(this.waterImpactOrigin.x, this.waterImpactOrigin.y);
+        if (t < 0.36 && Math.random() > 0.45) this._spawnSplash(this.waterImpactOrigin.x, this.waterImpactOrigin.y);
       }
     } else {
       this.player.position.x += this.impactVector.x * 0.42 * recoil;

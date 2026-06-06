@@ -10,6 +10,7 @@ The current background music file is:
 
 ```txt
 public/audio/mushroom-dance.ogg
+public/audio/kids-yay.mp3
 ```
 
 It is user-supplied media and is not automatically covered by the Apache-2.0 source-code license.
@@ -27,7 +28,7 @@ Prefer audio sources where the license is explicit and compatible with public ap
 Recommended asset policy:
 
 ```txt
-Do not add audio, image, or font assets unless the exact license is documented.
+Do not add audio, image, or font assets unless the exact license is documented. Sniglet is loaded from Google Fonts at runtime; do not bundle downloaded font files into this repository unless the license note is preserved.
 ```
 
 

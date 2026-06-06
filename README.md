@@ -7,7 +7,7 @@
 ![Three.js](https://img.shields.io/badge/Three.js-0.184-black?logo=threedotjs)
 ![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)
 
-**Voxel Crossing Game** is a lightweight browser mini-game built with **React, Vite, and Three.js**. It features a voxel chicken, smart traffic, 3-lane and 4-lane roads, trains, rivers, sinking wooden planks, high-score rewards, lazy-loaded background music, sound effects, a five-question learning quiz after game over, and responsive controls for desktop and mobile.
+**Voxel Crossing Game** is a lightweight browser mini-game built with **React, Vite, and Three.js**. It features a voxel chicken, smart traffic, 3-lane and 4-lane roads, trains, rivers, sinking wooden planks, high-score rewards, lazy-loaded background music, sound effects, a five-question learning quiz after every third game over, tactile quiz feedback, near-miss thrill text, bottom-cannon confetti, and responsive controls for desktop and mobile.
 
 Live demo after deployment:
 
@@ -31,9 +31,9 @@ It intentionally avoids third-party game branding and official game assets. The 
 - **Multiple road formats** including 3-lane and 4-lane road bands.
 - **Vehicle variety** including cars, pickups, vans, buses, trucks, tankers, containers, modern trains, classic trains, freight trains, and bullet trains.
 - **River hazard** with moving wooden planks that sink after being used too long.
-- **Dramatic feedback** with screen shake, feather burst, splash effect, high-score reward, and three-star reveal animation.
-- **Audio system** with lazy-loaded OGG background music and Web Audio sound effects.
-- **Post-game learning loop** with 5 randomized questions, shuffled answers, instant correct/wrong feedback, explanation text, and reward animation.
+- **Dramatic feedback** with screen shake, feather burst, splash effect, near-miss “NYARIS!” text, high-score reward, and three-star reveal animation.
+- **Audio system** with lazy-loaded OGG background music, automatic music pause during quiz, and Web Audio sound effects.
+- **Post-game learning loop** after every third game over with 5 randomized questions, shuffled answers, instant ballistic correct/wrong feedback, explanation text, and reward animation.
 - **In-game settings menu** for restart, high-score reset, music on/off, and sound-effect on/off.
 - **Automatic GitHub Pages deployment** through GitHub Actions.
 
@@ -120,14 +120,14 @@ This allows the game to become a route module inside an educational app. For exa
 
 ```txt
 .github/workflows/              CI and GitHub Pages deployment
-public/audio/                   Lazy-loaded background music
+public/audio/                   Lazy-loaded background music and reward SFX
 public/data/questionBanks.json   Learning quiz question bank loaded lazily after game over
 public/favicon.svg              App icon
 src/game/VoxelCrossing.jsx      React wrapper, HUD, menu, settings, keyboard start/restart, quiz flow
 src/game/RoadQuestGame.js       Three.js engine, camera, movement, collision, scoring
 src/game/renderers.js           Voxel player, vehicles, trains, rivers, planks, particles
 src/game/world.js               Procedural row generation and difficulty progression
-src/game/audio.js               Lazy-loaded music player, procedural sound effects, quiz feedback sounds
+src/game/audio.js               Lazy-loaded music player, procedural sound effects, quiz feedback and reward sounds
 src/game/VoxelCrossing.css      HUD, controls, menu, overlays, reward animation
 ```
 
@@ -135,7 +135,7 @@ src/game/VoxelCrossing.css      HUD, controls, menu, overlays, reward animation
 
 Source code is licensed under Apache-2.0.
 
-The included file `public/audio/mushroom-dance.ogg` is user-supplied media. The included `public/data/questionBanks.json` contains original practice questions supplied for learning use. Keep it only when you have the right to distribute it publicly. Otherwise, replace it with a confirmed CC0, MIT, Apache-2.0, or properly licensed chiptune loop before publishing a public app.
+The included files `public/audio/mushroom-dance.ogg` and `public/audio/kids-yay.mp3` are user-supplied media. The included `public/data/questionBanks.json` contains original practice questions supplied for learning use. Keep these assets only when you have the right to distribute them publicly. Otherwise, replace them with confirmed CC0, MIT, Apache-2.0, or properly licensed alternatives before publishing a public app.
 
 More details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [Asset licensing guide](docs/ASSET_LICENSING.md).
 
@@ -143,6 +143,7 @@ More details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [Asset 
 
 - The game is intentionally asset-light. Most visuals are generated from Three.js box/cuboid geometry.
 - Background music is lazy-loaded so the game can start quickly even if audio is still loading.
+- Reward audio is triggered only after user interaction and remains optional through settings.
 - Browser autoplay rules require a user interaction before music can play. The Start/Menu buttons unlock audio.
 - The Vite base path is automatically adjusted for GitHub Pages repository deployment.
 

@@ -133,6 +133,36 @@ function ProgressDots({ total, current }) {
   );
 }
 
+function ConfettiBurst({ burst }) {
+  if (!burst) return null;
+  const pieces = burst.level === 'gold' ? 84 : 68;
+  return (
+    <div key={burst.id} className={`confetti-layer ${burst.level || 'rainbow'}`} aria-hidden="true">
+      {Array.from({ length: pieces }, (_, index) => {
+        const side = index % 2 === 0 ? 0 : 1;
+        const origin = side === 0 ? 18 + ((index * 7) % 12) : 82 - ((index * 11) % 12);
+        const dxBase = side === 0 ? 90 + ((index * 29) % 220) : -90 - ((index * 31) % 220);
+        return (
+          <span
+            key={index}
+            className={`confetti-piece piece-${index % 8}`}
+            style={{
+              '--origin-x': `${origin}vw`,
+              '--dx': `${dxBase}px`,
+              '--dx2': `${Math.round(dxBase * 1.25)}px`,
+              '--apex': `${52 + ((index * 13) % 30)}dvh`,
+              '--delay': `${(index % 14) * 16}ms`,
+              '--dur': `${1180 + (index % 8) * 78}ms`,
+              '--rot': `${(index * 41) % 360}deg`,
+              '--spin': `${540 + (index % 5) * 180}deg`
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export default function VoxelCrossing({
   title = 'Voxel Crossing',
   subtitle = 'Bantu ayam menyeberang jalan, rel kereta, dan sungai. Hindari kendaraan, pilih timing yang tepat, dan kejar skor terbaik.',
@@ -151,6 +181,8 @@ export default function VoxelCrossing({
   const quizStartingRef = useRef(false);
   const gameOverCycleRef = useRef(0);
   const quizActiveMountedRef = useRef(false);
+  const confettiTimerRef = useRef(null);
+  const nearMissTimerRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -168,6 +200,8 @@ export default function VoxelCrossing({
   const [quizReveal, setQuizReveal] = useState(false);
   const [gameOversUntilQuiz, setGameOversUntilQuiz] = useState(GAME_OVERS_BEFORE_QUIZ);
   const [quiz, setQuiz] = useState(QUIZ_INITIAL);
+  const [confettiBurst, setConfettiBurst] = useState(null);
+  const [nearMissBurst, setNearMissBurst] = useState(null);
 
   useEffect(() => {
     audioRef.current = new GameAudio({
@@ -188,6 +222,24 @@ export default function VoxelCrossing({
     audioRef.current?.setMusicEnabled(settings.musicEnabled);
     audioRef.current?.setSfxEnabled(settings.sfxEnabled);
   }, [settings]);
+
+  useEffect(() => () => {
+    if (confettiTimerRef.current) window.clearTimeout(confettiTimerRef.current);
+    if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
+  }, []);
+
+  const triggerConfetti = (level = 'rainbow') => {
+    if (confettiTimerRef.current) window.clearTimeout(confettiTimerRef.current);
+    setConfettiBurst({ id: Date.now(), level });
+    confettiTimerRef.current = window.setTimeout(() => setConfettiBurst(null), 2100);
+  };
+
+  const triggerNearMiss = () => {
+    if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
+    setNearMissBurst({ id: Date.now() });
+    audioRef.current?.nearMiss?.();
+    nearMissTimerRef.current = window.setTimeout(() => setNearMissBurst(null), 980);
+  };
 
   const unlockAudio = () => {
     audioRef.current?.unlock();
@@ -258,6 +310,7 @@ export default function VoxelCrossing({
         if (kind === 'bulletTrain') audioRef.current?.trainPass(true);
         if (kind === 'trainHorn') audioRef.current?.trainHorn();
       },
+      onNearMiss: triggerNearMiss,
       onGameOver: (nextResult) => {
         const nextCycleCount = gameOverCycleRef.current + 1;
         const shouldStartQuiz = nextCycleCount >= GAME_OVERS_BEFORE_QUIZ;
@@ -305,6 +358,11 @@ export default function VoxelCrossing({
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameOver, result, menuOpen, quizDue, quiz.status]);
+
+  useEffect(() => {
+    const quizIsActive = ACTIVE_QUIZ_STATES.has(quiz.status);
+    if (quizIsActive) audioRef.current?.pauseMusic?.(180);
+  }, [quiz.status]);
 
   useEffect(() => {
     const quizIsActive = ACTIVE_QUIZ_STATES.has(quiz.status);
@@ -412,7 +470,12 @@ export default function VoxelCrossing({
   const nextQuizStep = () => {
     if (quiz.status !== 'running' || !quiz.selectedKey) return;
     if (quiz.index >= quiz.questions.length - 1) {
+      const stars = quiz.correctCount >= 5 ? 3 : quiz.correctCount >= 3 ? 2 : quiz.correctCount >= 1 ? 1 : 0;
       audioRef.current?.quizComplete(quiz.correctCount);
+      if (stars >= 2) {
+        audioRef.current?.kidsYayReward(stars);
+        triggerConfetti(stars >= 3 ? 'gold' : 'rainbow');
+      }
       setQuiz((current) => ({ ...current, status: 'complete', selectedKey: null, lastCorrect: null }));
       return;
     }
@@ -444,7 +507,11 @@ export default function VoxelCrossing({
     const timers = [0, 1, 2].map((index) => window.setTimeout(() => {
       audioRef.current?.rewardStar(index);
     }, 420 + index * 360));
-    timers.push(window.setTimeout(() => audioRef.current?.rewardComplete(), 1630));
+    timers.push(window.setTimeout(() => {
+      audioRef.current?.rewardComplete();
+      audioRef.current?.kidsYayReward(3);
+      triggerConfetti('gold');
+    }, 1630));
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [gameOver, result?.isNewHighScore]);
 
@@ -456,10 +523,6 @@ export default function VoxelCrossing({
       ? 'Kereta melintas sangat cepat. Amati ritmenya sebelum menyeberang rel.'
       : 'Tertabrak kendaraan. Perhatikan jarak dan kecepatan lane sebelum melompat.';
 
-  const restartHint = 'Tekan Space, Enter, WASD, atau Arrow untuk mulai lagi.';
-  const quizCountdownText = gameOversUntilQuiz <= 1
-    ? 'Quiz latihan muncul setelah game berikutnya.'
-    : `Quiz latihan muncul setelah ${gameOversUntilQuiz} game lagi.`;
   const currentQuizQuestion = quiz.questions[quiz.index];
   const quizAnswered = Boolean(quiz.selectedKey);
   const quizTotal = quiz.questions.length || QUIZ_SIZE;
@@ -468,6 +531,12 @@ export default function VoxelCrossing({
   return (
     <section className={`vc-shell ${orientationHint} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
       <div ref={hostRef} className="vc-host" />
+      <ConfettiBurst burst={confettiBurst} />
+      {nearMissBurst && (
+        <div key={nearMissBurst.id} className="near-miss-stinger" aria-hidden="true">
+          <span>NYARIS!</span>
+        </div>
+      )}
 
       {!ready && (
         <div className="vc-boot-loader" aria-live="polite">
@@ -588,9 +657,9 @@ export default function VoxelCrossing({
         <div className={`vc-overlay quiz ${quiz.status} ${quizReveal ? 'reveal' : ''} ${result?.isNewHighScore ? 'new-record' : ''}`}>
           <div className="quiz-card" role="dialog" aria-label="Quiz latihan">
             <div className="quiz-glow" aria-hidden="true" />
-            <div className="quiz-topline">
+            <div className="quiz-topline" aria-label={`Progress quiz. Score ${resultScore}, best ${highScore}`}>
               <span className="quiz-score-pill"><strong>{resultScore}</strong><small>Score</small></span>
-              <span className="quiz-title-pill">Belajar setelah bermain</span>
+              <ProgressDots total={quizTotal} current={Math.min(quiz.index, quizTotal - 1)} />
               <span className="quiz-score-pill"><strong>{highScore}</strong><small>Best</small></span>
             </div>
 
@@ -612,18 +681,9 @@ export default function VoxelCrossing({
 
             {quiz.status === 'running' && currentQuizQuestion && (
               <>
-                <div className="quiz-header">
-                  <div>
-                    <div className="quiz-kicker">Soal {quiz.index + 1} dari {quizTotal}</div>
-                    <h2>{currentQuizQuestion.questionText}</h2>
-                  </div>
-                  <ProgressDots total={quizTotal} current={quiz.index} />
-                </div>
-
-                <div className="quiz-meta">
-                  <span>{currentQuizQuestion.subject}</span>
-                  <span>{currentQuizQuestion.topic}</span>
-                  <span>{currentQuizQuestion.difficulty}</span>
+                <div className="quiz-question">
+                  <div className="quiz-question-count">Soal {quiz.index + 1} dari {quizTotal}</div>
+                  <h2>{currentQuizQuestion.questionText}</h2>
                 </div>
 
                 <div className="quiz-options">
@@ -677,7 +737,7 @@ export default function VoxelCrossing({
                 <h2>{quiz.correctCount} dari {quizTotal} benar</h2>
                 <p>{quiz.correctCount >= 4 ? 'Keren. Main lagi dan pertahankan streak belajarmu.' : 'Bagus. Main lagi, baca pelan-pelan, dan kumpulkan bintang lebih banyak.'}</p>
                 <div className="quiz-complete-actions">
-                  <button type="button" className="quiz-next-button primary" onClick={startGame}>Main Lagi</button>
+                  <button type="button" className="quiz-next-button primary" onClick={startGame}>Lanjut Game</button>
                 </div>
               </div>
             )}
@@ -698,13 +758,13 @@ export default function VoxelCrossing({
                   <span className="gold-star s3">★</span>
                 </div>
                 <h2>Score {resultScore}</h2>
-                <p className="reward-copy">Tiga bintang untuk rekor terbaikmu. {quizCountdownText}</p>
+                <p className="reward-copy">Tiga bintang untuk rekor terbaikmu. Pertahankan fokus dan cari jalur paling aman.</p>
               </>
             ) : (
               <>
                 <div className="mini-badge danger">Game Over</div>
                 <h2>Score {resultScore}</h2>
-                <p>{resultReasonText} {quizCountdownText} {restartHint}</p>
+                <p>{resultReasonText}</p>
               </>
             )}
             <button type="button" className="start-button" onClick={startGame}>Main Lagi</button>
@@ -731,7 +791,7 @@ export default function VoxelCrossing({
               <>
                 <div className="mini-badge danger">Game Over</div>
                 <h2>Score {resultScore}</h2>
-                <p>{resultReasonText} Best score: {highScore}. {restartHint}</p>
+                <p>{resultReasonText} Best score: {highScore}.</p>
               </>
             )}
             <button type="button" className="start-button" onClick={startGame}>Main Lagi</button>
