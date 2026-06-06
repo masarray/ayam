@@ -1,4 +1,4 @@
-# Voxel Crossing Game
+# Ayam SD
 
 [![CI](https://github.com/masarray/voxel-crossing-game/actions/workflows/ci.yml/badge.svg)](https://github.com/masarray/voxel-crossing-game/actions/workflows/ci.yml)
 [![Deploy GitHub Pages](https://github.com/masarray/voxel-crossing-game/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/masarray/voxel-crossing-game/actions/workflows/deploy-pages.yml)
@@ -7,7 +7,7 @@
 ![Three.js](https://img.shields.io/badge/Three.js-0.184-black?logo=threedotjs)
 ![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)
 
-**Voxel Crossing Game** is a lightweight browser mini-game built with **React, Vite, and Three.js**. It features a voxel chicken, smart traffic, 3-lane and 4-lane roads, trains, rivers, sinking wooden planks, high-score rewards, lazy-loaded background music, sound effects, a five-question learning quiz after every third game over, tactile quiz feedback, near-miss thrill text, bottom-cannon confetti, and responsive controls for desktop and mobile.
+**Ayam SD** is a lightweight browser mini-game built with **React, Vite, and Three.js**. It features a voxel chicken, smart traffic, 3-lane and 4-lane roads, trains, rivers, sinking wooden planks, high-score rewards, lazy-loaded background music, sound effects, a five-question learning quiz after every third game over, tactile quiz feedback, near-miss thrill text, bottom-cannon confetti, and responsive controls for desktop and mobile.
 
 Live demo after deployment:
 
@@ -15,7 +15,7 @@ Live demo after deployment:
 https://masarray.github.io/voxel-crossing-game/
 ```
 
-![Voxel Crossing gameplay preview](docs/assets/gameplay-preview.png)
+![Ayam SD gameplay preview](docs/assets/gameplay-preview.png)
 
 ## Why this project exists
 

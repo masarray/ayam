@@ -44,7 +44,7 @@ export class GameAudio {
     this.musicSuppressed = false;
   }
 
-  async unlock() {
+  async unlock({ allowMusic = true } = {}) {
     const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
 
     if (AudioContextCtor && !this.ctx) {
@@ -74,7 +74,7 @@ export class GameAudio {
     }
 
     if (this.sfxEnabled) this._ensureKidsYay();
-    if (this.musicEnabled && !this.musicSuppressed) this.startMusic();
+    if (allowMusic && this.musicEnabled && !this.musicSuppressed) this.startMusic();
   }
 
   setSfxEnabled(enabled) {
@@ -91,6 +91,7 @@ export class GameAudio {
     if (!this.musicEnabled || this.musicSuppressed) {
       this.stopMusicTimer();
       if (this.bgm) {
+        this.bgm.muted = true;
         this.bgm.pause();
         this.bgm.volume = 0;
       }
@@ -116,6 +117,7 @@ export class GameAudio {
     const audio = this.bgm;
     const startVolume = audio.volume || 0;
     if (fadeMs <= 0 || startVolume <= 0.01) {
+      audio.muted = true;
       audio.pause();
       audio.volume = 0;
       return;
@@ -172,6 +174,13 @@ export class GameAudio {
     audio.preload = 'none';
     audio.volume = this.musicEnabled ? this.musicVolume : 0;
     audio.addEventListener('canplaythrough', () => { this.bgmReady = true; }, { once: true });
+    audio.addEventListener('play', () => {
+      if (this.musicSuppressed || !this.musicEnabled) {
+        audio.muted = true;
+        audio.pause();
+        audio.volume = 0;
+      }
+    });
     audio.addEventListener('error', () => { this.bgmError = true; }, { once: true });
     this.bgm = audio;
     return this.bgm;
@@ -258,6 +267,7 @@ export class GameAudio {
     if (!bgm) return;
 
     this.bgmRequested = true;
+    bgm.muted = false;
     bgm.volume = this.musicVolume;
 
     // HTMLAudioElement streams the supplied OGG lazily. Gameplay never waits for this promise.

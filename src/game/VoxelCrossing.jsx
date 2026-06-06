@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RoadQuestGame } from './RoadQuestGame.js';
 import { GameAudio } from './audio.js';
-import { getBadgeCount, loadPlayerProfile, savePlayerProfile, trackBadgeEvent } from './badges.js';
+import { BADGE_FAMILIES, getBadgeCount, loadPlayerProfile, savePlayerProfile, trackBadgeEvent } from './badges.js';
 import './VoxelCrossing.css';
 
 const SETTINGS_KEY = 'ayam-sd-settings';
@@ -66,6 +66,15 @@ function normalizeDifficulty(value) {
   return 'Latihan';
 }
 
+function cleanQuestionText(text) {
+  return String(text || '')
+    .replace(/^\s*bacalah\s+stimulus\s+berikut\s*[.:!\-–—]*\s*/i, '')
+    .replace(/^\s*stimulus\s*[.:!\-–—]*\s*/i, '')
+    .replace(/\n\s*bacalah\s+stimulus\s+berikut\s*[.:!\-–—]*\s*/gi, '\n')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function flattenQuestionBanks(data) {
   const banks = Array.isArray(data) ? data : [data];
   return banks.flatMap((bank) => {
@@ -88,7 +97,7 @@ function flattenQuestionBanks(data) {
         subject: question.subject || subject,
         topic: question.topic || question.subtopic || 'Campuran',
         difficulty: normalizeDifficulty(question.difficulty),
-        questionText: question.questionText.trim(),
+        questionText: cleanQuestionText(question.questionText),
         explanationText: question.explanationText || 'Jawaban benar sudah ditandai hijau.',
         answerKey: question.answer,
         options: question.options
@@ -188,6 +197,111 @@ function BadgeUnlockOverlay({ badge, onClose }) {
   );
 }
 
+
+function getFamilyProgress(profile, family) {
+  const tiers = family.tiers || [];
+  const counterName = family.counter;
+  const unlocked = new Set(profile?.unlockedBadges || []);
+  const currentValue = Math.max(...tiers.map((tier) => Number(profile?.[tier.counter || counterName] || 0)), 0);
+  const unlockedCount = tiers.filter((tier) => unlocked.has(tier.id)).length;
+  const nextTier = tiers.find((tier) => !unlocked.has(tier.id));
+  return {
+    currentValue,
+    unlockedCount,
+    total: tiers.length,
+    nextTier,
+    percent: nextTier ? Math.min(100, Math.round((Number(profile?.[nextTier.counter || counterName] || 0) / nextTier.threshold) * 100)) : 100
+  };
+}
+
+function buildShareText(profile) {
+  const unlocked = profile?.unlockedBadges?.length || 0;
+  const total = getBadgeCount();
+  return `Aku sudah buka ${unlocked}/${total} badge di Ayam SD. Score terbaikku ${profile?.bestRunScore || 0}. Yuk main dan belajar bareng!`;
+}
+
+function BadgeBoardOverlay({ profile, onClose }) {
+  const [shareState, setShareState] = useState('idle');
+  const unlocked = new Set(profile?.unlockedBadges || []);
+  const unlockedCount = profile?.unlockedBadges?.length || 0;
+  const totalCount = getBadgeCount();
+
+  const shareBoard = async () => {
+    const textToShare = buildShareText(profile);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Ayam SD - Papan Badge', text: textToShare });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textToShare);
+      }
+      setShareState('done');
+      window.setTimeout(() => setShareState('idle'), 1400);
+    } catch {
+      setShareState('idle');
+    }
+  };
+
+  return (
+    <div className="badge-board-overlay" role="dialog" aria-label="Papan badge Ayam SD">
+      <div className="badge-board-card">
+        <div className="badge-board-head">
+          <div>
+            <span className="mini-badge gold">Papan Badge</span>
+            <h2>Koleksi Prestasimu</h2>
+            <p>{unlockedCount} dari {totalCount} badge terbuka. Badge gelap berarti masih terkunci.</p>
+          </div>
+          <button type="button" className="icon-close" onClick={onClose} aria-label="Tutup papan badge">×</button>
+        </div>
+
+        <div className="badge-board-summary">
+          <div><strong>{profile?.bestRunScore || 0}</strong><span>Best Score</span></div>
+          <div><strong>{profile?.nearMisses || 0}</strong><span>Nyaris</span></div>
+          <div><strong>{profile?.totalCorrectAnswers || 0}</strong><span>Jawaban Benar</span></div>
+          <div><strong>{unlockedCount}</strong><span>Badge</span></div>
+        </div>
+
+        <div className="badge-family-list">
+          {BADGE_FAMILIES.map((family) => {
+            const progress = getFamilyProgress(profile, family);
+            return (
+              <section className="badge-family-card" key={family.family}>
+                <div className="badge-family-title">
+                  <div>
+                    <strong>{family.label}</strong>
+                    <small>{progress.unlockedCount}/{progress.total} terbuka</small>
+                  </div>
+                  <span>{progress.nextTier ? `${progress.currentValue}/${progress.nextTier.threshold}` : 'Selesai'}</span>
+                </div>
+                <div className="badge-family-progress" aria-hidden="true"><i style={{ width: `${progress.percent}%` }} /></div>
+                <div className="badge-grid">
+                  {family.tiers.map((badge) => {
+                    const isUnlocked = unlocked.has(badge.id);
+                    const counterValue = Number(profile?.[badge.counter || family.counter] || 0);
+                    const pct = Math.min(100, Math.round((counterValue / badge.threshold) * 100));
+                    return (
+                      <div className={`badge-tile ${isUnlocked ? 'unlocked' : 'locked'} tier-${badge.tier}`} key={badge.id}>
+                        <div className="badge-tile-medal"><span>{badge.emoji}</span></div>
+                        <strong>{badge.name}</strong>
+                        <small>{isUnlocked ? 'Terbuka' : `${counterValue}/${badge.threshold}`}</small>
+                        {!isUnlocked && <div className="badge-tile-lock"><i style={{ width: `${pct}%` }} /></div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+
+        <div className="badge-board-actions">
+          <button type="button" className="badge-share-button" onClick={shareBoard}>{shareState === 'done' ? 'Teks Disalin!' : 'Bagikan Progress'}</button>
+          <button type="button" className="badge-continue" onClick={onClose}>Kembali</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function questionLengthClass(questionText = '') {
   const length = questionText.length;
   if (length > 150) return 'q-xlong';
@@ -240,6 +354,7 @@ export default function VoxelCrossing({
   const [nearMissBurst, setNearMissBurst] = useState(null);
   const [playerProfile, setPlayerProfile] = useState(() => loadPlayerProfile());
   const [activeBadge, setActiveBadge] = useState(null);
+  const [badgeBoardOpen, setBadgeBoardOpen] = useState(false);
   const playerProfileRef = useRef(playerProfile);
 
   useEffect(() => {
@@ -320,8 +435,10 @@ export default function VoxelCrossing({
     nearMissTimerRef.current = window.setTimeout(() => setNearMissBurst(null), 980);
   };
 
-  const unlockAudio = () => {
-    audioRef.current?.unlock();
+  const unlockAudio = ({ allowMusic = true } = {}) => {
+    const quizMusicLocked = quizDue || ACTIVE_QUIZ_STATES.has(quiz.status);
+    audioRef.current?.setMusicSuppressed?.(!allowMusic || quizMusicLocked);
+    audioRef.current?.unlock({ allowMusic: allowMusic && !quizMusicLocked });
   };
 
   async function loadQuestionPool() {
@@ -440,9 +557,9 @@ export default function VoxelCrossing({
   }, [gameOver, result, menuOpen, quizDue, quiz.status]);
 
   useEffect(() => {
-    const quizIsActive = ACTIVE_QUIZ_STATES.has(quiz.status);
-    audioRef.current?.setMusicSuppressed?.(quizIsActive);
-  }, [quiz.status]);
+    const quizMusicLocked = quizDue || ACTIVE_QUIZ_STATES.has(quiz.status);
+    audioRef.current?.setMusicSuppressed?.(quizMusicLocked);
+  }, [quiz.status, quizDue]);
 
   useEffect(() => {
     const quizIsActive = ACTIVE_QUIZ_STATES.has(quiz.status);
@@ -471,6 +588,7 @@ export default function VoxelCrossing({
     menuPausedRef.current = false;
     setMenuOpen(false);
     setSettingsOpen(false);
+    setBadgeBoardOpen(false);
     setImpacting(false);
     setGameOver(false);
     setResult(null);
@@ -480,6 +598,7 @@ export default function VoxelCrossing({
     setStarted(true);
     setScore(0);
     setLastRunScore(0);
+    window.setTimeout(() => audioRef.current?.setMusicSuppressed?.(false), 0);
   };
 
   const resumeGame = () => {
@@ -504,6 +623,7 @@ export default function VoxelCrossing({
     menuPausedRef.current = Boolean(started && !gameOver);
     if (started && !gameOver) pauseGame();
     setSettingsOpen(false);
+    setBadgeBoardOpen(false);
     setMenuOpen(true);
   };
 
@@ -515,6 +635,7 @@ export default function VoxelCrossing({
     menuPausedRef.current = false;
     setMenuOpen(false);
     setSettingsOpen(false);
+    setBadgeBoardOpen(false);
   };
 
   const resetHighScore = () => {
@@ -524,7 +645,7 @@ export default function VoxelCrossing({
   };
 
   const updateSetting = (key, value) => {
-    unlockAudio();
+    unlockAudio({ allowMusic: !ACTIVE_QUIZ_STATES.has(quiz.status) && !quizDue });
     setSettings((current) => ({ ...current, [key]: Boolean(value) }));
   };
 
@@ -537,7 +658,8 @@ export default function VoxelCrossing({
 
   const answerCurrentQuestion = (answerKey) => {
     if (quiz.status !== 'running' || quiz.selectedKey) return;
-    unlockAudio();
+    unlockAudio({ allowMusic: false });
+    audioRef.current?.setMusicSuppressed?.(true);
     const question = quiz.questions[quiz.index];
     const isCorrect = answerKey === question.answerKey;
     if (isCorrect) {
@@ -555,6 +677,7 @@ export default function VoxelCrossing({
   };
 
   const nextQuizStep = () => {
+    audioRef.current?.setMusicSuppressed?.(true);
     if (quiz.status !== 'running' || !quiz.selectedKey) return;
     if (quiz.index >= quiz.questions.length - 1) {
       const stars = quiz.correctCount >= 5 ? 3 : quiz.correctCount >= 3 ? 2 : quiz.correctCount >= 1 ? 1 : 0;
@@ -680,7 +803,8 @@ export default function VoxelCrossing({
               <button type="button" className="menu-action primary" onClick={startGame} disabled={!ready}>Mulai Main</button>
             )}
             <button type="button" className="menu-action" onClick={startGame} disabled={!ready}>Restart</button>
-            <button type="button" className={`menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => setSettingsOpen((open) => !open)}>Settings</button>
+            <button type="button" className={`menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}>Papan Badge</button>
+            <button type="button" className={`menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}>Settings</button>
           </div>
 
           {settingsOpen && (
@@ -715,6 +839,10 @@ export default function VoxelCrossing({
             </div>
           )}
         </div>
+      )}
+
+      {badgeBoardOpen && (
+        <BadgeBoardOverlay profile={playerProfile} onClose={() => setBadgeBoardOpen(false)} />
       )}
 
       <div className="vc-controls" aria-label="Kontrol game">

@@ -435,8 +435,12 @@ export class RoadQuestGame {
     const completedDirection = this.movement.direction;
     this.playerPosition = { ...this.movement.to };
     this._setPlayerWorldPosition(this.playerPosition.row, this.playerPosition.tile, completedDirection);
-    this.waterGraceUntil = performance.now() + 105;
+    const landedRow = this.rows[this.playerPosition.row];
+    // Water must be decided on landing. Without this guard, a fast repeated tap can
+    // queue the next hop and let the chicken cross water without touching a plank.
+    this.waterGraceUntil = landedRow?.type === 'water' ? 0 : performance.now() + 105;
     this.movement = null;
+    if (landedRow?.type === 'water') this._updateWaterState(0);
 
     if (this.playerPosition.row > this.highestRow) {
       this.highestRow = this.playerPosition.row;
