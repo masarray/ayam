@@ -546,8 +546,9 @@ export default function VoxelCrossing({
           <div className="quiz-card" role="dialog" aria-label="Quiz latihan">
             <div className="quiz-glow" aria-hidden="true" />
             <div className="quiz-topline">
-              <span>Score {resultScore}</span>
-              <span>Best {highScore}</span>
+              <span className="quiz-score-pill"><strong>{resultScore}</strong><small>Score</small></span>
+              <span className="quiz-title-pill">Belajar setelah bermain</span>
+              <span className="quiz-score-pill"><strong>{highScore}</strong><small>Best</small></span>
             </div>
 
             {result?.isNewHighScore && (
@@ -561,8 +562,8 @@ export default function VoxelCrossing({
             {quiz.status === 'loading' && (
               <div className="quiz-loading" aria-live="polite">
                 <div className="quiz-loader-ring" aria-hidden="true" />
-                <h2>Quiz siap dimulai…</h2>
-                <p>5 soal singkat setelah bermain.</p>
+                <h2>Quiz siap dimulai</h2>
+                <p>Jawab 5 soal. Lihat jawaban benar langsung setelah memilih.</p>
               </div>
             )}
 
@@ -570,7 +571,7 @@ export default function VoxelCrossing({
               <>
                 <div className="quiz-header">
                   <div>
-                    <div className="quiz-kicker">Quiz {quiz.index + 1} / {quizTotal}</div>
+                    <div className="quiz-kicker">Soal {quiz.index + 1} dari {quizTotal}</div>
                     <h2>{currentQuizQuestion.questionText}</h2>
                   </div>
                   <ProgressDots total={quizTotal} current={quiz.index} />
@@ -617,7 +618,7 @@ export default function VoxelCrossing({
                     </div>
                     <p>{currentQuizQuestion.explanationText}</p>
                     <button type="button" className="quiz-next-button" onClick={nextQuizStep}>
-                      {quiz.index >= quiz.questions.length - 1 ? 'Lihat Hasil Quiz' : 'Lanjut Soal'}
+                      {quiz.index >= quiz.questions.length - 1 ? 'Lihat Hasil' : 'Soal Berikutnya'}
                     </button>
                   </div>
                 )}
@@ -629,9 +630,9 @@ export default function VoxelCrossing({
                 <div className="quiz-complete-stars" aria-hidden="true">
                   {[0, 1, 2].map((star) => <span key={star} className={star < learningStars ? 'active' : ''}>★</span>)}
                 </div>
-                <div className="mini-badge gold">Quiz Selesai</div>
+                <div className="mini-badge gold">Misi Belajar Selesai</div>
                 <h2>{quiz.correctCount} dari {quizTotal} benar</h2>
-                <p>{quiz.correctCount >= 4 ? 'Keren. Main lagi, lalu kunci 5 benar.' : 'Bagus. Coba lagi, baca pelan-pelan, dan naikkan skor belajarmu.'}</p>
+                <p>{quiz.correctCount >= 4 ? 'Keren. Main lagi dan pertahankan streak belajarmu.' : 'Bagus. Main lagi, baca pelan-pelan, dan kumpulkan bintang lebih banyak.'}</p>
                 <div className="quiz-complete-actions">
                   <button type="button" className="quiz-next-button primary" onClick={startGame}>Main Lagi</button>
                 </div>
