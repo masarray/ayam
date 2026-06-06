@@ -1,0 +1,20 @@
+{
+  "name": "voxel-crossing-game",
+  "version": "1.7.0",
+  "private": true,
+  "type": "module",
+  "description": "Lightweight Three.js voxel crossing mini game with smart traffic, multi-lane roads, trains, river planks, high-score rewards, in-game menu, lazy-loaded background music, splash impact, and dynamic shadows.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "clean": "node -e \"import('fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "three": "^0.184.0",
+    "vite": "^8.0.16"
+  }
+}
