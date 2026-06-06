@@ -79,7 +79,7 @@ function laneProgress(vehicle, direction, wrapMin, wrapMax) {
   return direction > 0 ? vehicle.position.x - wrapMin : wrapMax - vehicle.position.x;
 }
 
-const HIGH_SCORE_KEY = 'voxel-crossing-high-score';
+const HIGH_SCORE_KEY = 'ayam-sd-high-score';
 
 function readHighScore() {
   try {
@@ -134,7 +134,7 @@ export class RoadQuestGame {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     applyRendererQuality(this.renderer);
     this.renderer.domElement.className = 'vc-canvas';
-    this.renderer.domElement.setAttribute('aria-label', 'Voxel crossing game canvas');
+    this.renderer.domElement.setAttribute('aria-label', 'Ayam SD game canvas');
     this.renderer.domElement.setAttribute('role', 'img');
     this.container.appendChild(this.renderer.domElement);
 

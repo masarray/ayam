@@ -1,6 +1,6 @@
 {
-  "name": "Voxel Crossing Game",
-  "short_name": "Voxel Crossing",
+  "name": "Ayam SD",
+  "short_name": "Ayam SD",
   "description": "A lightweight Three.js voxel road-crossing game with cars, trains, rivers, and mobile controls.",
   "start_url": ".",
   "display": "standalone",

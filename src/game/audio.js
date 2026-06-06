@@ -41,6 +41,7 @@ export class GameAudio {
     this.bgmRequested = false;
     this.bgmReady = false;
     this.bgmError = false;
+    this.musicSuppressed = false;
   }
 
   async unlock() {
@@ -73,7 +74,7 @@ export class GameAudio {
     }
 
     if (this.sfxEnabled) this._ensureKidsYay();
-    if (this.musicEnabled) this.startMusic();
+    if (this.musicEnabled && !this.musicSuppressed) this.startMusic();
   }
 
   setSfxEnabled(enabled) {
@@ -87,7 +88,7 @@ export class GameAudio {
   setMusicEnabled(enabled) {
     this.musicEnabled = Boolean(enabled);
 
-    if (!this.musicEnabled) {
+    if (!this.musicEnabled || this.musicSuppressed) {
       this.stopMusicTimer();
       if (this.bgm) {
         this.bgm.pause();
@@ -98,6 +99,15 @@ export class GameAudio {
 
     if (this.bgm) this.bgm.volume = this.musicVolume;
     this.startMusic();
+  }
+
+  setMusicSuppressed(suppressed) {
+    this.musicSuppressed = Boolean(suppressed);
+    if (this.musicSuppressed) {
+      this.pauseMusic(120);
+      return;
+    }
+    this.resumeMusic();
   }
 
   pauseMusic(fadeMs = 160) {
@@ -124,7 +134,7 @@ export class GameAudio {
   }
 
   resumeMusic() {
-    if (!this.musicEnabled) return;
+    if (!this.musicEnabled || this.musicSuppressed) return;
     this.startMusic();
   }
 
@@ -243,7 +253,7 @@ export class GameAudio {
   }
 
   startMusic() {
-    if (!this.musicEnabled || this.bgmError) return;
+    if (!this.musicEnabled || this.musicSuppressed || this.bgmError) return;
     const bgm = this._ensureBgm();
     if (!bgm) return;
 

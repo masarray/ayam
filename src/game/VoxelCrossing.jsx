@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { RoadQuestGame } from './RoadQuestGame.js';
 import { GameAudio } from './audio.js';
+import { getBadgeCount, loadPlayerProfile, savePlayerProfile, trackBadgeEvent } from './badges.js';
 import './VoxelCrossing.css';
 
-const SETTINGS_KEY = 'voxel-crossing-settings';
+const SETTINGS_KEY = 'ayam-sd-settings';
 const QUIZ_SIZE = 5;
 const GAME_OVERS_BEFORE_QUIZ = 3;
 const QUIZ_APPEAR_DELAY_MS = 300;
@@ -163,9 +164,42 @@ function ConfettiBurst({ burst }) {
   );
 }
 
+
+function BadgeUnlockOverlay({ badge, onClose }) {
+  if (!badge) return null;
+  const tierLabel = `Tier ${badge.tier}`;
+  return (
+    <div className={`badge-unlock-overlay tier-${badge.tier}`} role="dialog" aria-live="polite" aria-label="Badge baru terbuka">
+      <div className="badge-unlock-card">
+        <div className="badge-aura" aria-hidden="true" />
+        <div className="badge-emblem" aria-hidden="true">
+          <span>{badge.emoji}</span>
+        </div>
+        <div className="mini-badge gold">Badge Baru</div>
+        <h2>{badge.name}</h2>
+        <p>{badge.copy}</p>
+        <div className="badge-meta">
+          <span>{badge.label}</span>
+          <span>{tierLabel}</span>
+        </div>
+        <button type="button" className="badge-continue" onClick={onClose}>Lanjut Game</button>
+      </div>
+    </div>
+  );
+}
+
+function questionLengthClass(questionText = '') {
+  const length = questionText.length;
+  if (length > 150) return 'q-xlong';
+  if (length > 105) return 'q-long';
+  if (length > 72) return 'q-medium';
+  return 'q-short';
+}
+
+
 export default function VoxelCrossing({
-  title = 'Voxel Crossing',
-  subtitle = 'Bantu ayam menyeberang jalan, rel kereta, dan sungai. Hindari kendaraan, pilih timing yang tepat, dan kejar skor terbaik.',
+  title = 'Ayam SD',
+  subtitle = 'Menyeberang, belajar, dan buka badge keren. Main terus, jawab soal, dan jadikan ayam kecilmu makin jago.',
   enableMilestoneCallback = false,
   milestoneEvery = 5,
   onQuestionGate,
@@ -183,6 +217,8 @@ export default function VoxelCrossing({
   const quizActiveMountedRef = useRef(false);
   const confettiTimerRef = useRef(null);
   const nearMissTimerRef = useRef(null);
+  const badgeQueueRef = useRef([]);
+  const badgeTimerRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -202,6 +238,9 @@ export default function VoxelCrossing({
   const [quiz, setQuiz] = useState(QUIZ_INITIAL);
   const [confettiBurst, setConfettiBurst] = useState(null);
   const [nearMissBurst, setNearMissBurst] = useState(null);
+  const [playerProfile, setPlayerProfile] = useState(() => loadPlayerProfile());
+  const [activeBadge, setActiveBadge] = useState(null);
+  const playerProfileRef = useRef(playerProfile);
 
   useEffect(() => {
     audioRef.current = new GameAudio({
@@ -226,6 +265,7 @@ export default function VoxelCrossing({
   useEffect(() => () => {
     if (confettiTimerRef.current) window.clearTimeout(confettiTimerRef.current);
     if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
+    if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
   }, []);
 
   const triggerConfetti = (level = 'rainbow') => {
@@ -234,10 +274,49 @@ export default function VoxelCrossing({
     confettiTimerRef.current = window.setTimeout(() => setConfettiBurst(null), 2100);
   };
 
+  const showNextBadge = () => {
+    if (activeBadge || badgeQueueRef.current.length === 0) return;
+    const [nextBadge, ...remaining] = badgeQueueRef.current;
+    badgeQueueRef.current = remaining;
+    setActiveBadge(nextBadge);
+    triggerConfetti(nextBadge.tier >= 3 ? 'gold' : 'rainbow');
+    audioRef.current?.kidsYayReward?.(nextBadge.tier >= 3 ? 3 : 2);
+  };
+
+  const enqueueBadges = (badges) => {
+    if (!badges?.length) return;
+    badgeQueueRef.current = [...badgeQueueRef.current, ...badges];
+    window.requestAnimationFrame(showNextBadge);
+  };
+
+  const closeBadge = () => {
+    setActiveBadge(null);
+    if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
+    badgeTimerRef.current = window.setTimeout(() => {
+      if (badgeQueueRef.current.length === 0) return;
+      const [nextBadge, ...remaining] = badgeQueueRef.current;
+      badgeQueueRef.current = remaining;
+      setActiveBadge(nextBadge);
+      triggerConfetti(nextBadge.tier >= 3 ? 'gold' : 'rainbow');
+      audioRef.current?.kidsYayReward?.(nextBadge.tier >= 3 ? 3 : 2);
+    }, 120);
+  };
+
+  const trackProfileEvent = (eventName, payload = {}) => {
+    const next = trackBadgeEvent(playerProfileRef.current, eventName, payload);
+    playerProfileRef.current = next.profile;
+    savePlayerProfile(next.profile);
+    setPlayerProfile(next.profile);
+    if (next.newBadges.length) {
+      window.setTimeout(() => enqueueBadges(next.newBadges), 0);
+    }
+  };
+
   const triggerNearMiss = () => {
     if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
     setNearMissBurst({ id: Date.now() });
     audioRef.current?.nearMiss?.();
+    trackProfileEvent('near_miss');
     nearMissTimerRef.current = window.setTimeout(() => setNearMissBurst(null), 980);
   };
 
@@ -327,6 +406,7 @@ export default function VoxelCrossing({
         setQuizDue(shouldStartQuiz);
         setQuizReveal(false);
         setGameOversUntilQuiz(shouldStartQuiz ? 0 : GAME_OVERS_BEFORE_QUIZ - nextCycleCount);
+        trackProfileEvent('game_over', { score: nextResult.score });
         onGameOver?.(nextResult);
       },
       onMilestone: (payload) => onQuestionGate?.(payload)
@@ -361,7 +441,7 @@ export default function VoxelCrossing({
 
   useEffect(() => {
     const quizIsActive = ACTIVE_QUIZ_STATES.has(quiz.status);
-    if (quizIsActive) audioRef.current?.pauseMusic?.(180);
+    audioRef.current?.setMusicSuppressed?.(quizIsActive);
   }, [quiz.status]);
 
   useEffect(() => {
@@ -383,7 +463,10 @@ export default function VoxelCrossing({
   }, [quiz.status]);
 
   const startGame = () => {
+    const wasGameOver = gameOver && Boolean(result);
     unlockAudio();
+    if (wasGameOver) trackProfileEvent('restart_after_game_over');
+    trackProfileEvent('run_started');
     gameRef.current?.reset(true);
     menuPausedRef.current = false;
     setMenuOpen(false);
@@ -457,8 +540,12 @@ export default function VoxelCrossing({
     unlockAudio();
     const question = quiz.questions[quiz.index];
     const isCorrect = answerKey === question.answerKey;
-    if (isCorrect) audioRef.current?.quizCorrect();
-    else audioRef.current?.quizWrong();
+    if (isCorrect) {
+      audioRef.current?.quizCorrect();
+      trackProfileEvent('quiz_correct');
+    } else {
+      audioRef.current?.quizWrong();
+    }
     setQuiz((current) => ({
       ...current,
       selectedKey: answerKey,
@@ -476,6 +563,7 @@ export default function VoxelCrossing({
         audioRef.current?.kidsYayReward(stars);
         triggerConfetti(stars >= 3 ? 'gold' : 'rainbow');
       }
+      trackProfileEvent('quiz_finished', { stars });
       setQuiz((current) => ({ ...current, status: 'complete', selectedKey: null, lastCorrect: null }));
       return;
     }
@@ -532,6 +620,7 @@ export default function VoxelCrossing({
     <section className={`vc-shell ${orientationHint} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
       <div ref={hostRef} className="vc-host" />
       <ConfettiBurst burst={confettiBurst} />
+      <BadgeUnlockOverlay badge={activeBadge} onClose={closeBadge} />
       {nearMissBurst && (
         <div key={nearMissBurst.id} className="near-miss-stinger" aria-hidden="true">
           <span>NYARIS!</span>
@@ -576,6 +665,12 @@ export default function VoxelCrossing({
               <span>{menuPausedRef.current ? 'Game dijeda' : 'Atur game'}</span>
             </div>
             <button type="button" className="icon-close" onClick={() => closeMenu({ resume: menuPausedRef.current })} aria-label="Tutup menu">×</button>
+          </div>
+
+          <div className="badge-progress-pill" aria-label={`Badge terbuka ${playerProfile.unlockedBadges.length} dari ${getBadgeCount()}`}>
+            <span>🏅</span>
+            <strong>{playerProfile.unlockedBadges.length}/{getBadgeCount()}</strong>
+            <small>Badge terbuka</small>
           </div>
 
           <div className="menu-actions">
@@ -681,7 +776,7 @@ export default function VoxelCrossing({
 
             {quiz.status === 'running' && currentQuizQuestion && (
               <>
-                <div className="quiz-question">
+                <div className={`quiz-question ${questionLengthClass(currentQuizQuestion.questionText)}`}>
                   <div className="quiz-question-count">Soal {quiz.index + 1} dari {quizTotal}</div>
                   <h2>{currentQuizQuestion.questionText}</h2>
                 </div>
