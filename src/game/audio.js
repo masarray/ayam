@@ -302,6 +302,31 @@ export class GameAudio {
     this._tone({ type: 'triangle', frequency: 760, endFrequency: 390, duration: 0.08, gain: 0.032, delay: 0.06, decay: 0.08 });
   }
 
+
+  quizCorrect() {
+    if (!this._cooldown('quiz-correct', 160)) return;
+    this._tone({ type: 'sine', frequency: 523.25, endFrequency: 783.99, duration: 0.11, gain: 0.072, attack: 0.004, decay: 0.07 });
+    this._tone({ type: 'triangle', frequency: 659.25, endFrequency: 1046.5, duration: 0.14, gain: 0.056, attack: 0.004, decay: 0.08, delay: 0.08 });
+    this._tone({ type: 'sine', frequency: 1046.5, endFrequency: 1567.98, duration: 0.12, gain: 0.05, attack: 0.004, decay: 0.09, delay: 0.18 });
+    this._noise({ duration: 0.11, gain: 0.034, frequency: 5200, type: 'highpass', delay: 0.035 });
+  }
+
+  quizWrong() {
+    if (!this._cooldown('quiz-wrong', 190)) return;
+    this._tone({ type: 'sawtooth', frequency: 220, endFrequency: 150, duration: 0.12, gain: 0.062, attack: 0.006, decay: 0.08 });
+    this._tone({ type: 'triangle', frequency: 164, endFrequency: 116, duration: 0.16, gain: 0.052, attack: 0.006, decay: 0.1, delay: 0.08 });
+    this._noise({ duration: 0.08, gain: 0.032, frequency: 900, type: 'bandpass', delay: 0.02 });
+  }
+
+  quizComplete(correctCount = 0) {
+    if (!this._cooldown('quiz-complete', 700)) return;
+    const strong = correctCount >= 4;
+    this._tone({ type: 'triangle', frequency: 392, endFrequency: 523.25, duration: 0.13, gain: 0.055, decay: 0.07 });
+    this._tone({ type: 'triangle', frequency: 523.25, endFrequency: 659.25, duration: 0.13, gain: 0.058, delay: 0.11, decay: 0.07 });
+    this._tone({ type: 'triangle', frequency: 659.25, endFrequency: strong ? 1046.5 : 783.99, duration: 0.18, gain: 0.066, delay: 0.23, decay: 0.1 });
+    this._noise({ duration: 0.18, gain: strong ? 0.042 : 0.028, frequency: 4600, type: 'highpass', delay: 0.18 });
+  }
+
   rewardStar(index = 0) {
     const key = `reward-star-${index}`;
     if (!this._cooldown(key, 90)) return;

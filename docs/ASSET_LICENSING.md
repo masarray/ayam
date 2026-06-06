@@ -29,3 +29,8 @@ Recommended asset policy:
 ```txt
 Do not add audio, image, or font assets unless the exact license is documented.
 ```
+
+
+## Question bank
+
+`public/data/questionBanks.json` is included as user-supplied learning content. Keep it in the repository only when the question content is cleared for the intended public or private distribution.

@@ -42,3 +42,8 @@ export default function GamePage() {
 ## Design notes
 
 Keep the game canvas inside a stable parent container. The component uses `ResizeObserver` to adapt camera and layout to portrait or landscape.
+
+
+## Post-game quiz
+
+After a run ends, the game loads `public/data/questionBanks.json` lazily and presents 5 randomized questions. Answer order is shuffled for each question. Questions already shown in the current browser session are skipped until the pool is exhausted.
