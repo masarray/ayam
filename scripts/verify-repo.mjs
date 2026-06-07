@@ -47,8 +47,12 @@ if (!/railLine: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 3\.6, RAIL_HEAD_HE
   console.error('Rail geometry should use a slim raised rail-head profile and aligned wheel contact constants.');
   process.exit(1);
 }
-if (!/ROAD_WHITE_LINE_WIDTH = 0\.34/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 0\.52/.test(rendererSource)) {
-  console.error('Road side and yellow center markings should stay truly thin and readable.');
+if (!/ROAD_EDGE_WHITE_LINE_WIDTH = 0\.68/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 0\.58/.test(rendererSource)) {
+  console.error('Road edge and yellow center markings should stay visually narrow but stable enough to avoid mobile shimmer.');
+  process.exit(1);
+}
+if (!/ROAD_MARK_Z = 0\.28/.test(rendererSource) || !/ROAD_EDGE_MARK_Z = 0\.36/.test(rendererSource) || !/ROAD_YELLOW_MARK_Z = 0\.30/.test(rendererSource)) {
+  console.error('Road markings need dedicated Z lifts so thin lines do not fight with asphalt during camera movement.');
   process.exit(1);
 }
 if (!/ROAD_EDGE_LINE_INSET = 4\.25/.test(rendererSource) || !/ROAD_EDGE_SHOULDER_INSET = 1\.65/.test(rendererSource)) {
@@ -59,8 +63,12 @@ if (!/row\.roadLaneCount === 2 && !isLastLane/.test(rendererSource) || /row\.roa
   console.error('Two-lane roads must use a white dashed divider only, never yellow center markings.');
   process.exit(1);
 }
-if (!/roadLineLong: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 1, 0\.34\)/.test(rendererSource) || !/makeRoadLine/.test(rendererSource)) {
-  console.error('Continuous road markings must use flat line geometry, not scaled row slabs.');
+if (!/roadLineLong: new THREE\.PlaneGeometry\(ENDLESS_VISUAL_WIDTH, 1\)/.test(rendererSource) || !/roadDashMark: new THREE\.PlaneGeometry\(22, 2\)/.test(rendererSource) || !/roadEdgeLineLong: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, ROAD_EDGE_WHITE_LINE_WIDTH, 0\.08\)/.test(rendererSource) || !/roadShoulderLong: new THREE\.PlaneGeometry\(ENDLESS_VISUAL_WIDTH, 1\)/.test(rendererSource)) {
+  console.error('Road markings must use stable flat/low-profile geometry so edge lines do not shimmer or disappear during camera movement.');
+  process.exit(1);
+}
+if (!/makeRoadMark/.test(rendererSource) || !/polygonOffsetFactor: -8/.test(rendererSource) || !/renderOrder = 11/.test(rendererSource) || !/makeRoadEdgeLine/.test(rendererSource)) {
+  console.error('Road marking materials must use polygon offset, fixed render order, and dedicated edge-line geometry for stable mobile rendering.');
   process.exit(1);
 }
 

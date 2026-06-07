@@ -23,14 +23,28 @@ const TRAIN_WHEEL_CENTER_Z = RAIL_HEAD_TOP_Z + TRAIN_WHEEL_HALF_Z;
 const TRAIN_BOGIE_CENTER_Z = TRAIN_WHEEL_CENTER_Z - 1.05;
 const TRAIN_UNDERCARRIAGE_Z = TRAIN_WHEEL_CENTER_Z - 0.65;
 const TRAIN_BODY_LIFT_Z = 18.8;
-const ROAD_WHITE_LINE_WIDTH = 0.34;
-const ROAD_YELLOW_LINE_WIDTH = 0.52;
-const ROAD_DASH_SCALE_Y = 0.46;
+const ROAD_WHITE_LINE_WIDTH = 0.58;
+const ROAD_EDGE_WHITE_LINE_WIDTH = 0.68;
+const ROAD_YELLOW_LINE_WIDTH = 0.58;
+const ROAD_DASH_SCALE_Y = 0.54;
+const ROAD_MARK_Z = 0.28;
+const ROAD_EDGE_MARK_Z = 0.36;
+const ROAD_YELLOW_MARK_Z = 0.30;
 const ROAD_EDGE_LINE_INSET = 4.25;
 const ROAD_EDGE_SHOULDER_INSET = 1.65;
 
 export function createMaterials() {
   const make = (color, options = {}) => new THREE.MeshLambertMaterial({ color, ...options });
+  const makeRoadMark = (color, options = {}) => new THREE.MeshBasicMaterial({
+    color,
+    polygonOffset: true,
+    polygonOffsetFactor: -8,
+    polygonOffsetUnits: -8,
+    depthWrite: true,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+    ...options
+  });
   return {
     grass: make(COLORS.grass),
     grassAlt: make(COLORS.grassAlt),
@@ -39,8 +53,8 @@ export function createMaterials() {
     road: make(COLORS.road),
     roadAlt: make(COLORS.roadAlt),
     roadEdge: make(COLORS.roadEdge),
-    asphaltMark: make(COLORS.asphaltMark),
-    asphaltYellow: make(COLORS.asphaltYellow),
+    asphaltMark: makeRoadMark(COLORS.asphaltMark),
+    asphaltYellow: makeRoadMark(COLORS.asphaltYellow),
     water: make(COLORS.water),
     waterAlt: make(COLORS.waterAlt),
     waterDeep: make(COLORS.waterDeep),
@@ -92,7 +106,10 @@ export function createGeometryCache() {
     row: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, ROW_DEPTH, 5),
     rowWide: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, ROW_DEPTH, 5),
     roadStripe: new THREE.BoxGeometry(22, 2, 1),
-    roadLineLong: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 1, 0.34),
+    roadDashMark: new THREE.PlaneGeometry(22, 2),
+    roadLineLong: new THREE.PlaneGeometry(ENDLESS_VISUAL_WIDTH, 1),
+    roadEdgeLineLong: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, ROAD_EDGE_WHITE_LINE_WIDTH, 0.08),
+    roadShoulderLong: new THREE.PlaneGeometry(ENDLESS_VISUAL_WIDTH, 1),
     waterRipple: new THREE.BoxGeometry(26, 2, 1),
     waterWave: new THREE.BoxGeometry(54, 2.4, 1),
     waterSparkle: new THREE.BoxGeometry(9, 2, 1),
@@ -1106,55 +1123,73 @@ export function createRowGroup(row, geometries, materials) {
     const isFirstLane = !hasRoadBand || row.roadLaneIndex === 0;
     const isLastLane = !hasRoadBand || row.roadLaneIndex === row.roadLaneCount - 1;
 
-    const makeEdge = (edgeY, material = materials.roadEdge, thickness = 0.08, z = 0.1) => {
-      const edge = new THREE.Mesh(geometries.row, material);
-      edge.scale.set(1, thickness, 1);
+    const makeEdge = (edgeY, material = materials.roadEdge, thickness = 0.08, z = 0.08) => {
+      // Keep the dark shoulder flat. The old raised voxel strip could visually fight with
+      // the adjacent white edge line when the camera moved at an isometric angle.
+      const edge = new THREE.Mesh(geometries.roadShoulderLong, material);
+      edge.scale.set(1, thickness * ROW_DEPTH, 1);
       edge.position.set(0, edgeY, z);
       edge.receiveShadow = false;
       edge.castShadow = false;
+      edge.renderOrder = 4;
       group.add(edge);
       return edge;
     };
 
-    const makeRoadLine = (lineY, material, width, z = 1.72) => {
+    const makeRoadLine = (lineY, material, width, z = ROAD_MARK_Z) => {
       const line = new THREE.Mesh(geometries.roadLineLong, material);
       line.scale.set(1, width, 1);
       line.position.set(0, lineY, z);
       line.receiveShadow = false;
       line.castShadow = false;
+      line.renderOrder = 10;
       group.add(line);
       return line;
     };
 
-    const makeRoadDash = (tile, edgeY, material = materials.asphaltMark, z = 1.55) => {
-      const stripe = new THREE.Mesh(geometries.roadStripe, material);
+    const makeRoadEdgeLine = (lineY) => {
+      // Continuous edge lines are the most visible shimmer candidate. A very shallow
+      // raised cuboid gives the GPU a stable depth footprint while still reading as
+      // a slim road paint stripe from the camera angle.
+      const line = new THREE.Mesh(geometries.roadEdgeLineLong, materials.asphaltMark);
+      line.position.set(0, lineY, ROAD_EDGE_MARK_Z);
+      line.receiveShadow = false;
+      line.castShadow = false;
+      line.renderOrder = 11;
+      group.add(line);
+      return line;
+    };
+
+    const makeRoadDash = (tile, edgeY, material = materials.asphaltMark, z = ROAD_MARK_Z) => {
+      const stripe = new THREE.Mesh(geometries.roadDashMark, material);
       stripe.position.set(tileToX(tile, TILE_SIZE), edgeY, z);
-      stripe.scale.set(0.86, ROAD_DASH_SCALE_Y, 0.62);
+      stripe.scale.set(0.86, ROAD_DASH_SCALE_Y, 1);
       stripe.castShadow = false;
       stripe.receiveShadow = false;
+      stripe.renderOrder = 8;
       group.add(stripe);
     };
 
     if (!hasRoadBand) {
-      makeEdge(y - ROW_DEPTH / 2 + ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.5);
-      makeEdge(y + ROW_DEPTH / 2 - ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.5);
-      makeRoadLine(y - ROW_DEPTH / 2 + ROAD_EDGE_LINE_INSET, materials.asphaltMark, ROAD_WHITE_LINE_WIDTH, 1.72);
-      makeRoadLine(y + ROW_DEPTH / 2 - ROAD_EDGE_LINE_INSET, materials.asphaltMark, ROAD_WHITE_LINE_WIDTH, 1.72);
+      makeEdge(y - ROW_DEPTH / 2 + ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.08);
+      makeEdge(y + ROW_DEPTH / 2 - ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.08);
+      makeRoadEdgeLine(y - ROW_DEPTH / 2 + ROAD_EDGE_LINE_INSET);
+      makeRoadEdgeLine(y + ROW_DEPTH / 2 - ROAD_EDGE_LINE_INSET);
     } else {
       if (isFirstLane) {
-        makeEdge(y - ROW_DEPTH / 2 + ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.5);
-        makeRoadLine(y - ROW_DEPTH / 2 + ROAD_EDGE_LINE_INSET, materials.asphaltMark, ROAD_WHITE_LINE_WIDTH, 1.72);
+        makeEdge(y - ROW_DEPTH / 2 + ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.08);
+        makeRoadEdgeLine(y - ROW_DEPTH / 2 + ROAD_EDGE_LINE_INSET);
       }
 
       if (isLastLane) {
-        makeEdge(y + ROW_DEPTH / 2 - ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.5);
-        makeRoadLine(y + ROW_DEPTH / 2 - ROAD_EDGE_LINE_INSET, materials.asphaltMark, ROAD_WHITE_LINE_WIDTH, 1.72);
+        makeEdge(y + ROW_DEPTH / 2 - ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.08);
+        makeRoadEdgeLine(y + ROW_DEPTH / 2 - ROAD_EDGE_LINE_INSET);
       }
 
       if (row.roadLaneCount === 2 && !isLastLane) {
         const centerY = y + ROW_DEPTH / 2;
         for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 3) {
-          makeRoadDash(tile, centerY, materials.asphaltMark, 1.72);
+          makeRoadDash(tile, centerY, materials.asphaltMark);
         }
       }
 
@@ -1164,11 +1199,11 @@ export function createRowGroup(row, geometries, materials) {
       const separatesOpposingTraffic = row.roadLaneCount >= 3 && !isLastLane && nextLaneDirection !== row.direction;
       if (separatesOpposingTraffic) {
         const yellowGap = 3.5;
-        makeRoadLine(y + ROW_DEPTH / 2 - yellowGap, materials.asphaltYellow, ROAD_YELLOW_LINE_WIDTH, 1.9);
-        makeRoadLine(y + ROW_DEPTH / 2 + yellowGap, materials.asphaltYellow, ROAD_YELLOW_LINE_WIDTH, 1.9);
+        makeRoadLine(y + ROW_DEPTH / 2 - yellowGap, materials.asphaltYellow, ROAD_YELLOW_LINE_WIDTH, ROAD_YELLOW_MARK_Z);
+        makeRoadLine(y + ROW_DEPTH / 2 + yellowGap, materials.asphaltYellow, ROAD_YELLOW_LINE_WIDTH, ROAD_YELLOW_MARK_Z);
       } else if (!isLastLane && row.roadLaneCount !== 2) {
         for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 3) {
-          makeRoadDash(tile, y + ROW_DEPTH / 2 - 1, materials.asphaltMark, 1.7);
+          makeRoadDash(tile, y + ROW_DEPTH / 2 - 1, materials.asphaltMark);
         }
       }
     }

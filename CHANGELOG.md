@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.3.16 - White edge line stability fix
+
+- Fixed the regression where continuous white road-edge lines could shimmer or appear missing during camera movement.
+- Replaced raised dark shoulder voxel strips with flat shoulder planes so they no longer visually fight with adjacent white edge markings.
+- Added a dedicated low-profile raised geometry for continuous white edge lines while keeping yellow center lines stable.
+- Kept 2-lane roads free of yellow center markings and preserved the existing 3/4-lane road logic.
+
+## 3.3.15 - Road marking render stability
+- Fixed subtle shimmer/flicker on thin yellow lane separators and white road edge lines during camera movement.
+- Rebuilt road markings as flat, shadowless plane geometry with polygon offset and fixed render order instead of tiny voxel boxes.
+- Kept the 2-lane road rule: white dashed divider only, no yellow center line.
+- Preserved narrow edge-line alignment so vehicles remain visually inside the road boundary.
+
 ## 3.3.14 - Road marking alignment pass
 
 - Changed two-lane roads to use a white dashed center divider only, without yellow markings.
