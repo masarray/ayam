@@ -91,26 +91,26 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  min-width: 70px;
-  min-height: 38px;
-  padding: 7px 12px;
-  border-radius: 18px;
-  background: rgba(27, 34, 43, 0.34);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 15px 36px rgba(17, 26, 25, 0.16);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  gap: 9px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   pointer-events: none;
 }
 
 .life-hud span {
   font-family: "Segoe UI Symbol", "Apple Color Emoji", system-ui, sans-serif;
-  font-size: 22px;
+  font-size: 40px;
   line-height: 1;
   font-weight: 400;
   color: #ff5368;
-  text-shadow: 0 2px 0 rgba(96, 18, 28, 0.18);
+  text-shadow: 0 4px 0 rgba(96, 18, 28, 0.16), 0 9px 18px rgba(17, 26, 25, 0.2);
 }
 
 .life-hud span.spent {

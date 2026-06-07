@@ -15,11 +15,11 @@ Do not commit large raw screenshots such as full-size `.png` captures unless the
 The current audio files are:
 
 ```txt
-public/audio/mushroom-dance.ogg
+public/audio/mushroom-dance.mp3
 public/audio/kids-yay.mp3
 ```
 
-### `public/audio/mushroom-dance.ogg`
+### `public/audio/mushroom-dance.mp3`
 
 This background music is **Mushroom Dance** by **bart**, sourced from **OpenGameArt.org**.
 
@@ -34,6 +34,8 @@ OpenGameArt: https://opengameart.org
 ```
 
 Keep this attribution visible in repository notices, release notes, or an in-app credits screen when the game is published.
+
+Repository optimization note: the distributed file is a compressed MP3 version tuned for browser-game background music. Duration is kept intact; bitrate is reduced so the game loads faster on mobile networks.
 
 ### `public/audio/kids-yay.mp3`
 

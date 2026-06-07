@@ -573,7 +573,11 @@ export default function VoxelCrossing({
   const startMusicTimerRef = useRef(null);
   const restartPrepareTaskRef = useRef(null);
   const deferredAudioTaskRef = useRef(null);
+  const deferredAudioTimerRef = useRef(null);
+  const deferredAudioFrameRef = useRef(null);
   const resumeFramesRef = useRef([]);
+  const startFramesRef = useRef([]);
+  const startedRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -615,6 +619,10 @@ export default function VoxelCrossing({
   useEffect(() => {
     livesRef.current = lives;
   }, [lives]);
+
+  useEffect(() => {
+    startedRef.current = started;
+  }, [started]);
 
   useEffect(() => {
     if (isStandaloneDisplay()) {
@@ -719,6 +727,7 @@ export default function VoxelCrossing({
 
   const resumeEngineAfterMenuPaint = () => {
     cancelDeferredResume();
+    cancelDeferredStart();
     const firstFrame = window.requestAnimationFrame(() => {
       const secondFrame = window.requestAnimationFrame(() => {
         resumeFramesRef.current = [];
@@ -730,6 +739,41 @@ export default function VoxelCrossing({
     resumeFramesRef.current = [firstFrame];
   };
 
+  const cancelDeferredStart = () => {
+    if (!startFramesRef.current.length) return;
+    startFramesRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId));
+    startFramesRef.current = [];
+  };
+
+  const cancelDeferredAudioUnlock = () => {
+    if (deferredAudioTimerRef.current) {
+      window.clearTimeout(deferredAudioTimerRef.current);
+      deferredAudioTimerRef.current = null;
+    }
+    if (deferredAudioFrameRef.current) {
+      window.cancelAnimationFrame(deferredAudioFrameRef.current);
+      deferredAudioFrameRef.current = null;
+    }
+    if (deferredAudioTaskRef.current) {
+      cancelIdleTask(deferredAudioTaskRef.current);
+      deferredAudioTaskRef.current = null;
+    }
+  };
+
+  const startEngineAfterIntroPaint = () => {
+    cancelDeferredStart();
+    const firstFrame = window.requestAnimationFrame(() => {
+      const secondFrame = window.requestAnimationFrame(() => {
+        startFramesRef.current = [];
+        if (!gameRef.current || menuOpen) return;
+        gameRef.current.start();
+        runHaptic('start', settingsRef.current.hapticsEnabled);
+      });
+      startFramesRef.current = [secondFrame];
+    });
+    startFramesRef.current = [firstFrame];
+  };
+
   useEffect(() => () => {
     if (confettiTimerRef.current) window.clearTimeout(confettiTimerRef.current);
     if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
@@ -739,8 +783,9 @@ export default function VoxelCrossing({
     if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
     if (startMusicTimerRef.current) window.clearTimeout(startMusicTimerRef.current);
     if (restartPrepareTaskRef.current) cancelIdleTask(restartPrepareTaskRef.current);
-    if (deferredAudioTaskRef.current) cancelIdleTask(deferredAudioTaskRef.current);
+    cancelDeferredAudioUnlock();
     cancelDeferredResume();
+    cancelDeferredStart();
   }, []);
 
   const triggerConfetti = (level = 'rainbow') => {
@@ -819,19 +864,76 @@ export default function VoxelCrossing({
     audioRef.current?.unlock({ allowMusic: allowMusic && !quizMusicLocked });
   };
 
-  const deferAudioUnlock = (options = {}, timeout = 1200) => {
-    if (deferredAudioTaskRef.current) {
-      cancelIdleTask(deferredAudioTaskRef.current);
-      deferredAudioTaskRef.current = null;
-    }
+  const deferAudioUnlock = (options = {}, delayMs = 1600, idleTimeout = 2400) => {
+    cancelDeferredAudioUnlock();
 
-    window.requestAnimationFrame(() => {
-      deferredAudioTaskRef.current = runWhenIdle(() => {
-        deferredAudioTaskRef.current = null;
-        unlockAudio(options);
-      }, timeout);
-    });
+    // Keep the first movement visually sacred. AudioContext creation/resume is
+    // useful for later SFX, but on some mobile browsers it can still block the
+    // first active WebGL frame. We delay it until after the hop has painted.
+    deferredAudioTimerRef.current = window.setTimeout(() => {
+      deferredAudioTimerRef.current = null;
+      deferredAudioFrameRef.current = window.requestAnimationFrame(() => {
+        deferredAudioFrameRef.current = null;
+        deferredAudioTaskRef.current = runWhenIdle(() => {
+          deferredAudioTaskRef.current = null;
+          unlockAudio({ ...options, allowMusic: false });
+        }, idleTimeout);
+      });
+    }, delayMs);
   };
+
+  const deferMusicResume = (delayMs = 1800) => {
+    if (startMusicTimerRef.current) {
+      window.clearTimeout(startMusicTimerRef.current);
+      startMusicTimerRef.current = null;
+    }
+    startMusicTimerRef.current = window.setTimeout(() => {
+      startMusicTimerRef.current = null;
+      window.requestAnimationFrame(() => {
+        runWhenIdle(() => {
+          if (!gameRef.current || gameOver || impacting) return;
+          if (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status)) return;
+          audioRef.current?.setMusicSuppressed?.(false);
+          audioRef.current?.resumeMusic?.();
+        }, 1800);
+      });
+    }, delayMs);
+  };
+
+  useEffect(() => {
+    const isGameplayPointerTarget = (target) => {
+      if (!target?.closest) return false;
+      if (target.closest('.start-button, .menu-action, .icon-close, .settings-section, .pwa-install-overlay, .badge-board-overlay, .badge-unlock-overlay, input, textarea, select')) {
+        return false;
+      }
+      return Boolean(target.closest('.vc-controls, .vc-canvas'));
+    };
+
+    const primeGameplayAudioFromTrustedGesture = (event) => {
+      if (!ready || !startedRef.current || !audioRef.current) return;
+
+      if (event.type === 'keydown') {
+        if (!isPlayKey(event)) return;
+        deferAudioUnlock({ allowMusic: false }, 2200, 2600);
+        return;
+      }
+
+      if (!isGameplayPointerTarget(event.target)) return;
+      deferAudioUnlock({ allowMusic: false }, 2200, 2600);
+    };
+
+    // Important: do not prime audio from the Start/Menu buttons. Creating or
+    // resuming an AudioContext from the same tap that removes the intro overlay
+    // can still block weaker mobile browsers for a few seconds. Audio is only
+    // unlocked lazily after real gameplay controls have already painted.
+    window.addEventListener('pointerdown', primeGameplayAudioFromTrustedGesture, { capture: true, passive: true });
+    window.addEventListener('keydown', primeGameplayAudioFromTrustedGesture, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', primeGameplayAudioFromTrustedGesture, { capture: true });
+      window.removeEventListener('keydown', primeGameplayAudioFromTrustedGesture, { capture: true });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, quiz.status, quizDue]);
 
   async function loadQuestionPool() {
     if (questionPoolRef.current) return questionPoolRef.current;
@@ -896,6 +998,7 @@ export default function VoxelCrossing({
       onMoveStart: () => {
         runHaptic('jump', settingsRef.current.hapticsEnabled);
         audioRef.current?.jump();
+        deferMusicResume(7000);
       },
       onHazardSound: ({ kind }) => {
         if (kind === 'carHorn') audioRef.current?.carHorn();
@@ -1024,11 +1127,9 @@ export default function VoxelCrossing({
       startMusicTimerRef.current = null;
     }
 
-    // Start must stay frame-safe. The engine is already prepared before the menu
-    // appears. Do not unlock audio, fetch media, or show install prompts here.
-    // The first visual frame must be just: hide overlay + start animation.
-    runHaptic('start', settingsRef.current.hapticsEnabled);
-    gameRef.current?.start();
+    // Start must stay frame-safe. Do not unlock audio, fetch media, start music,
+    // or even resume the WebGL engine in this click handler. First paint the
+    // game screen, then start the engine two animation frames later.
     menuPausedRef.current = false;
     setStarted(true);
     setPwaPromptVisible(false);
@@ -1046,6 +1147,11 @@ export default function VoxelCrossing({
     setQuiz(QUIZ_INITIAL);
     setScore(0);
     setLastRunScore(0);
+    startEngineAfterIntroPaint();
+
+    // BGM is intentionally not started inside the Start click/pointerdown path.
+    // The MP3 music file is started later, after the child makes a movement, so
+    // the Start tap stays a pure visual transition with no media fetch/decode.
 
     // Keep storage/profile work off the first visual frame. Audio is unlocked
     // later on an idle task after movement/resume/settings, never on Start/Menu open.
@@ -1088,7 +1194,8 @@ export default function VoxelCrossing({
     setLifeBlinkIndex(null);
     setScore(saveState.score || saveState.row || 0);
     setLastRunScore(saveState.score || saveState.row || 0);
-    deferAudioUnlock({ allowMusic: true }, 1400);
+    deferAudioUnlock({ allowMusic: false }, 1400);
+    deferMusicResume(1800);
   };
 
   const resumeGame = ({ deferEngine = false } = {}) => {
@@ -1153,7 +1260,8 @@ export default function VoxelCrossing({
     if (!started && !gameOver) resumeGame();
     const accepted = gameRef.current?.queueMove(direction) === true;
     if (!accepted) runHaptic('blocked', settingsRef.current.hapticsEnabled);
-    deferAudioUnlock({ allowMusic: true }, 1400);
+    deferAudioUnlock({ allowMusic: false }, 1400);
+    deferMusicResume(1800);
   };
 
   const handleControlPointer = (event, direction) => {
@@ -1411,7 +1519,7 @@ export default function VoxelCrossing({
 
       {impacting && (
         <div className={`impact-stinger ${impactReason}`} aria-hidden="true">
-          <span>{impactReason === 'train' ? 'TRAIN!' : impactReason === 'water' ? 'SPLASH!' : 'HIT!'}</span>
+          <span>{impactReason === 'train' ? 'KERETA!' : impactReason === 'water' ? 'JEBURR!' : 'TUBRUK!'}</span>
         </div>
       )}
 

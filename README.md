@@ -154,7 +154,7 @@ Source code is licensed under **Apache-2.0**.
 The included files below are user-supplied media and are **not automatically covered** by the Apache-2.0 source-code license:
 
 ```txt
-public/audio/mushroom-dance.ogg
+public/audio/mushroom-dance.mp3
 public/audio/kids-yay.mp3
 ```
 

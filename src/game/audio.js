@@ -34,7 +34,7 @@ export class GameAudio {
     this.musicStep = 0;
     this.nextMusicTime = 0;
     const baseUrl = (import.meta.env?.BASE_URL || '/').replace(/\/?$/, '/');
-    this.musicUrl = musicUrl || `${baseUrl}audio/mushroom-dance.ogg`;
+    this.musicUrl = musicUrl || this._resolveMusicUrl(baseUrl);
     this.kidsYayUrl = `${baseUrl}audio/kids-yay.mp3`;
     this.bgm = null;
     this.kidsYay = null;
@@ -42,9 +42,10 @@ export class GameAudio {
     this.bgmReady = false;
     this.bgmError = false;
     this.musicSuppressed = false;
+    this.userInteracted = false;
   }
 
-  async unlock({ allowMusic = true } = {}) {
+  unlock({ allowMusic = true } = {}) {
     const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
 
     if (AudioContextCtor && !this.ctx) {
@@ -69,8 +70,13 @@ export class GameAudio {
       this.limiter.connect(this.ctx.destination);
     }
 
+    this.userInteracted = true;
+
     if (this.ctx?.state === 'suspended') {
-      try { await this.ctx.resume(); } catch { /* ignore */ }
+      try {
+        const resumePromise = this.ctx.resume();
+        resumePromise?.catch?.(() => {});
+      } catch { /* ignore */ }
     }
 
     // Do not create/preload sampled reward audio during Start. On lower-end
@@ -101,7 +107,7 @@ export class GameAudio {
     }
 
     if (this.bgm) this.bgm.volume = this.musicVolume;
-    this.startMusic();
+    if (this.userInteracted) this.startMusic();
   }
 
   setMusicSuppressed(suppressed) {
@@ -179,6 +185,24 @@ export class GameAudio {
       window.clearInterval(this.musicTimer);
       this.musicTimer = null;
     }
+  }
+
+  warmMusic() {
+    if (!this.musicEnabled || this.bgmError || typeof window === 'undefined') return;
+    const bgm = this._ensureBgm();
+    if (!bgm) return;
+    try {
+      bgm.preload = 'metadata';
+      bgm.load?.();
+    } catch {
+      // Warming is best-effort and must never affect gameplay.
+    }
+  }
+
+  _resolveMusicUrl(baseUrl) {
+    // MP3 is the runtime asset for broad, fast-start browser playback.
+    // The source license is documented separately; the original OGG is not loaded by the game.
+    return `${baseUrl}audio/mushroom-dance.mp3`;
   }
 
   _ensureBgm() {
@@ -277,7 +301,7 @@ export class GameAudio {
   }
 
   startMusic() {
-    if (!this.musicEnabled || this.musicSuppressed || this.bgmError) return;
+    if (!this.userInteracted || !this.musicEnabled || this.musicSuppressed || this.bgmError) return;
     const bgm = this._ensureBgm();
     if (!bgm) return;
 
@@ -292,7 +316,7 @@ export class GameAudio {
     bgm.muted = false;
     bgm.volume = this.musicVolume;
 
-    // HTMLAudioElement streams the supplied OGG lazily. Gameplay never waits for this promise.
+    // HTMLAudioElement streams the supplied MP3 lazily. Gameplay never waits for this promise.
     const playPromise = bgm.play();
     if (playPromise?.then) {
       playPromise.then(() => {

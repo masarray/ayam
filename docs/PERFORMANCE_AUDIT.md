@@ -6,13 +6,13 @@ Ayam SD uses a small custom Three.js engine. The current runtime is safe for pub
 
 Approximate production build output:
 
-- Total `dist`: about 5 MB
+- Total `dist`: about 3.5 MB
 - Three.js chunk: about 511 KB uncompressed / 128 KB gzip
 - React vendor chunk: about 190 KB uncompressed / 60 KB gzip
 - Game app chunk: about 124 KB uncompressed / 36 KB gzip
 - CSS: about 72 KB uncompressed / 16 KB gzip
 - Question bank: about 1.9 MB
-- Background music: about 2.2 MB
+- Background music: about 619 KB after Vorbis recompression
 
 ## Engine profile
 

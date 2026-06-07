@@ -1,6 +1,6 @@
 {
   "name": "ayam-sd",
-  "version": "3.3.7",
+  "version": "3.3.14",
   "type": "module",
   "description": "Free and open-source Three.js Ayam SD browser game with a voxel chicken, traffic, trains, rivers, rewards, audio, mobile controls, and a learning quiz loop.",
   "license": "Apache-2.0",

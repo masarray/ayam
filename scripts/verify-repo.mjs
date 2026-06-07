@@ -14,7 +14,8 @@ const requiredFiles = [
   'public/sw.js',
   'public/icons/icon-192.png',
   'public/icons/icon-512.png',
-  'public/audio/mushroom-dance.ogg',
+  'public/audio/mushroom-dance.mp3',
+  'docs/START_AUDIO_ROAD_TREE_AUDIT.md',
   '.github/workflows/deploy-pages.yml'
 ];
 
@@ -42,8 +43,24 @@ if (!/export const PLAYER_RAIL_STAND_Z = 7\.2;/.test(constantsSource)) {
 }
 
 const rendererSource = readFileSync('src/game/renderers.js', 'utf8');
-if (!/railLine: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 4\.8, RAIL_HEAD_HEIGHT\)/.test(rendererSource)) {
-  console.error('Rail geometry should use the raised rail-head profile and aligned wheel contact constants.');
+if (!/railLine: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 3\.6, RAIL_HEAD_HEIGHT\)/.test(rendererSource)) {
+  console.error('Rail geometry should use a slim raised rail-head profile and aligned wheel contact constants.');
+  process.exit(1);
+}
+if (!/ROAD_WHITE_LINE_WIDTH = 0\.34/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 0\.52/.test(rendererSource)) {
+  console.error('Road side and yellow center markings should stay truly thin and readable.');
+  process.exit(1);
+}
+if (!/ROAD_EDGE_LINE_INSET = 4\.25/.test(rendererSource) || !/ROAD_EDGE_SHOULDER_INSET = 1\.65/.test(rendererSource)) {
+  console.error('Road edge lines should sit near the asphalt edge so vehicles stay visually inside the boundary.');
+  process.exit(1);
+}
+if (!/row\.roadLaneCount === 2 && !isLastLane/.test(rendererSource) || /row\.roadLaneCount === 2[\s\S]{0,220}asphaltYellow/.test(rendererSource)) {
+  console.error('Two-lane roads must use a white dashed divider only, never yellow center markings.');
+  process.exit(1);
+}
+if (!/roadLineLong: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 1, 0\.34\)/.test(rendererSource) || !/makeRoadLine/.test(rendererSource)) {
+  console.error('Continuous road markings must use flat line geometry, not scaled row slabs.');
   process.exit(1);
 }
 
@@ -51,16 +68,50 @@ if (!/navigator\.vibrate/.test(crossingSource) || !/hapticsEnabled/.test(crossin
   console.error('Mobile haptic guard is missing from VoxelCrossing.jsx.');
   process.exit(1);
 }
+
+if (!/primeGameplayAudioFromTrustedGesture/.test(crossingSource) || !/startedRef\.current/.test(crossingSource)) {
+  console.error('Audio priming must be gated behind startedRef so the Start/Menu buttons never create AudioContext work.');
+  process.exit(1);
+}
+const primeAudioSource = crossingSource.slice(
+  crossingSource.indexOf('const primeGameplayAudioFromTrustedGesture'),
+  crossingSource.indexOf('    // Important: do not prime audio from the Start/Menu buttons')
+);
+if (/allowMusic:\s*true/.test(primeAudioSource) || !/isGameplayPointerTarget/.test(primeAudioSource)) {
+  console.error('Gameplay audio priming must avoid BGM and must ignore Start/Menu controls.');
+  process.exit(1);
+}
+const audioSource = readFileSync('src/game/audio.js', 'utf8');
+if (!/mushroom-dance\.mp3/.test(audioSource) || /mushroom-dance\.ogg`/.test(audioSource)) {
+  console.error('Runtime background music should prefer mushroom-dance.mp3, not OGG, for faster mobile startup.');
+  process.exit(1);
+}
+if (!/userInteracted/.test(audioSource)) {
+  console.error('Audio engine should gate autoplay until a real user gesture has occurred.');
+  process.exit(1);
+}
+if (!/wheel: new THREE\.BoxGeometry\(9\.5, 6, 9\.5\)/.test(rendererSource) || !/trainWheel: new THREE\.BoxGeometry\(10\.8, 6\.8, 10\.8\)/.test(rendererSource)) {
+  console.error('Vehicle/train wheels should stay slightly enlarged and aligned to road/rail surfaces.');
+  process.exit(1);
+}
+if (!/font-size: 40px;/.test(readFileSync('src/game/VoxelCrossing.css', 'utf8')) || !/background: transparent;/.test(readFileSync('src/game/VoxelCrossing.css', 'utf8'))) {
+  console.error('Life HUD should use large bare hearts without background or border.');
+  process.exit(1);
+}
 const startFnSource = crossingSource.slice(
   crossingSource.indexOf('const startGame = () => {'),
   crossingSource.indexOf('  const saveGame = () => {')
 );
-if (startFnSource.includes('unlockAudio')) {
-  console.error('Start button must not unlock audio directly; it can block the first mobile frame. Defer audio unlock to movement/menu/idle.');
-  process.exit(1);
-}
 if (startFnSource.includes('reset(true)')) {
   console.error('Start button must not call reset(true); it rebuilds the whole scene and can freeze low-end devices. Use game.start() for first-play flow.');
+  process.exit(1);
+}
+if (/deferMusicResume\s*\(|resumeMusic\?\.\(|startMusic\?\.\(|warmMusic\?\.\(/.test(startFnSource)) {
+  console.error('Start button must not start/warm background music; media probing can freeze the first game frame.');
+  process.exit(1);
+}
+if (/gameRef\.current\?\.start\(\)/.test(startFnSource) || !/startEngineAfterIntroPaint\(\)/.test(startFnSource)) {
+  console.error('Start button should paint the UI first and defer engine start by animation frames.');
   process.exit(1);
 }
 
@@ -86,8 +137,13 @@ if (!/resumeEngineAfterMenuPaint/.test(resumeFnSource) || /deferAudioUnlock/.tes
   console.error('Menu close/resume must defer WebGL resume until after UI paint and must not unlock audio directly.');
   process.exit(1);
 }
-if (!/RAIL_HEAD_Y_OFFSET = 19\.5/.test(rendererSource) || !/TRAIN_WHEEL_CENTER_Z/.test(rendererSource)) {
+if (!/RAIL_HEAD_Y_OFFSET = 17\.4/.test(rendererSource) || !/TRAIN_WHEEL_CENTER_Z/.test(rendererSource)) {
   console.error('Train wheels must stay aligned to the raised rail-head surface.');
+  process.exit(1);
+}
+
+if (/warmMusic\?\.\(\)/.test(crossingSource)) {
+  console.error('Do not warm background music from the ready path; it can collide with Start on mobile.');
   process.exit(1);
 }
 
@@ -97,15 +153,30 @@ if (!/isUiPaused/.test(gameSource) || !/lastPausedRenderAt/.test(gameSource)) {
   process.exit(1);
 }
 
-const musicSize = statSync('public/audio/mushroom-dance.ogg').size;
+const musicSize = statSync('public/audio/mushroom-dance.mp3').size;
 if (musicSize < 1024) {
   console.error('Background music file looks too small or empty.');
+  process.exit(1);
+}
+if (musicSize > 600 * 1024) {
+  console.error(`Background music is too large for the public mobile build: ${musicSize} bytes. Keep mushroom-dance.mp3 compressed.`);
   process.exit(1);
 }
 
 const rows = createInitialRows(48);
 extendRows(rows, 180);
 const passabilityErrors = [];
+for (let rowIndex = 0; rowIndex < 4; rowIndex += 1) {
+  const row = rows[rowIndex];
+  if (!row?.trees?.length) {
+    passabilityErrors.push(`start row ${rowIndex} should include decorative trees`);
+  }
+  for (const centerTile of [-1, 0, 1]) {
+    if (row?.blockers?.has(centerTile)) {
+      passabilityErrors.push(`start row ${rowIndex} must keep center tile ${centerTile} open`);
+    }
+  }
+}
 rows.forEach((row) => {
   if (!row) return;
 

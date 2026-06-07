@@ -80,6 +80,13 @@ function randomInt(random, min, maxInclusive) {
   return min + Math.floor(random() * (maxInclusive - min + 1));
 }
 
+const START_ROW_TREES = Object.freeze({
+  0: [-7, 7],
+  1: [-6, 6],
+  2: [-8, 5],
+  3: [-5, 8]
+});
+
 function createTreeBlockers(trees) {
   // Collision follows the trunk/core tile only. The crown is decorative and must
   // not block neighbouring tiles, otherwise the player feels stopped far away
@@ -473,14 +480,16 @@ function generateWaterRow(rowIndex, random) {
   const laneOffset = (random() - 0.5) * 3;
   const span = (MAX_TILE - MIN_TILE + 1) * TILE_SIZE + WATER_SAFE_MARGIN * 2;
   const minX = MIN_TILE * TILE_SIZE - WATER_SAFE_MARGIN;
-  const count = rowIndex > 28 ? (random() > 0.62 ? 4 : 3) : 2 + Math.floor(random() * 2);
+  // More planks, slightly slower: children should read the timing and feel
+  // invited to cross, not punished by sparse fast boards.
+  const count = rowIndex > 28 ? (random() > 0.55 ? 5 : 4) : 3 + Math.floor(random() * 2);
   const spacing = span / count;
-  const laneSpeed = (50 + random() * 46) * (0.85 + Math.min(0.48, speedMultiplier - 1));
+  const laneSpeed = (42 + random() * 38) * (0.78 + Math.min(0.38, speedMultiplier - 1));
   const planks = [];
 
   for (let i = 0; i < count; i += 1) {
     const width = randomInt(random, 92, rowIndex > 26 ? 138 : 152);
-    const speed = laneSpeed * (0.94 + random() * 0.1);
+    const speed = laneSpeed * (0.86 + random() * 0.08);
     const x = minX + spacing * (i + 0.5) + (random() - 0.5) * Math.min(54, spacing * 0.18);
     planks.push({
       id: `${rowIndex}-plank-${i}`,
@@ -508,10 +517,12 @@ function generateWaterRow(rowIndex, random) {
 
 export function generateRow(rowIndex, rows) {
   if (rowIndex < STARTING_ROWS) {
+    const trees = START_ROW_TREES[rowIndex] || [];
     return {
       index: rowIndex,
       type: 'grass',
-      blockers: new Set()
+      trees,
+      blockers: createTreeBlockers(trees)
     };
   }
 

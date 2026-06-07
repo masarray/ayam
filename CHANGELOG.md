@@ -1,5 +1,59 @@
 # Changelog
 
+## 3.3.14 - Road marking alignment pass
+
+- Changed two-lane roads to use a white dashed center divider only, without yellow markings.
+- Moved continuous white road edge lines closer to the asphalt edge so vehicles sit visually inside the road boundary.
+- Kept three-lane and four-lane yellow divider logic intact.
+- Added verification guards for two-lane marking rules and edge-line placement.
+
+## 3.3.13 - First-jump freeze and comfort tuning
+
+- Delayed gameplay audio unlock so the first hop does not compete with AudioContext setup on mobile browsers.
+- Smoothed camera comfort by following logical row/tile movement instead of the chicken's hop bob.
+- Localized impact stingers to `TUBRUK!`, `KERETA!`, and `JEBURR!`.
+- Raised train body groups above wheel/bogie rail gear so carriages visually sit on the wheels.
+- Increased water plank availability and slowed plank movement slightly for a more child-friendly crossing rhythm.
+
+## 3.3.12 - Start freeze deep fix
+
+- Removed Start/Menu from capture-phase audio priming so the Start tap no longer creates or resumes AudioContext work.
+- Deferred engine start until after the intro overlay has had two animation frames to paint away.
+- Delayed background music resume further after gameplay movement so media loading cannot compete with the first Start frame.
+- Added verification rules for UI-first Start and gameplay-only audio priming.
+
+## 3.3.11 - MP3 audio start freeze and road marking correction
+
+- Converted runtime background music from `mushroom-dance.ogg` to `mushroom-dance.mp3` at 48 kbps for faster browser media probing/loading.
+- Removed eager background-music warm-up from the ready/start path so pressing **Mulai Main** stays visual-only.
+- Background music now waits until after the first movement path instead of starting during the Start tap.
+- Rebuilt continuous road side/yellow markings with flat line geometry so they are actually thinner; dashed lane markings remain readable.
+- Added `docs/AUDIO_MP3_AND_ROAD_MARKING_AUDIT.md`.
+
+## 3.3.10 - Background music compression
+
+- Recompressed `public/audio/mushroom-dance.ogg` from about 2.2 MB to about 619 KB while keeping the same duration and filename.
+- Bumped the service worker cache version so deployed browsers refresh the optimized audio asset.
+- Added an audio compression audit note and verification guard for public-repo asset budget.
+
+## 3.3.9 - Start freeze regression, thinner road lines, and start-area trees
+
+- Fixed a Start/Main freeze regression by removing heavy BGM playback from the capture-phase pointerdown path.
+- Kept mobile audio unlocked for procedural SFX while delaying large background music until after the first gameplay paint and idle time.
+- Added best-effort background music warming so the OGG file is prepared away from the button tap path.
+- Made continuous white side road lines and yellow center markings thinner again.
+- Added decorative, trunk-blocked trees to the start grass rows while keeping the center start path open.
+- Added verification guardrails for Start audio safety, road line thinness, and start-area tree decoration.
+
+## 3.3.8 - Audio, wheel, rail, road marking, and life HUD polish
+
+- Fixed mobile audio unlock by priming Web Audio / HTML audio from trusted pointer and key gestures.
+- Kept Start/Menu frame-safe by avoiding scene rebuilds, quiz fetches, storage work, and media preload in the visual transition path.
+- Made yellow center road markings and continuous white side lines thinner and cleaner.
+- Slightly enlarged road vehicle wheels and lifted them so they sit above the road surface.
+- Re-aligned train wheels to sit on the raised rail head, narrowed rail heads, and reduced modern train side flicker.
+- Simplified Life HUD to large 40px hearts without background, border, or blur.
+
 ## 3.3.7 - Menu resume and rail visual fix
 
 - Fixed close-menu resume jank by closing the React menu first, letting the browser paint, then resuming the Three.js engine on the next frame.
@@ -40,7 +94,6 @@
 - Added renderer warm-up and mobile overlay blur reduction for weaker devices.
 - Expanded `npm run verify` with late-game tree collision regression checks.
 
-
 ## 3.3.3 - Start Button Freeze Fix
 
 - Fixed a start-button freeze caused by rebuilding the full Three.js world on the first play tap.
@@ -70,8 +123,6 @@
 - Changed hop travel easing for a softer, more natural step.
 - Added early touch swipe commit so mobile controls feel more responsive.
 - Added movement audit documentation in `docs/MOVEMENT_AUDIT.md`.
-
-
 
 ## 3.3.1 - Engine performance audit
 

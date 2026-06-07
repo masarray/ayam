@@ -1588,19 +1588,22 @@ export class RoadQuestGame {
     const rect = this.container.getBoundingClientRect();
     const isPortrait = rect.height > rect.width;
 
-    // Mode B: softer child-friendly camera. Follow the chicken's visual position
-    // rather than snapping hard to the destination row, with gentle lateral drift
-    // so the map feels smooth instead of locked or floaty.
-    const playerX = this.player.position.x;
-    const playerY = this.player.position.y;
-    const lateralWeight = isPortrait ? 0.46 : 0.54;
+    // Mode B calm camera: follow the logical row/tile, not the chicken's hop
+    // arc. The player can bounce, but the camera should not bob with every jump
+    // because that feels dizzy on phones. Water-plank drift may still gently
+    // influence X so riding a plank does not leave the chicken off-screen.
+    const anchor = this.movement?.to || this.playerPosition;
+    const logicalX = tileToX(anchor.tile, TILE_SIZE);
+    const logicalY = rowToY(anchor.row, TILE_SIZE);
+    const ridingPlankX = this.activeRidePlankId ? this.player.position.x : logicalX;
+    const lateralWeight = isPortrait ? 0.36 : 0.42;
     const targetX = clamp(
-      playerX * lateralWeight,
-      MIN_TILE * TILE_SIZE + 86,
-      MAX_TILE * TILE_SIZE - 86
+      ridingPlankX * lateralWeight,
+      MIN_TILE * TILE_SIZE + 92,
+      MAX_TILE * TILE_SIZE - 92
     );
-    const targetY = playerY + (isPortrait ? 88 : 58);
-    const targetZ = isPortrait ? 22 : 0;
+    const targetY = logicalY + (isPortrait ? 88 : 58);
+    const targetZ = isPortrait ? 16 : 0;
     this.cameraRawTarget.set(targetX, targetY, targetZ);
 
     const targetAlpha = 1 - Math.exp(-CAMERA_TARGET_STIFFNESS * Math.max(0.001, delta));

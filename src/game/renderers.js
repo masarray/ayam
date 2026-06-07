@@ -14,14 +14,20 @@ const ENDLESS_FOUNDATION_WIDTH = BOARD_WIDTH + TILE_SIZE * 62;
 const EXTENDED_TILE_MIN = MIN_TILE - 28;
 const EXTENDED_TILE_MAX = MAX_TILE + 28;
 
-const RAIL_HEAD_Y_OFFSET = 19.5;
+const RAIL_HEAD_Y_OFFSET = 17.4;
 const RAIL_HEAD_CENTER_Z = 5.6;
 const RAIL_HEAD_HEIGHT = 3.4;
 const RAIL_HEAD_TOP_Z = RAIL_HEAD_CENTER_Z + RAIL_HEAD_HEIGHT / 2;
-const TRAIN_WHEEL_HALF_Z = 4.5;
+const TRAIN_WHEEL_HALF_Z = 5.4;
 const TRAIN_WHEEL_CENTER_Z = RAIL_HEAD_TOP_Z + TRAIN_WHEEL_HALF_Z;
-const TRAIN_BOGIE_CENTER_Z = TRAIN_WHEEL_CENTER_Z - 1.2;
-const TRAIN_UNDERCARRIAGE_Z = TRAIN_WHEEL_CENTER_Z - 0.9;
+const TRAIN_BOGIE_CENTER_Z = TRAIN_WHEEL_CENTER_Z - 1.05;
+const TRAIN_UNDERCARRIAGE_Z = TRAIN_WHEEL_CENTER_Z - 0.65;
+const TRAIN_BODY_LIFT_Z = 18.8;
+const ROAD_WHITE_LINE_WIDTH = 0.34;
+const ROAD_YELLOW_LINE_WIDTH = 0.52;
+const ROAD_DASH_SCALE_Y = 0.46;
+const ROAD_EDGE_LINE_INSET = 4.25;
+const ROAD_EDGE_SHOULDER_INSET = 1.65;
 
 export function createMaterials() {
   const make = (color, options = {}) => new THREE.MeshLambertMaterial({ color, ...options });
@@ -86,6 +92,7 @@ export function createGeometryCache() {
     row: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, ROW_DEPTH, 5),
     rowWide: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, ROW_DEPTH, 5),
     roadStripe: new THREE.BoxGeometry(22, 2, 1),
+    roadLineLong: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 1, 0.34),
     waterRipple: new THREE.BoxGeometry(26, 2, 1),
     waterWave: new THREE.BoxGeometry(54, 2.4, 1),
     waterSparkle: new THREE.BoxGeometry(9, 2, 1),
@@ -94,7 +101,7 @@ export function createGeometryCache() {
     plankCap: new THREE.BoxGeometry(5, 30, 9),
     plankStripe: new THREE.BoxGeometry(5, 24, 10),
     railBallast: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 34, 4),
-    railLine: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 4.8, RAIL_HEAD_HEIGHT),
+    railLine: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 3.6, RAIL_HEAD_HEIGHT),
     railSleeper: new THREE.BoxGeometry(9, 32, 3.2),
 
     chickenBody: new THREE.BoxGeometry(18, 17, 19),
@@ -118,9 +125,9 @@ export function createGeometryCache() {
     treeTop: new THREE.BoxGeometry(28, 28, 28),
     treeCrownSmall: new THREE.BoxGeometry(24, 24, 24),
 
-    wheel: new THREE.BoxGeometry(8, 5, 8),
-    wheelWide: new THREE.BoxGeometry(9, 6, 9),
-    smallHub: new THREE.BoxGeometry(3, 2.4, 3),
+    wheel: new THREE.BoxGeometry(9.5, 6, 9.5),
+    wheelWide: new THREE.BoxGeometry(11, 7, 11),
+    smallHub: new THREE.BoxGeometry(3.6, 2.8, 3.6),
     carBody: new THREE.BoxGeometry(60, 28, 16),
     carLongBody: new THREE.BoxGeometry(76, 30, 16),
     carCabin: new THREE.BoxGeometry(27, 22, 14),
@@ -184,7 +191,7 @@ export function createGeometryCache() {
     trainWindowStrip: new THREE.BoxGeometry(74, 4, 8),
     trainCoupler: new THREE.BoxGeometry(9, 12, 6),
     trainBogie: new THREE.BoxGeometry(24, 28, 5),
-    trainWheel: new THREE.BoxGeometry(9, 6, 9),
+    trainWheel: new THREE.BoxGeometry(10.8, 6.8, 10.8),
     classicBoiler,
     classicPilot: new THREE.BoxGeometry(16, 30, 12),
     classicCabin: new THREE.BoxGeometry(30, 32, 30),
@@ -297,9 +304,12 @@ export function createTree(tileIndex, rowIndex, geometries, materials, variant =
 
 function addWheelPair(group, geometries, materials, x, z = 6, wide = false) {
   const wheelGeometry = wide ? geometries.wheelWide : geometries.wheel;
+  const wheelZ = z + (wide ? 0.75 : 0.35);
+  const tireY = wide ? 17.4 : 17;
+  const hubY = wide ? 21.2 : 20.7;
   [-1, 1].forEach((side) => {
-    box(group, wheelGeometry, materials.wheel, x, side * 17, z);
-    box(group, geometries.smallHub, materials.tireHub, x, side * 20.5, z, { castShadow: false });
+    box(group, wheelGeometry, materials.wheel, x, side * tireY, wheelZ);
+    box(group, geometries.smallHub, materials.tireHub, x, side * hubY, wheelZ, { castShadow: false });
   });
 }
 
@@ -313,7 +323,7 @@ function addVehicleGrounding(group, vehicle, geometries, materials) {
   const trim = dynamicMaterial(0x111820);
   const widthScale = Math.max(1.35, vehicle.width / 44);
   const depthScale = Math.max(5.4, vehicle.depth / 6);
-  box(group, geometries.roadStripe, trim, 0, 0, 3.4, { scale: { x: widthScale, y: depthScale, z: 1.35 }, castShadow: false });
+  box(group, geometries.roadStripe, trim, 0, 0, 4.2, { scale: { x: widthScale, y: depthScale, z: 1.22 }, castShadow: false });
   box(group, geometries.licensePlate, materials.trimLight, vehicle.width * 0.5 + 1, 0, 10.8, { castShadow: false });
 }
 
@@ -418,8 +428,8 @@ function createSportsCar(group, vehicle, geometries, materials, bodyMaterial, da
     [-31, 31].forEach((x) => {
       addWheelPair(group, geometries, materials, x, 5, true);
       addWheelArchPair(group, geometries, bodyMaterial, x, 18.6, 9.6);
-      box(group, geometries.smallHub, wheelAccent, x, -21.4, 5.2, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
-      box(group, geometries.smallHub, wheelAccent, x, 21.4, 5.2, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
+      box(group, geometries.smallHub, wheelAccent, x, -21.4, 6.0, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
+      box(group, geometries.smallHub, wheelAccent, x, 21.4, 6.0, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
     });
     group.scale.set(0.82, 0.9, 0.92);
     return;
@@ -676,13 +686,14 @@ export function createVehicle(vehicle, row, geometries, materials) {
 }
 
 function addTrainBogie(group, geometries, materials, centerX, bodyLength, yOffset = RAIL_HEAD_Y_OFFSET) {
+  const gearGroup = group.userData?.trainGearGroup || group;
   const spread = Math.max(18, bodyLength * 0.34);
-  box(group, geometries.roadStripe, materials.railShadow, centerX, 0, TRAIN_UNDERCARRIAGE_Z, { scale: { x: Math.max(1.2, bodyLength / 32), y: 10.4, z: 1.15 }, castShadow: false });
+  box(gearGroup, geometries.roadStripe, materials.railShadow, centerX, 0, TRAIN_UNDERCARRIAGE_Z, { scale: { x: Math.max(1.2, bodyLength / 32), y: 10.4, z: 1.15 }, castShadow: false });
   [centerX - spread, centerX + spread].forEach((x) => {
-    box(group, geometries.trainBogie, materials.railShadow, x, 0, TRAIN_BOGIE_CENTER_Z, { scale: { x: 1, y: 1.18, z: 1 }, castShadow: false });
+    box(gearGroup, geometries.trainBogie, materials.railShadow, x, 0, TRAIN_BOGIE_CENTER_Z, { scale: { x: 1, y: 1.18, z: 1 }, castShadow: false });
     [-1, 1].forEach((side) => {
-      box(group, geometries.trainWheel, materials.wheel, x, side * yOffset, TRAIN_WHEEL_CENTER_Z);
-      box(group, geometries.smallHub, materials.tireHub, x, side * (yOffset + 3.4), TRAIN_WHEEL_CENTER_Z, { castShadow: false });
+      box(gearGroup, geometries.trainWheel, materials.wheel, x, side * yOffset, TRAIN_WHEEL_CENTER_Z);
+      box(gearGroup, geometries.smallHub, materials.tireHub, x, side * (yOffset + 3.4), TRAIN_WHEEL_CENTER_Z, { castShadow: false });
     });
   });
 }
@@ -775,8 +786,8 @@ function createModernTrain(group, train, geometries, materials, bodyMaterial, da
     box(group, geometries.modernNose, darkerBodyMaterial, anchorX - dir * 10, 0, 15.5, { scale: { x: 0.96, y: 1.04, z: 1.14 } });
     box(group, geometries.truckWindshield, materials.glassDark, anchorX + dir * 1, 0, 28.5, { scale: { x: 0.78, y: 1.35, z: 1.15 }, castShadow: false });
     box(group, geometries.roadStripe, darkerBodyMaterial, anchorX + dir * 2, 0, 8.2, { scale: { x: 1.1, y: 8.7, z: 1.2 }, castShadow: false });
-    box(group, geometries.bulletStripe, electricAccent, centerX - dir * 4, -20.8, 21, { scale: { x: cabLength / 98, y: 1, z: 0.72 }, castShadow: false });
-    box(group, geometries.bulletStripe, electricAccent, centerX - dir * 4, 20.8, 21, { scale: { x: cabLength / 98, y: 1, z: 0.72 }, castShadow: false });
+    box(group, geometries.bulletStripe, electricAccent, centerX - dir * 4, -21.35, 21.25, { scale: { x: cabLength / 98, y: 0.82, z: 0.68 }, castShadow: false, receiveShadow: false });
+    box(group, geometries.bulletStripe, electricAccent, centerX - dir * 4, 21.35, 21.25, { scale: { x: cabLength / 98, y: 0.82, z: 0.68 }, castShadow: false, receiveShadow: false });
     box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 7, -12, 18.4, { castShadow: false });
     box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 7, 12, 18.4, { castShadow: false });
     addTrainWindows(group, geometries, materials, centerX - dir * 10, 3, 17.5, -20.2, 27.2);
@@ -794,8 +805,8 @@ function createModernTrain(group, train, geometries, materials, bodyMaterial, da
     box(group, geometries.trainWindowStrip, materials.glassDark, cursor, -20, 27, { scale: { x: carLength / 96, y: 1, z: 1 }, castShadow: false });
     box(group, geometries.trainWindowStrip, materials.glassDark, cursor, 20, 27, { scale: { x: carLength / 96, y: 1, z: 1 }, castShadow: false });
     box(group, geometries.modernRoof, materials.trimLight, cursor, 0, 32, { scale: { x: carLength / 104, y: 1, z: 0.55 }, castShadow: false });
-    box(group, geometries.bulletStripe, electricAccent, cursor, -20.8, 21, { scale: { x: carLength / 96, y: 1, z: 0.72 }, castShadow: false });
-    box(group, geometries.bulletStripe, electricAccent, cursor, 20.8, 21, { scale: { x: carLength / 96, y: 1, z: 0.72 }, castShadow: false });
+    box(group, geometries.bulletStripe, electricAccent, cursor, -21.35, 21.25, { scale: { x: carLength / 96, y: 0.82, z: 0.68 }, castShadow: false, receiveShadow: false });
+    box(group, geometries.bulletStripe, electricAccent, cursor, 21.35, 21.25, { scale: { x: carLength / 96, y: 0.82, z: 0.68 }, castShadow: false, receiveShadow: false });
     if (i % 2 === 0) addPantograph(cursor, 24);
     addTrainBogie(group, geometries, materials, cursor, carLength, 20);
     addCoupler(group, geometries, materials, cursor + carLength / 2 + 4);
@@ -940,15 +951,24 @@ export function createTrain(train, row, geometries, materials) {
   const bodyMaterial = train.trainClass === 'bullet' ? dynamicMaterial(0xf4f0e8) : dynamicMaterial(train.color);
   const darkerBodyMaterial = train.trainClass === 'bullet' ? dynamicMaterial(0xd92d34) : dynamicMaterial(train.color, 0.76);
 
+  const gearGroup = new THREE.Group();
+  gearGroup.name = `${group.name} rail gear`;
+  const bodyGroup = new THREE.Group();
+  bodyGroup.name = `${group.name} raised body`;
+  bodyGroup.userData.trainGearGroup = gearGroup;
+
   if (train.trainClass === 'bullet') {
-    createBulletTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
+    createBulletTrain(bodyGroup, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
   } else if (train.trainClass === 'classic') {
-    createClassicTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
+    createClassicTrain(bodyGroup, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
   } else if (train.trainClass === 'freight') {
-    createFreightTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
+    createFreightTrain(bodyGroup, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
   } else {
-    createModernTrain(group, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
+    createModernTrain(bodyGroup, train, geometries, materials, bodyMaterial, darkerBodyMaterial);
   }
+
+  bodyGroup.position.z = TRAIN_BODY_LIFT_Z;
+  group.add(gearGroup, bodyGroup);
 
   return group;
 }
@@ -1096,36 +1116,46 @@ export function createRowGroup(row, geometries, materials) {
       return edge;
     };
 
+    const makeRoadLine = (lineY, material, width, z = 1.72) => {
+      const line = new THREE.Mesh(geometries.roadLineLong, material);
+      line.scale.set(1, width, 1);
+      line.position.set(0, lineY, z);
+      line.receiveShadow = false;
+      line.castShadow = false;
+      group.add(line);
+      return line;
+    };
+
     const makeRoadDash = (tile, edgeY, material = materials.asphaltMark, z = 1.55) => {
       const stripe = new THREE.Mesh(geometries.roadStripe, material);
       stripe.position.set(tileToX(tile, TILE_SIZE), edgeY, z);
+      stripe.scale.set(0.86, ROAD_DASH_SCALE_Y, 0.62);
       stripe.castShadow = false;
       stripe.receiveShadow = false;
       group.add(stripe);
     };
 
     if (!hasRoadBand) {
-      makeEdge(y - ROW_DEPTH / 2 + 2, materials.roadEdge, 0.11, 0.5);
-      makeEdge(y + ROW_DEPTH / 2 - 2, materials.roadEdge, 0.11, 0.5);
-      makeEdge(y - ROW_DEPTH / 2 + 7, materials.asphaltMark, 0.02, 1.5);
-      makeEdge(y + ROW_DEPTH / 2 - 7, materials.asphaltMark, 0.02, 1.5);
+      makeEdge(y - ROW_DEPTH / 2 + ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.5);
+      makeEdge(y + ROW_DEPTH / 2 - ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.5);
+      makeRoadLine(y - ROW_DEPTH / 2 + ROAD_EDGE_LINE_INSET, materials.asphaltMark, ROAD_WHITE_LINE_WIDTH, 1.72);
+      makeRoadLine(y + ROW_DEPTH / 2 - ROAD_EDGE_LINE_INSET, materials.asphaltMark, ROAD_WHITE_LINE_WIDTH, 1.72);
     } else {
       if (isFirstLane) {
-        makeEdge(y - ROW_DEPTH / 2 + 2, materials.roadEdge, 0.11, 0.5);
-        makeEdge(y - ROW_DEPTH / 2 + 8, materials.asphaltMark, 0.018, 1.5);
+        makeEdge(y - ROW_DEPTH / 2 + ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.5);
+        makeRoadLine(y - ROW_DEPTH / 2 + ROAD_EDGE_LINE_INSET, materials.asphaltMark, ROAD_WHITE_LINE_WIDTH, 1.72);
       }
 
       if (isLastLane) {
-        makeEdge(y + ROW_DEPTH / 2 - 2, materials.roadEdge, 0.11, 0.5);
-        makeEdge(y + ROW_DEPTH / 2 - 8, materials.asphaltMark, 0.018, 1.5);
+        makeEdge(y + ROW_DEPTH / 2 - ROAD_EDGE_SHOULDER_INSET, materials.roadEdge, 0.085, 0.5);
+        makeRoadLine(y + ROW_DEPTH / 2 - ROAD_EDGE_LINE_INSET, materials.asphaltMark, ROAD_WHITE_LINE_WIDTH, 1.72);
       }
 
-      if (row.roadLaneCount === 2) {
-        const centerY = row.roadLaneIndex === 0
-          ? y + ROW_DEPTH / 2
-          : y - ROW_DEPTH / 2;
-        makeEdge(centerY - 2.2, materials.asphaltYellow, 0.018, 2.05);
-        makeEdge(centerY + 2.2, materials.asphaltYellow, 0.018, 2.05);
+      if (row.roadLaneCount === 2 && !isLastLane) {
+        const centerY = y + ROW_DEPTH / 2;
+        for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 3) {
+          makeRoadDash(tile, centerY, materials.asphaltMark, 1.72);
+        }
       }
 
       const nextLaneDirection = row.roadLaneIndex < row.roadLaneCount - 1
@@ -1133,10 +1163,10 @@ export function createRowGroup(row, geometries, materials) {
         : row.direction;
       const separatesOpposingTraffic = row.roadLaneCount >= 3 && !isLastLane && nextLaneDirection !== row.direction;
       if (separatesOpposingTraffic) {
-        const yellowGap = row.roadLaneCount === 2 ? 2.2 : 3.5;
-        makeEdge(y + ROW_DEPTH / 2 - yellowGap, materials.asphaltYellow, 0.014, 1.8);
-        makeEdge(y + ROW_DEPTH / 2 + yellowGap, materials.asphaltYellow, 0.014, 1.8);
-      } else if (!isLastLane) {
+        const yellowGap = 3.5;
+        makeRoadLine(y + ROW_DEPTH / 2 - yellowGap, materials.asphaltYellow, ROAD_YELLOW_LINE_WIDTH, 1.9);
+        makeRoadLine(y + ROW_DEPTH / 2 + yellowGap, materials.asphaltYellow, ROAD_YELLOW_LINE_WIDTH, 1.9);
+      } else if (!isLastLane && row.roadLaneCount !== 2) {
         for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 3) {
           makeRoadDash(tile, y + ROW_DEPTH / 2 - 1, materials.asphaltMark, 1.7);
         }

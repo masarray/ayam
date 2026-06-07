@@ -15,7 +15,7 @@ Design and technical inspiration:
 
 Audio:
 
-- `public/audio/mushroom-dance.ogg` — **Mushroom Dance** by **bart**, sourced from **OpenGameArt.org**, used under **CC BY 3.0**.
+- `public/audio/mushroom-dance.mp3` — **Mushroom Dance** by **bart**, sourced from **OpenGameArt.org**, used under **CC BY 3.0**.
   - Source: https://opengameart.org/content/mushroom-dance
   - OpenGameArt: https://opengameart.org
   - Attribution note from the asset page: credit must include a link to OpenGameArt.
