@@ -30,8 +30,8 @@ const ROAD_DASH_SCALE_Y = 0.54;
 const ROAD_MARK_Z = 0.28;
 const ROAD_EDGE_MARK_Z = 0.36;
 const ROAD_YELLOW_MARK_Z = 0.30;
-const ROAD_EDGE_LINE_INSET = 4.25;
-const ROAD_EDGE_SHOULDER_INSET = 1.65;
+const ROAD_EDGE_LINE_INSET = 2.7;
+const ROAD_EDGE_SHOULDER_INSET = 0.95;
 
 export function createMaterials() {
   const make = (color, options = {}) => new THREE.MeshLambertMaterial({ color, ...options });

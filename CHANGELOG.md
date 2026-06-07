@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.17 - 2026-06-07
+
+### Improved
+- Widened the visual roadway by moving the white edge lines closer to the outer asphalt edge.
+- Reduced the road shoulder inset so cars and buses sit more clearly inside the white boundary marking instead of riding on the line.
+- Preserved the existing road-marking rules: 2-lane roads keep a white dashed divider only, while 3-lane and 4-lane roads keep their current center-marking logic.
+
 ## 3.3.16 - White edge line stability fix
 
 - Fixed the regression where continuous white road-edge lines could shimmer or appear missing during camera movement.

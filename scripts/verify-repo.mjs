@@ -55,7 +55,7 @@ if (!/ROAD_MARK_Z = 0\.28/.test(rendererSource) || !/ROAD_EDGE_MARK_Z = 0\.36/.t
   console.error('Road markings need dedicated Z lifts so thin lines do not fight with asphalt during camera movement.');
   process.exit(1);
 }
-if (!/ROAD_EDGE_LINE_INSET = 4\.25/.test(rendererSource) || !/ROAD_EDGE_SHOULDER_INSET = 1\.65/.test(rendererSource)) {
+if (!/ROAD_EDGE_LINE_INSET = 2\.7/.test(rendererSource) || !/ROAD_EDGE_SHOULDER_INSET = 0\.95/.test(rendererSource)) {
   console.error('Road edge lines should sit near the asphalt edge so vehicles stay visually inside the boundary.');
   process.exit(1);
 }
