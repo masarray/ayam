@@ -25,6 +25,7 @@ export function createMaterials() {
     roadAlt: make(COLORS.roadAlt),
     roadEdge: make(COLORS.roadEdge),
     asphaltMark: make(COLORS.asphaltMark),
+    asphaltYellow: make(COLORS.asphaltYellow),
     water: make(COLORS.water),
     waterAlt: make(COLORS.waterAlt),
     waterDeep: make(COLORS.waterDeep),
@@ -411,6 +412,7 @@ function createSportsCar(group, vehicle, geometries, materials, bodyMaterial, da
       box(group, geometries.smallHub, wheelAccent, x, -21.4, 5.2, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
       box(group, geometries.smallHub, wheelAccent, x, 21.4, 5.2, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
     });
+    group.scale.set(0.82, 0.9, 0.92);
     return;
   }
 
@@ -885,13 +887,22 @@ export function createPlank(plank, row, geometries, materials) {
 
   const bodyMaterial = dynamicMaterial(plank.color);
   const darkerMaterial = dynamicMaterial(plank.color, 0.72);
-  box(group, geometries.plankBody, bodyMaterial, 0, 0, 6, { scale: { x: plank.width / 72, y: 1, z: 1 } });
-  box(group, geometries.plankCap, darkerMaterial, plank.width / 2 - 3, 0, 7, { castShadow: false });
-  box(group, geometries.plankCap, darkerMaterial, -plank.width / 2 + 3, 0, 7, { castShadow: false });
-  const stripes = Math.max(2, Math.floor(plank.width / 32));
+  const highlightMaterial = dynamicMaterial(plank.color, 1.14);
+  box(group, geometries.plankBody, bodyMaterial, 0, -9, 6, { scale: { x: plank.width / 72, y: 0.31, z: 0.92 } });
+  box(group, geometries.plankBody, highlightMaterial, 0, 0, 6.4, { scale: { x: plank.width / 72, y: 0.32, z: 0.96 } });
+  box(group, geometries.plankBody, bodyMaterial, 0, 9, 6, { scale: { x: plank.width / 72, y: 0.31, z: 0.9 } });
+  box(group, geometries.roadStripe, darkerMaterial, 0, -15, 8.6, { scale: { x: plank.width / 22, y: 0.7, z: 1.1 }, castShadow: false });
+  box(group, geometries.roadStripe, darkerMaterial, 0, 15, 8.6, { scale: { x: plank.width / 22, y: 0.7, z: 1.1 }, castShadow: false });
+  box(group, geometries.plankCap, darkerMaterial, plank.width / 2 - 3, 0, 8, { castShadow: false });
+  box(group, geometries.plankCap, darkerMaterial, -plank.width / 2 + 3, 0, 8, { castShadow: false });
+  const stripes = Math.max(3, Math.floor(plank.width / 30));
   for (let i = 1; i < stripes; i += 1) {
     const x = -plank.width / 2 + (plank.width / stripes) * i;
-    box(group, geometries.plankStripe, materials.plankEdge, x, 0, 11, { castShadow: false });
+    box(group, geometries.plankStripe, materials.plankEdge, x, 0, 11, { scale: { x: 0.65, y: 0.92, z: 0.75 }, castShadow: false });
+  }
+  for (let i = 0; i < 3; i += 1) {
+    const x = -plank.width * 0.28 + i * plank.width * 0.28;
+    box(group, geometries.roadStripe, darkerMaterial, x, i % 2 ? -7 : 7, 11.4, { scale: { x: 0.68, y: 0.35, z: 0.55 }, castShadow: false });
   }
   return group;
 }
@@ -1073,14 +1084,60 @@ export function createRowGroup(row, geometries, materials) {
       return edge;
     };
 
-    if (isLastLane) makeEdge(y + ROW_DEPTH / 2 - 2);
-    else makeEdge(y + ROW_DEPTH / 2 - 1, materials.asphaltMark, 0.025, 1.2);
+    const makeRoadDash = (tile, edgeY, material = materials.asphaltMark, z = 1.55) => {
+      const stripe = new THREE.Mesh(geometries.roadStripe, material);
+      stripe.position.set(tileToX(tile, TILE_SIZE), edgeY, z);
+      stripe.castShadow = false;
+      stripe.receiveShadow = false;
+      group.add(stripe);
+    };
 
-    if (isFirstLane) makeEdge(y - ROW_DEPTH / 2 + 2);
+    if (!hasRoadBand) {
+      makeEdge(y - ROW_DEPTH / 2 + 2, materials.roadEdge, 0.11, 0.5);
+      makeEdge(y + ROW_DEPTH / 2 - 2, materials.roadEdge, 0.11, 0.5);
+      makeEdge(y - ROW_DEPTH / 2 + 7, materials.asphaltMark, 0.02, 1.5);
+      makeEdge(y + ROW_DEPTH / 2 - 7, materials.asphaltMark, 0.02, 1.5);
+    } else {
+      if (isFirstLane) {
+        makeEdge(y - ROW_DEPTH / 2 + 2, materials.roadEdge, 0.11, 0.5);
+        makeEdge(y - ROW_DEPTH / 2 + 8, materials.asphaltMark, 0.018, 1.5);
+      }
 
-    // Dashed lane markers along the driving direction. Consecutive traffic rows read as 3-lane/4-lane roads.
-    for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 3) {
-      group.add(createRoadStripe(tile, row.index, geometries, materials.asphaltMark));
+      if (isLastLane) {
+        makeEdge(y + ROW_DEPTH / 2 - 2, materials.roadEdge, 0.11, 0.5);
+        makeEdge(y + ROW_DEPTH / 2 - 8, materials.asphaltMark, 0.018, 1.5);
+      }
+
+      if (row.roadLaneCount === 2) {
+        const centerY = row.roadLaneIndex === 0
+          ? y + ROW_DEPTH / 2
+          : y - ROW_DEPTH / 2;
+        makeEdge(centerY - 2.2, materials.asphaltYellow, 0.018, 2.05);
+        makeEdge(centerY + 2.2, materials.asphaltYellow, 0.018, 2.05);
+      }
+
+      const nextLaneDirection = row.roadLaneIndex < row.roadLaneCount - 1
+        ? (row.roadLaneIndex + 1 < Math.ceil(row.roadLaneCount / 2) ? -1 : 1) * (row.roadReversed ? -1 : 1)
+        : row.direction;
+      const separatesOpposingTraffic = row.roadLaneCount >= 3 && !isLastLane && nextLaneDirection !== row.direction;
+      if (separatesOpposingTraffic) {
+        const yellowGap = row.roadLaneCount === 2 ? 2.2 : 3.5;
+        makeEdge(y + ROW_DEPTH / 2 - yellowGap, materials.asphaltYellow, 0.014, 1.8);
+        makeEdge(y + ROW_DEPTH / 2 + yellowGap, materials.asphaltYellow, 0.014, 1.8);
+      } else if (!isLastLane) {
+        for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 3) {
+          makeRoadDash(tile, y + ROW_DEPTH / 2 - 1, materials.asphaltMark, 1.7);
+        }
+      }
+    }
+
+    for (let tile = EXTENDED_TILE_MIN + ((row.index + row.roadLaneIndex) % 3); tile <= EXTENDED_TILE_MAX; tile += 6) {
+      const patch = new THREE.Mesh(geometries.roadStripe, row.index % 2 ? materials.roadEdge : materials.roadAlt);
+      patch.position.set(tileToX(tile, TILE_SIZE), y + (((tile + row.index) % 3) - 1) * 8, 0.9);
+      patch.scale.set(1.25 + ((tile + row.index) % 2) * 0.45, 0.42, 0.7);
+      patch.castShadow = false;
+      patch.receiveShadow = false;
+      group.add(patch);
     }
   }
 
@@ -1092,7 +1149,7 @@ export function createRowGroup(row, geometries, materials) {
     group.add(createWaterSurface(row, geometries, materials));
   }
 
-  if (row.type === 'forest') {
+  if (row.type === 'forest' || (row.type === 'grass' && row.trees?.length)) {
     row.trees.forEach((tile, index) => group.add(createTree(tile, row.index, geometries, materials, index + row.index)));
   }
 

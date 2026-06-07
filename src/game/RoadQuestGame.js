@@ -126,7 +126,8 @@ export class RoadQuestGame {
       onMilestone: options.onMilestone || (() => {}),
       onMoveStart: options.onMoveStart || (() => {}),
       onHazardSound: options.onHazardSound || (() => {}),
-      onNearMiss: options.onNearMiss || (() => {})
+      onNearMiss: options.onNearMiss || (() => {}),
+      onRespawn: options.onRespawn || (() => {})
     };
 
     this.scene = new THREE.Scene();
@@ -149,12 +150,15 @@ export class RoadQuestGame {
     this.scene.add(this.worldGroup, this.vehicleGroup, this.fxGroup);
 
     this.rows = [];
+    this.minPlayableRow = 0;
+    this.prunedRowDataBefore = 0;
     this.rowGroups = new Map();
     this.vehicles = [];
     this.planks = [];
     this.trafficRows = new Map();
     this.waterRows = new Map();
     this.waterFlowItems = [];
+    this.waterFlowRows = new Map();
     this.fxItems = [];
     this.moveQueue = [];
     this.player = null;
@@ -173,6 +177,10 @@ export class RoadQuestGame {
     this.impactDuration = 920;
     this.impactReason = 'traffic';
     this.impactVector = new THREE.Vector2(0, 0);
+    this.cheatMode = Boolean(options.cheatMode);
+    this.cheatRespawnPending = false;
+    this.cheatRespawnPosition = null;
+    this.invulnerableUntil = 0;
     this.waterGraceUntil = 0;
     this.waterImpactOrigin = new THREE.Vector3();
     this.lastWaterStruggleFx = 0;
@@ -239,6 +247,9 @@ export class RoadQuestGame {
     this.isImpacting = false;
     this.impactStartedAt = 0;
     this.impactVector.set(0, 0);
+    this.cheatRespawnPending = false;
+    this.cheatRespawnPosition = null;
+    this.invulnerableUntil = 0;
     this.moveQueue = [];
     this.movement = null;
     this.playerPosition = { row: 0, tile: 0 };
@@ -250,6 +261,8 @@ export class RoadQuestGame {
     this.newRecordThisRun = false;
     this.newRecordScore = 0;
     this.activeRidePlankId = null;
+    this.minPlayableRow = 0;
+    this.prunedRowDataBefore = 0;
 
     disposeDynamicMaterials(this.worldGroup);
     disposeDynamicMaterials(this.vehicleGroup);
@@ -262,6 +275,7 @@ export class RoadQuestGame {
     this.fxItems = [];
     this.trafficRows.clear();
     this.waterRows.clear();
+    this.waterFlowRows.clear();
     this.waterFlowItems = [];
     this.rowGroups.clear();
 
@@ -306,6 +320,83 @@ export class RoadQuestGame {
     return 0;
   }
 
+  getSaveState(extra = {}) {
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      row: this.playerPosition.row,
+      tile: this.playerPosition.tile,
+      highestRow: this.highestRow,
+      score: this.score,
+      highScore: this.highScore,
+      ...extra
+    };
+  }
+
+  loadSaveState(state, startImmediately = true) {
+    const row = Math.max(0, Math.floor(Number(state?.row) || 0));
+    const tile = clamp(Math.floor(Number(state?.tile) || 0), MIN_TILE, MAX_TILE);
+    const score = Math.max(0, Math.floor(Number(state?.score) || row));
+    const highestRow = Math.max(score, Math.floor(Number(state?.highestRow) || row));
+
+    this.reset(false);
+    extendRows(this.rows, row + 38);
+    this._addRowsAround(row, 42, 24);
+
+    this.playerPosition = { row, tile };
+    this.highestRow = highestRow;
+    this.score = score;
+    this.lastMilestone = Math.floor(score / this.options.milestoneEvery) * this.options.milestoneEvery;
+    this.minPlayableRow = Math.max(0, row - 24);
+    this.prunedRowDataBefore = Math.max(0, row - 32);
+    this.moveQueue = [];
+    this.movement = null;
+    this.isGameOver = false;
+    this.isImpacting = false;
+    this.isPlaying = Boolean(startImmediately);
+    this.activeRidePlankId = null;
+    this.invulnerableUntil = performance.now() + 1200;
+    this.waterGraceUntil = this.invulnerableUntil;
+    this._setPlayerWorldPosition(row, tile);
+    this._pruneRowsBehindPlayer();
+    this._clearSpawnAroundPlayer(2, 210);
+    this._updateCamera(true);
+    this.callbacks.onScore(this.score);
+    this.callbacks.onHighScore(this.highScore);
+    return this.getSaveState();
+  }
+
+  continueAfterLife(invulnerableMs = 1200) {
+    if (!this.player) return false;
+    this.isGameOver = false;
+    this.isImpacting = false;
+    this.isPlaying = true;
+    this.moveQueue = [];
+    this.movement = null;
+    this.activeRidePlankId = null;
+    this.cheatRespawnPending = false;
+    this.cheatRespawnPosition = null;
+
+    this.invulnerableUntil = performance.now() + invulnerableMs;
+    this.waterGraceUntil = this.invulnerableUntil;
+    this._setPlayerWorldPosition(this.playerPosition.row, this.playerPosition.tile);
+    this.player.rotation.set(0, 0, this.player.rotation.z);
+    this.player.scale.setScalar(this.player.userData.baseScale || 0.62);
+    this.player.visible = true;
+    this._clearSpawnAroundPlayer(2, 220);
+    this._updateCamera(true);
+    return true;
+  }
+
+  setCheatMode(enabled) {
+    this.cheatMode = Boolean(enabled);
+    if (!this.cheatMode) {
+      this.cheatRespawnPending = false;
+      this.invulnerableUntil = 0;
+      if (this.player) this.player.visible = true;
+    }
+  }
+
   queueMove(direction) {
     if (!DIRECTIONS.has(direction)) return false;
     if (!this.isPlaying || this.isGameOver || this.isImpacting) return false;
@@ -345,7 +436,11 @@ export class RoadQuestGame {
 
     if (row.type === 'water') {
       rowGroup.traverse((child) => {
-        if (child.userData?.waterFlow) this.waterFlowItems.push(child);
+        if (child.userData?.waterFlow) {
+          this.waterFlowItems.push(child);
+          if (!this.waterFlowRows.has(row.index)) this.waterFlowRows.set(row.index, []);
+          this.waterFlowRows.get(row.index).push(child);
+        }
       });
     }
 
@@ -380,6 +475,42 @@ export class RoadQuestGame {
     }
   }
 
+  _addRowsAround(centerRow, forwardRows = 42, backwardRows = 24) {
+    const start = Math.max(0, centerRow - backwardRows);
+    const end = Math.min(this.rows.length - 1, centerRow + forwardRows);
+    for (let index = start; index <= end; index += 1) {
+      if (this.rows[index]) this._addRow(this.rows[index]);
+    }
+  }
+
+  _clearSpawnAroundPlayer(rowRadius = 2, clearRadius = 190) {
+    if (!this.player) return;
+    const playerX = this.player.position.x;
+
+    this.vehicles.forEach((obstacle) => {
+      const data = obstacle.userData || {};
+      if (!Number.isFinite(data.rowIndex)) return;
+      if (Math.abs(data.rowIndex - this.playerPosition.row) > rowRadius) return;
+
+      const halfWidth = (data.width || 72) * 0.5;
+      const safetyRadius = clearRadius + halfWidth;
+      if (Math.abs(obstacle.position.x - playerX) >= safetyRadius) return;
+
+      const direction = data.direction || (obstacle.position.x >= playerX ? 1 : -1);
+      const margin = data.type === 'train' ? TRAIN_SAFE_MARGIN : VEHICLE_SAFE_MARGIN;
+      const { minX, maxX } = laneBounds(margin);
+      const preferredX = playerX + direction * safetyRadius;
+      const fallbackX = playerX - direction * safetyRadius;
+      obstacle.position.x = preferredX >= minX - halfWidth && preferredX <= maxX + halfWidth
+        ? preferredX
+        : clamp(fallbackX, minX - halfWidth, maxX + halfWidth);
+
+      if (data.currentSpeed && data.baseSpeed) {
+        data.currentSpeed = Math.min(data.currentSpeed, data.baseSpeed);
+      }
+    });
+  }
+
   _plannedPosition() {
     let row = this.playerPosition.row;
     let tile = this.playerPosition.tile;
@@ -396,11 +527,10 @@ export class RoadQuestGame {
   }
 
   _canMoveTo(row, tile) {
+    if (row < this.minPlayableRow) return false;
     if (row < 0 || tile < MIN_TILE || tile > MAX_TILE) return false;
     extendRows(this.rows, row + 18);
-    for (let index = this.rowGroups.size; index < this.rows.length; index += 1) {
-      this._addRow(this.rows[index]);
-    }
+    this._addRowsAround(row, 24, 24);
     const targetRow = this.rows[row];
     if (!targetRow) return false;
     if (targetRow.blockers?.has(tile)) return false;
@@ -442,8 +572,16 @@ export class RoadQuestGame {
     this.waterGraceUntil = landedRow?.type === 'water' ? 0 : performance.now() + 105;
     this.movement = null;
     if (landedRow?.type === 'water') {
-      this._updateWaterState(0);
-      if (this.isImpacting || this.isGameOver) return;
+      const supportingPlank = this._findSupportingPlank();
+      if (!supportingPlank) {
+        this._updateWaterState(0);
+        if (this.isImpacting || this.isGameOver) return;
+      } else {
+        const now = performance.now();
+        this.activeRidePlankId = supportingPlank.uuid;
+        supportingPlank.userData.riderSince = now;
+        this.waterGraceUntil = now + 180;
+      }
     }
 
     if (this.playerPosition.row > this.highestRow) {
@@ -471,11 +609,51 @@ export class RoadQuestGame {
     }
 
     extendRows(this.rows, this.playerPosition.row + 38);
-    for (let index = this.rowGroups.size; index < this.rows.length; index += 1) {
-      this._addRow(this.rows[index]);
-    }
+    this._addRowsAround(this.playerPosition.row, 42, 24);
+    this._pruneRowsBehindPlayer();
 
     this._beginNextMove();
+  }
+
+  _pruneRowsBehindPlayer() {
+    const keepFromRow = Math.max(0, this.playerPosition.row - 24);
+    const pruneDataBefore = Math.max(0, keepFromRow - 8);
+    this.minPlayableRow = keepFromRow;
+
+    for (const [rowIndex, rowGroup] of this.rowGroups) {
+      if (rowIndex >= keepFromRow) continue;
+      disposeDynamicMaterials(rowGroup);
+      this.worldGroup.remove(rowGroup);
+      this.rowGroups.delete(rowIndex);
+      this.waterFlowRows.delete(rowIndex);
+    }
+
+    const pruneMovingItem = (item) => {
+      if ((item.userData?.rowIndex ?? 0) >= keepFromRow) return false;
+      disposeDynamicMaterials(item);
+      this.vehicleGroup.remove(item);
+      return true;
+    };
+
+    this.vehicles = this.vehicles.filter((vehicle) => !pruneMovingItem(vehicle));
+    this.planks = this.planks.filter((plank) => !pruneMovingItem(plank));
+
+    for (const rowIndex of Array.from(this.trafficRows.keys())) {
+      if (rowIndex < keepFromRow) this.trafficRows.delete(rowIndex);
+    }
+    for (const rowIndex of Array.from(this.waterRows.keys())) {
+      if (rowIndex < keepFromRow) this.waterRows.delete(rowIndex);
+    }
+
+    this.waterFlowItems = [];
+    this.waterFlowRows.forEach((items) => {
+      this.waterFlowItems.push(...items);
+    });
+
+    for (let index = this.prunedRowDataBefore; index < pruneDataBefore; index += 1) {
+      if (this.rows[index]) this.rows[index] = null;
+    }
+    this.prunedRowDataBefore = Math.max(this.prunedRowDataBefore, pruneDataBefore);
   }
 
   _setPlayerWorldPosition(row, tile, direction = 'forward') {
@@ -516,6 +694,7 @@ export class RoadQuestGame {
 
     this._updateWaterFlow(delta);
     this._updateFx(delta);
+    this._updateGhostBlink();
     this._updateCamera(false);
     if (this.isImpacting) this._applyCameraShake();
     this.renderer.render(this.scene, this.camera);
@@ -967,15 +1146,15 @@ export class RoadQuestGame {
     for (const plank of this.planks) {
       const { rowIndex, width, depth, sinking } = plank.userData;
       if (sinking) continue;
-      const rowY = rowToY(rowIndex, TILE_SIZE);
-      if (Math.abs(playerY - rowY) > (depth + PLAYER_DEPTH) * 0.5) continue;
-      if (Math.abs(playerX - plank.position.x) <= (width + PLAYER_WIDTH) * 0.46) return plank;
+      if (Math.abs(playerY - plank.position.y) > (depth + PLAYER_DEPTH) * 0.62) continue;
+      if (Math.abs(playerX - plank.position.x) <= (width + PLAYER_WIDTH) * 0.54) return plank;
     }
     return null;
   }
 
   _updateWaterState(delta) {
     if (!this.player || this.isImpacting || this.isGameOver || this.movement) return;
+    if (performance.now() < this.invulnerableUntil) return;
     const row = this.rows[this.playerPosition.row];
     if (!row || row.type !== 'water') return;
     if (performance.now() < this.waterGraceUntil) return;
@@ -1076,6 +1255,7 @@ export class RoadQuestGame {
 
   _checkTrafficCollision() {
     if (!this.player || this.isImpacting) return;
+    if (performance.now() < this.invulnerableUntil) return;
     const playerX = this.player.position.x;
     const playerY = this.player.position.y;
 
@@ -1091,11 +1271,22 @@ export class RoadQuestGame {
 
   _triggerImpact(reason, obstacle) {
     if (this.isImpacting || this.isGameOver) return;
+    const cheatRespawn = this.cheatMode;
     this.isImpacting = true;
     this.isPlaying = false;
     this.impactStartedAt = performance.now();
     this.impactReason = reason;
-    this.impactDuration = reason === 'train' ? 2120 : reason === 'water' ? 1980 : 1880;
+    this.impactDuration = cheatRespawn ? 640 : reason === 'train' ? 2120 : reason === 'water' ? 1980 : 1880;
+    this.cheatRespawnPending = cheatRespawn;
+    this.cheatRespawnPosition = cheatRespawn && this.player
+      ? {
+          row: this.playerPosition.row,
+          tile: this.playerPosition.tile,
+          x: this.player.position.x,
+          y: this.player.position.y,
+          z: 0
+        }
+      : null;
     this.moveQueue = [];
     this.movement = null;
 
@@ -1160,9 +1351,52 @@ export class RoadQuestGame {
     }
 
     if (t >= 1) {
+      if (this.cheatRespawnPending) {
+        this._respawnAfterCheatImpact();
+        return;
+      }
       this.isImpacting = false;
       this._gameOver(this.impactReason);
     }
+  }
+
+  _respawnAfterCheatImpact() {
+    const respawn = this.cheatRespawnPosition;
+    this.isImpacting = false;
+    this.isGameOver = false;
+    this.isPlaying = true;
+    this.cheatRespawnPending = false;
+    this.cheatRespawnPosition = null;
+    this.moveQueue = [];
+    this.movement = null;
+    this.activeRidePlankId = null;
+    this.invulnerableUntil = performance.now() + 1000;
+    this.waterGraceUntil = this.invulnerableUntil;
+
+    if (respawn && this.player) {
+      this.playerPosition = { row: respawn.row, tile: respawn.tile };
+      this.player.position.set(respawn.x, respawn.y, respawn.z);
+      this.player.rotation.set(0, 0, this.player.rotation.z);
+      this.player.scale.setScalar(this.player.userData.baseScale || 0.62);
+      this.player.visible = true;
+    }
+
+    this.callbacks.onRespawn({
+      score: this.score,
+      highScore: this.highScore,
+      reason: this.impactReason,
+      invulnerableMs: 1000
+    });
+  }
+
+  _updateGhostBlink() {
+    if (!this.player) return;
+    const now = performance.now();
+    if (now >= this.invulnerableUntil) {
+      this.player.visible = true;
+      return;
+    }
+    this.player.visible = Math.floor(now / 95) % 2 === 0;
   }
 
   _applyCameraShake() {

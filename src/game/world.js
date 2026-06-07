@@ -3,6 +3,7 @@ import {
   MIN_TILE,
   PLANK_PALETTE,
   STARTING_ROWS,
+  SUPERCAR_PALETTE,
   TRAFFIC_MIN_GAP,
   TILE_SIZE,
   TRAIN_PALETTE,
@@ -79,6 +80,28 @@ function randomInt(random, min, maxInclusive) {
   return min + Math.floor(random() * (maxInclusive - min + 1));
 }
 
+function generateGrassRow(rowIndex, random = null, withDecorTrees = false) {
+  const shouldDecorate = withDecorTrees || rowIndex >= 80;
+  const trees = shouldDecorate && random
+    ? uniqueRandomTiles(random, 2 + Math.floor(random() * 3), MIN_TILE, MAX_TILE, [-2, -1, 0, 1, 2])
+    : [];
+  return {
+    index: rowIndex,
+    type: 'grass',
+    trees,
+    blockers: new Set()
+  };
+}
+
+function rowsSinceOpenGrass(rows, rowIndex) {
+  for (let i = rowIndex - 1; i >= 0; i -= 1) {
+    const row = rows[i];
+    if (!row) continue;
+    if (row.type === 'grass') return rowIndex - i;
+  }
+  return rowIndex;
+}
+
 function generateForestRow(rowIndex, random) {
   const treeCount = 4 + Math.floor(random() * 5);
   const excluded = [-1, 0, 1];
@@ -147,6 +170,54 @@ function railBandContinuation(rows, rowIndex) {
   };
 }
 
+function generateLateGameStageRow(rowIndex, random) {
+  const cycle = (rowIndex - 100) % 21;
+  const cycleBase = rowIndex - cycle;
+  const park = () => generateGrassRow(rowIndex, random, true);
+  const highway4 = (laneIndex, bandOffset = 0) => generateTrafficRow(rowIndex, random, {
+    bandId: cycleBase + bandOffset,
+    laneCount: 4,
+    laneIndex,
+    reversed: (cycleBase + bandOffset) % 2 === 0
+  });
+  const road2 = (laneIndex, bandOffset = 0) => generateTrafficRow(rowIndex, random, {
+    bandId: cycleBase + bandOffset,
+    laneCount: 2,
+    laneIndex,
+    reversed: (cycleBase + bandOffset) % 2 !== 0
+  });
+  const rail2 = (trackIndex, bandOffset = 0) => generateRailRow(rowIndex, random, {
+    bandId: cycleBase + bandOffset,
+    trackCount: 2,
+    trackIndex,
+    reversed: (cycleBase + bandOffset) % 2 === 0
+  });
+
+  switch (cycle) {
+    case 0: return rail2(0, 0);
+    case 1: return rail2(1, 0);
+    case 2: return park();
+    case 3: return highway4(0, 3);
+    case 4: return highway4(1, 3);
+    case 5: return highway4(2, 3);
+    case 6: return highway4(3, 3);
+    case 7: return park();
+    case 8: return generateWaterRow(rowIndex, random);
+    case 9: return road2(0, 9);
+    case 10: return road2(1, 9);
+    case 11: return park();
+    case 12: return rail2(0, 12);
+    case 13: return rail2(1, 12);
+    case 14: return park();
+    case 15: return generateWaterRow(rowIndex, random);
+    case 16: return highway4(0, 16);
+    case 17: return highway4(1, 16);
+    case 18: return highway4(2, 16);
+    case 19: return highway4(3, 16);
+    default: return park();
+  }
+}
+
 function chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants = []) {
   const supercar = VEHICLE_VARIANTS.find((variant) => variant.kind === 'supercar');
   const superCount = chosenVariants.filter((variant) => variant.kind === 'supercar').length;
@@ -197,14 +268,16 @@ function generateTrafficRow(rowIndex, random, roadBand = null) {
   // Later rows get denser lanes, but spacing still prevents pile-ups.
   const highwayBonus = rowIndex >= 100 && laneCount === 4 ? 2 : 0;
   const densityBonus = laneCount > 1 && rowIndex > 18 ? 1 : 0;
-  const desiredCount = 2 + Math.floor(random() * 4) + densityBonus + highwayBonus + (rowIndex > 28 && random() > 0.58 ? 1 : 0);
+  let desiredCount = 2 + Math.floor(random() * 4) + densityBonus + highwayBonus + (rowIndex > 28 && random() > 0.58 ? 1 : 0);
+  if (rowIndex >= 80) desiredCount = Math.min(desiredCount, laneCount >= 4 ? 5 : 4);
+  if (rowIndex >= 100 && laneCount >= 4) desiredCount = Math.min(desiredCount, random() > 0.72 ? 5 : 4);
   const vehicles = [];
   const chosenVariants = [];
   let safetyBudget = span - 140;
 
   for (let i = 0; i < desiredCount; i += 1) {
     const variant = chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants);
-    const minGap = Math.max(rowIndex >= 100 ? 104 : 92, variant.width * 0.72);
+    const minGap = Math.max(rowIndex >= 100 ? 138 : rowIndex >= 80 ? 118 : 92, variant.width * 0.86);
     if (safetyBudget - variant.width - minGap < 0 && chosenVariants.length >= 2) break;
     chosenVariants.push(variant);
     safetyBudget -= variant.width + minGap;
@@ -217,7 +290,12 @@ function generateTrafficRow(rowIndex, random, roadBand = null) {
   for (let i = 0; i < count; i += 1) {
     const variant = chosenVariants[i] || chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants);
     const maxJitter = Math.min(spacing * 0.12, TILE_SIZE * 0.82);
-    const x = minX + spacing * (i + 0.5) + (random() - 0.5) * maxJitter;
+    let x = minX + spacing * (i + 0.5) + (random() - 0.5) * maxJitter;
+    const crossingGap = rowIndex >= 100 ? TILE_SIZE * 3.1 : rowIndex >= 80 ? TILE_SIZE * 2.35 : 0;
+    if (crossingGap > 0 && Math.abs(x) < crossingGap) {
+      const side = x >= 0 ? 1 : -1;
+      x = side * (crossingGap + 18 + random() * 42);
+    }
     const baseSpeed = variant.speedMin + random() * (variant.speedMax - variant.speedMin);
     const aggression = variant.tier === 'super'
       ? 0.82 + random() * 0.18
@@ -248,7 +326,9 @@ function generateTrafficRow(rowIndex, random, roadBand = null) {
       aggression,
       reaction: 0.14 + random() * 0.18,
       minFollowGap: Math.max(TRAFFIC_MIN_GAP, variant.width * (0.42 + (1 - aggression) * 0.26)),
-      color: variant.fixedColor || pick(random, VEHICLE_PALETTE),
+      color: variant.kind === 'supercar'
+        ? pick(random, SUPERCAR_PALETTE)
+        : variant.fixedColor || pick(random, VEHICLE_PALETTE),
       trimColor: random() > 0.5 ? 0xd2d8df : 0x9eabb8
     });
   }
@@ -344,13 +424,13 @@ function generateWaterRow(rowIndex, random) {
   const laneOffset = (random() - 0.5) * 3;
   const span = (MAX_TILE - MIN_TILE + 1) * TILE_SIZE + WATER_SAFE_MARGIN * 2;
   const minX = MIN_TILE * TILE_SIZE - WATER_SAFE_MARGIN;
-  const count = rowIndex > 28 ? 3 : 2 + Math.floor(random() * 2);
+  const count = rowIndex > 28 ? (random() > 0.62 ? 4 : 3) : 2 + Math.floor(random() * 2);
   const spacing = span / count;
   const laneSpeed = (50 + random() * 46) * (0.85 + Math.min(0.48, speedMultiplier - 1));
   const planks = [];
 
   for (let i = 0; i < count; i += 1) {
-    const width = randomInt(random, 84, rowIndex > 26 ? 128 : 146);
+    const width = randomInt(random, 92, rowIndex > 26 ? 138 : 152);
     const speed = laneSpeed * (0.94 + random() * 0.1);
     const x = minX + spacing * (i + 0.5) + (random() - 0.5) * Math.min(54, spacing * 0.18);
     planks.push({
@@ -388,6 +468,8 @@ export function generateRow(rowIndex, rows) {
 
   const random = mulberry32(hashSeed(rowIndex, 41));
 
+  if (rowIndex >= 100) return generateLateGameStageRow(rowIndex, random);
+
   const continuation = roadBandContinuation(rows, rowIndex);
   if (continuation) return generateTrafficRow(rowIndex, random, continuation);
   const railContinuation = railBandContinuation(rows, rowIndex);
@@ -401,41 +483,28 @@ export function generateRow(rowIndex, rows) {
   const lastThree = previousTypes(rows, rowIndex, 3);
   const lastTwo = lastThree.slice(-2);
   const { hazardBonus, waterChance, railChance } = difficultyForRow(rowIndex);
+  const openGrassGap = rowsSinceOpenGrass(rows, rowIndex);
 
-  if (rowIndex >= 100) {
-    const previous = rows[rowIndex - 1]?.type;
-    const roll = random();
-    if (previous === 'water') {
-      return roll < 0.48 ? generateTrafficRow(rowIndex, random) : roll < 0.78 ? generateRailRow(rowIndex, random) : generateForestRow(rowIndex, random);
-    }
-    if (previous === 'traffic') {
-      return roll < 0.42 ? generateRailRow(rowIndex, random) : roll < 0.72 ? generateWaterRow(rowIndex, random) : generateForestRow(rowIndex, random);
-    }
-    if (previous === 'rail') {
-      return roll < 0.44 ? generateTrafficRow(rowIndex, random) : roll < 0.72 ? generateWaterRow(rowIndex, random) : generateForestRow(rowIndex, random);
-    }
-    if (roll < 0.46) return generateTrafficRow(rowIndex, random);
-    if (roll < 0.76) return generateRailRow(rowIndex, random);
-    if (roll < 0.9) return generateWaterRow(rowIndex, random);
-    return generateForestRow(rowIndex, random);
-  }
+  // Every stage needs a real breathing row. Forest rows are scenic blockers; pure
+  // grass is the reliable safe reset where players can pause and plan.
+  if (openGrassGap >= 6) return generateGrassRow(rowIndex, random);
 
   if (rowIndex >= 80) {
     const previous = rows[rowIndex - 1]?.type;
     const roll = random();
     if (previous === 'water') {
-      return roll < 0.58 ? generateTrafficRow(rowIndex, random) : roll < 0.82 ? generateRailRow(rowIndex, random) : generateForestRow(rowIndex, random);
+      return roll < 0.58 ? generateTrafficRow(rowIndex, random) : roll < 0.82 ? generateRailRow(rowIndex, random) : generateGrassRow(rowIndex, random);
     }
     if (previous === 'traffic') {
-      return roll < 0.36 ? generateRailRow(rowIndex, random) : roll < 0.62 ? generateWaterRow(rowIndex, random) : generateForestRow(rowIndex, random);
+      return roll < 0.36 ? generateRailRow(rowIndex, random) : roll < 0.62 ? generateWaterRow(rowIndex, random) : generateGrassRow(rowIndex, random);
     }
     if (previous === 'rail') {
-      return roll < 0.52 ? generateTrafficRow(rowIndex, random) : roll < 0.76 ? generateWaterRow(rowIndex, random) : generateForestRow(rowIndex, random);
+      return roll < 0.52 ? generateTrafficRow(rowIndex, random) : roll < 0.76 ? generateWaterRow(rowIndex, random) : generateGrassRow(rowIndex, random);
     }
     if (roll < 0.52) return generateTrafficRow(rowIndex, random);
     if (roll < 0.76) return generateRailRow(rowIndex, random);
     if (roll < 0.9) return generateWaterRow(rowIndex, random);
-    return generateForestRow(rowIndex, random);
+    return generateGrassRow(rowIndex, random);
   }
 
   const hazardTypes = new Set(['traffic', 'rail', 'water']);

@@ -30,6 +30,7 @@ export const COLORS = Object.freeze({
   roadAlt: 0x383d49,
   roadEdge: 0x252a34,
   asphaltMark: 0xc9d2de,
+  asphaltYellow: 0xe4c642,
   water: 0x3f96c7,
   waterAlt: 0x2f83b3,
   waterDeep: 0x1d5f86,
@@ -93,6 +94,14 @@ export const VEHICLE_PALETTE = [
   0x2b5872
 ];
 
+export const SUPERCAR_PALETTE = [
+  0xb91f2d,
+  0xf39a12,
+  0x0c1018,
+  0x1559b7,
+  0x1e8b4d
+];
+
 export const VEHICLE_VARIANTS = Object.freeze([
   { kind: 'sedan', width: 66, depth: 30, speedMin: 86, speedMax: 148, weight: 16, tier: 'medium' },
   { kind: 'hatchback', width: 58, depth: 29, speedMin: 92, speedMax: 158, weight: 12, tier: 'medium' },
@@ -110,7 +119,7 @@ export const VEHICLE_VARIANTS = Object.freeze([
   { kind: 'police', width: 72, depth: 31, speedMin: 122, speedMax: 190, weight: 5, fixedColor: 0xf4f7fb, tier: 'fast' },
   { kind: 'ambulance', width: 98, depth: 35, speedMin: 108, speedMax: 174, weight: 4, fixedColor: 0xf4f7fb, tier: 'fast' },
   { kind: 'sports', width: 70, depth: 31, speedMin: 146, speedMax: 222, weight: 5, tier: 'fast' },
-  { kind: 'supercar', width: 98, depth: 36, speedMin: 190, speedMax: 292, weight: 2, fixedColor: 0xf39a12, tier: 'super' }
+  { kind: 'supercar', width: 74, depth: 32, speedMin: 190, speedMax: 292, weight: 2, tier: 'super' }
 ]);
 
 export const PLANK_PALETTE = [

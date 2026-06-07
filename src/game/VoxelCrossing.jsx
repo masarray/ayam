@@ -5,11 +5,13 @@ import { BADGE_FAMILIES, getBadgeCount, loadPlayerProfile, savePlayerProfile, tr
 import './VoxelCrossing.css';
 
 const SETTINGS_KEY = 'ayam-sd-settings';
+const SAVE_GAME_KEY = 'ayam-sd-save-game-v1';
 const INSTALL_PROMPT_KEY = 'ayam-sd-install-prompt-v1';
 const SEEN_QUESTIONS_KEY = 'ayam-sd-seen-questions-v1';
 const QUIZ_SIZE = 5;
 const GAME_OVERS_BEFORE_QUIZ = 3;
 const QUIZ_APPEAR_DELAY_MS = 300;
+const MAX_LIVES = 2;
 const PLAY_KEYS = new Set([' ', 'spacebar', 'enter', 'w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 const ACTIVE_QUIZ_STATES = new Set(['loading', 'running', 'complete']);
 
@@ -32,14 +34,15 @@ function isPlayKey(event) {
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { musicEnabled: true, sfxEnabled: true };
+    if (!raw) return { musicEnabled: true, sfxEnabled: true, cheatMode: false };
     const parsed = JSON.parse(raw);
     return {
       musicEnabled: parsed.musicEnabled !== false,
-      sfxEnabled: parsed.sfxEnabled !== false
+      sfxEnabled: parsed.sfxEnabled !== false,
+      cheatMode: parsed.cheatMode === true
     };
   } catch {
-    return { musicEnabled: true, sfxEnabled: true };
+    return { musicEnabled: true, sfxEnabled: true, cheatMode: false };
   }
 }
 
@@ -49,6 +52,30 @@ function saveSettings(settings) {
   } catch {
     // Browser storage is optional. The game still runs when storage is blocked.
   }
+}
+
+function loadSavedGame() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVE_GAME_KEY) || 'null');
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!Number.isFinite(Number(parsed.row)) || !Number.isFinite(Number(parsed.tile))) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedGame(saveState) {
+  try {
+    localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(saveState));
+  } catch {
+    // Save is optional; gameplay continues even when storage is blocked.
+  }
+}
+
+function normalizeLives(value) {
+  if (!Number.isFinite(Number(value))) return MAX_LIVES;
+  return Math.max(0, Math.min(MAX_LIVES, Math.floor(Number(value))));
 }
 
 function loadSeenQuestionIds() {
@@ -514,10 +541,14 @@ export default function VoxelCrossing({
   const [score, setScore] = useState(0);
   const [lastRunScore, setLastRunScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
+  const [lives, setLives] = useState(MAX_LIVES);
+  const [lifeBlinkIndex, setLifeBlinkIndex] = useState(null);
   const [orientationHint, setOrientationHint] = useState('landscape');
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(() => loadSettings());
+  const [savedGame, setSavedGame] = useState(() => loadSavedGame());
+  const [saveNotice, setSaveNotice] = useState('');
   const [quizDue, setQuizDue] = useState(false);
   const [quizReveal, setQuizReveal] = useState(false);
   const [gameOversUntilQuiz, setGameOversUntilQuiz] = useState(GAME_OVERS_BEFORE_QUIZ);
@@ -534,6 +565,13 @@ export default function VoxelCrossing({
   const [pwaPromptVisible, setPwaPromptVisible] = useState(false);
   const [pwaPromptStatus, setPwaPromptStatus] = useState('ready');
   const [standalonePwa, setStandalonePwa] = useState(() => isStandaloneDisplay());
+
+  const livesRef = useRef(MAX_LIVES);
+  const lifeBlinkTimerRef = useRef(null);
+
+  useEffect(() => {
+    livesRef.current = lives;
+  }, [lives]);
 
   useEffect(() => {
     if (isStandaloneDisplay()) {
@@ -623,11 +661,13 @@ export default function VoxelCrossing({
     saveSettings(settings);
     audioRef.current?.setMusicEnabled(settings.musicEnabled);
     audioRef.current?.setSfxEnabled(settings.sfxEnabled);
+    gameRef.current?.setCheatMode?.(settings.cheatMode);
   }, [settings]);
 
   useEffect(() => () => {
     if (confettiTimerRef.current) window.clearTimeout(confettiTimerRef.current);
     if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
+    if (lifeBlinkTimerRef.current) window.clearTimeout(lifeBlinkTimerRef.current);
     if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
     if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
     if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
@@ -752,6 +792,7 @@ export default function VoxelCrossing({
     const game = new RoadQuestGame(hostRef.current, {
       enableMilestoneCallback,
       milestoneEvery,
+      cheatMode: settings.cheatMode,
       onReady: ({ highScore: initialHighScore }) => {
         setHighScore(initialHighScore);
         setReady(true);
@@ -774,7 +815,34 @@ export default function VoxelCrossing({
         if (kind === 'trainHorn') audioRef.current?.trainHorn();
       },
       onNearMiss: triggerNearMiss,
+      onRespawn: () => {
+        setImpacting(false);
+        setGameOver(false);
+        setStarted(true);
+        setResult(null);
+      },
       onGameOver: (nextResult) => {
+        if (livesRef.current > 0 && game.continueAfterLife?.()) {
+          const nextLives = Math.max(0, livesRef.current - 1);
+          livesRef.current = nextLives;
+          setLives(nextLives);
+          setLifeBlinkIndex(nextLives);
+          if (lifeBlinkTimerRef.current) window.clearTimeout(lifeBlinkTimerRef.current);
+          lifeBlinkTimerRef.current = window.setTimeout(() => {
+            setLifeBlinkIndex(null);
+            lifeBlinkTimerRef.current = null;
+          }, 920);
+          setImpacting(false);
+          setGameOver(false);
+          setStarted(true);
+          setResult(null);
+          setQuizDue(false);
+          setQuizReveal(false);
+          setSaveNotice(nextLives > 0 ? `Nyawa tersisa ${nextLives}` : 'Kesempatan terakhir');
+          window.setTimeout(() => setSaveNotice(''), 1200);
+          return;
+        }
+
         const nextCycleCount = gameOverCycleRef.current + 1;
         const shouldStartQuiz = nextCycleCount >= GAME_OVERS_BEFORE_QUIZ;
         gameOverCycleRef.current = shouldStartQuiz ? 0 : nextCycleCount;
@@ -860,6 +928,9 @@ export default function VoxelCrossing({
     setImpacting(false);
     setGameOver(false);
     setResult(null);
+    livesRef.current = MAX_LIVES;
+    setLives(MAX_LIVES);
+    setLifeBlinkIndex(null);
     setQuizDue(false);
     setQuizReveal(false);
     setQuiz(QUIZ_INITIAL);
@@ -870,6 +941,39 @@ export default function VoxelCrossing({
       audioRef.current?.setMusicSuppressed?.(false);
       schedulePendingBadgeCelebration();
     }, 0);
+  };
+
+  const saveGame = () => {
+    const saveState = gameRef.current?.getSaveState?.({ lives });
+    if (!saveState) return;
+    writeSavedGame(saveState);
+    setSavedGame(saveState);
+    setSaveNotice(`Tersimpan di score ${saveState.score}`);
+    window.setTimeout(() => setSaveNotice(''), 1500);
+  };
+
+  const continueSavedGame = () => {
+    const saveState = savedGame || loadSavedGame();
+    if (!saveState) return;
+    unlockAudio();
+    gameRef.current?.loadSaveState?.(saveState, true);
+    menuPausedRef.current = false;
+    setMenuOpen(false);
+    setSettingsOpen(false);
+    setBadgeBoardOpen(false);
+    setImpacting(false);
+    setGameOver(false);
+    setResult(null);
+    setQuizDue(false);
+    setQuizReveal(false);
+    setQuiz(QUIZ_INITIAL);
+    setStarted(true);
+    const restoredLives = normalizeLives(saveState.lives);
+    livesRef.current = restoredLives;
+    setLives(restoredLives);
+    setLifeBlinkIndex(null);
+    setScore(saveState.score || saveState.row || 0);
+    setLastRunScore(saveState.score || saveState.row || 0);
   };
 
   const resumeGame = () => {
@@ -1053,6 +1157,13 @@ export default function VoxelCrossing({
         <div className="high-value">{highScore}</div>
       </div>
 
+      <div className="life-hud" aria-label={`Nyawa tersisa ${lives} dari ${MAX_LIVES}`}>
+        {Array.from({ length: MAX_LIVES }, (_, index) => {
+          const stateClass = index < lives ? 'active' : index === lifeBlinkIndex ? 'lost' : 'spent';
+          return <span key={index} className={stateClass} aria-hidden="true">♥</span>;
+        })}
+      </div>
+
       <button
         type="button"
         className={`menu-button ${menuOpen ? 'active' : ''}`}
@@ -1090,10 +1201,14 @@ export default function VoxelCrossing({
               <button type="button" className="menu-action primary" onClick={startGame} disabled={!ready}>Mulai Main</button>
             )}
             <button type="button" className="menu-action" onClick={startGame} disabled={!ready}>Restart</button>
+            <button type="button" className="menu-action" onClick={saveGame} disabled={!ready || gameOver}>Save</button>
+            <button type="button" className="menu-action" onClick={continueSavedGame} disabled={!ready || !savedGame}>Continue</button>
             <button type="button" className={`menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}>Papan Badge</button>
             {!standalonePwa && <button type="button" className="menu-action install" onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(false); setPwaPromptVisible(true); }}>Install App</button>}
             <button type="button" className={`menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}>Settings</button>
           </div>
+
+          {saveNotice && <div className="menu-save-note" role="status">{saveNotice}</div>}
 
           {settingsOpen && (
             <div className="settings-section">
@@ -1119,6 +1234,19 @@ export default function VoxelCrossing({
                   type="checkbox"
                   checked={settings.sfxEnabled}
                   onChange={(event) => updateSetting('sfxEnabled', event.target.checked)}
+                />
+                <i aria-hidden="true" />
+              </label>
+
+              <label className="setting-row">
+                <span>
+                  <strong>QA cheat mode</strong>
+                  <small>Impact respawn di posisi sama, ghost 1 detik</small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.cheatMode}
+                  onChange={(event) => updateSetting('cheatMode', event.target.checked)}
                 />
                 <i aria-hidden="true" />
               </label>

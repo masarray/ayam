@@ -83,6 +83,56 @@
   right: max(18px, env(safe-area-inset-right));
 }
 
+.life-hud {
+  position: absolute;
+  z-index: 5;
+  top: max(24px, calc(env(safe-area-inset-top) + 6px));
+  left: max(102px, calc(env(safe-area-inset-left) + 102px));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 70px;
+  min-height: 38px;
+  padding: 7px 12px;
+  border-radius: 18px;
+  background: rgba(27, 34, 43, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 15px 36px rgba(17, 26, 25, 0.16);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  pointer-events: none;
+}
+
+.life-hud span {
+  font-family: "Segoe UI Symbol", "Apple Color Emoji", system-ui, sans-serif;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 400;
+  color: #ff5368;
+  text-shadow: 0 2px 0 rgba(96, 18, 28, 0.18);
+}
+
+.life-hud span.spent {
+  color: rgba(255, 255, 255, 0.36);
+  text-shadow: none;
+}
+
+.life-hud span.lost {
+  color: #ff5368;
+  animation: life-lost-blink 920ms ease-out both;
+}
+
+@keyframes life-lost-blink {
+  0% { transform: scale(1); opacity: 1; }
+  14% { transform: scale(1.32); opacity: 1; }
+  30% { transform: scale(0.86); opacity: 0.38; }
+  46% { transform: scale(1.18); opacity: 1; }
+  62% { transform: scale(0.9); opacity: 0.32; }
+  78% { transform: scale(1.06); opacity: 0.86; }
+  100% { transform: scale(1); opacity: 0.36; color: rgba(255, 255, 255, 0.36); }
+}
+
 .score-value,
 .high-value {
   font-size: 28px;
@@ -3534,4 +3584,39 @@
     padding-top: 12px !important;
     padding-bottom: 12px !important;
   }
+}
+
+/* v3.3 quiz readability: question and answer copy must stay calm and non-bold. */
+.vc-overlay.quiz .quiz-question-count,
+.vc-overlay.quiz .quiz-question h2,
+.vc-overlay.quiz .quiz-option,
+.vc-overlay.quiz .quiz-option-key,
+.vc-overlay.quiz .quiz-option-text,
+.vc-overlay.quiz .quiz-mark,
+.vc-overlay.quiz .quiz-feedback-title,
+.vc-overlay.quiz .quiz-feedback p,
+.vc-overlay.quiz .quiz-next-button,
+.vc-overlay.quiz .quiz-loading h2,
+.vc-overlay.quiz .quiz-complete h2,
+.vc-overlay.quiz .quiz-score-pill strong,
+.vc-overlay.quiz .quiz-score-pill small {
+  font-weight: 400 !important;
+}
+
+.vc-overlay.quiz .quiz-question h2,
+.vc-overlay.quiz .quiz-option-text {
+  letter-spacing: 0 !important;
+  text-rendering: geometricPrecision;
+}
+
+.vc-shell .vc-overlay.quiz .quiz-option.correct,
+.vc-shell .vc-overlay.quiz .quiz-option.wrong,
+.vc-shell .vc-overlay.quiz .quiz-option.correct .quiz-option-key,
+.vc-shell .vc-overlay.quiz .quiz-option.wrong .quiz-option-key,
+.vc-shell .vc-overlay.quiz .quiz-option.correct .quiz-option-text,
+.vc-shell .vc-overlay.quiz .quiz-option.wrong .quiz-option-text,
+.vc-shell .vc-overlay.quiz .quiz-option.selected .quiz-option-text,
+.vc-shell .vc-overlay.quiz .quiz-feedback-title,
+.vc-shell .vc-overlay.quiz .quiz-mark {
+  font-weight: 400 !important;
 }
