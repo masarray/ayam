@@ -192,7 +192,7 @@ export class GameAudio {
     const bgm = this._ensureBgm();
     if (!bgm) return;
     try {
-      bgm.preload = 'metadata';
+      bgm.preload = 'auto';
       bgm.load?.();
     } catch {
       // Warming is best-effort and must never affect gameplay.
@@ -210,7 +210,7 @@ export class GameAudio {
     const audio = new Audio();
     audio.src = this.musicUrl;
     audio.loop = true;
-    audio.preload = 'none';
+    audio.preload = 'metadata';
     audio.volume = this.musicEnabled ? this.musicVolume : 0;
     audio.addEventListener('canplaythrough', () => { this.bgmReady = true; }, { once: true });
     audio.addEventListener('play', () => {

@@ -292,6 +292,20 @@ function MenuIcon() {
   );
 }
 
+function ControlArrowIcon({ direction }) {
+  const paths = {
+    up: 'M12 7.2 6.6 12.6l1.4 1.4 4-4.01V19h2V9.99l4 4.01 1.4-1.4Z',
+    down: 'M12 16.8 17.4 11.4 16 10l-4 4.01V5h-2v9.01L6 10l-1.4 1.4Z',
+    left: 'M7.2 12 12.6 17.4l1.4-1.4-4.01-4H19v-2H9.99L14 6l-1.4-1.4Z',
+    right: 'M16.8 12 11.4 6.6 10 8l4.01 4H5v2h9.01L10 18l1.4 1.4Z'
+  };
+  return (
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+      <path d={paths[direction]} fill="currentColor" />
+    </svg>
+  );
+}
+
 function ProgressDots({ total, current }) {
   return (
     <div className="quiz-dots" aria-label={`Soal ${current + 1} dari ${total}`}>
@@ -719,6 +733,19 @@ export default function VoxelCrossing({
     gameRef.current?.setCheatMode?.(settings.cheatMode);
   }, [settings]);
 
+  useEffect(() => {
+    const handleSecretCheatToggle = (event) => {
+      const key = String(event.key || '').toLowerCase();
+      if (!(event.ctrlKey && event.altKey && event.shiftKey && key === 'x')) return;
+      if (event.repeat) return;
+      event.preventDefault();
+      setSettings((current) => ({ ...current, cheatMode: !current.cheatMode }));
+    };
+
+    window.addEventListener('keydown', handleSecretCheatToggle);
+    return () => window.removeEventListener('keydown', handleSecretCheatToggle);
+  }, []);
+
   const cancelDeferredResume = () => {
     if (!resumeFramesRef.current.length) return;
     resumeFramesRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId));
@@ -911,15 +938,13 @@ export default function VoxelCrossing({
 
     const primeGameplayAudioFromTrustedGesture = (event) => {
       if (!ready || !startedRef.current || !audioRef.current) return;
-
       if (event.type === 'keydown') {
         if (!isPlayKey(event)) return;
-        deferAudioUnlock({ allowMusic: false }, 2200, 2600);
         return;
       }
-
       if (!isGameplayPointerTarget(event.target)) return;
-      deferAudioUnlock({ allowMusic: false }, 2200, 2600);
+      // Intentionally no deferred audio unlock here. Earlier delayed priming
+      // could still hitch a few steps after Start on weaker phones.
     };
 
     // Important: do not prime audio from the Start/Menu buttons. Creating or
@@ -1149,17 +1174,30 @@ export default function VoxelCrossing({
     setLastRunScore(0);
     startEngineAfterIntroPaint();
 
-    // BGM is intentionally not started inside the Start click/pointerdown path.
-    // The MP3 music file is started later, after the child makes a movement, so
-    // the Start tap stays a pure visual transition with no media fetch/decode.
+    // Keep the Start tap visually light, but still mark the page as user-interacted
+    // so background music can be lazily warmed and resumed later without requiring
+    // a visible extra gesture from the child.
+    audioRef.current?.unlock?.({ allowMusic: false });
 
-    // Keep storage/profile work off the first visual frame. Audio is unlocked
-    // later on an idle task after movement/resume/settings, never on Start/Menu open.
+    // Background music is warmed and resumed only on idle work after gameplay has
+    // already painted, so it should not steal the first rendered frames.
     window.requestAnimationFrame(() => {
       runWhenIdle(() => {
         if (wasGameOver) trackProfileEvent('restart_after_game_over');
         trackProfileEvent('run_started');
         schedulePendingBadgeCelebration();
+        audioRef.current?.warmMusic?.();
+        if (settingsRef.current.musicEnabled && !quizDue) {
+          if (startMusicTimerRef.current) window.clearTimeout(startMusicTimerRef.current);
+          startMusicTimerRef.current = window.setTimeout(() => {
+            startMusicTimerRef.current = null;
+            runWhenIdle(() => {
+              if (!impacting && !gameOver && !quizDue && !ACTIVE_QUIZ_STATES.has(quiz.status)) {
+                audioRef.current?.resumeMusic?.();
+              }
+            }, 900);
+          }, 2400);
+        }
       }, 1000);
     });
   };
@@ -1194,8 +1232,6 @@ export default function VoxelCrossing({
     setLifeBlinkIndex(null);
     setScore(saveState.score || saveState.row || 0);
     setLastRunScore(saveState.score || saveState.row || 0);
-    deferAudioUnlock({ allowMusic: false }, 1400);
-    deferMusicResume(1800);
   };
 
   const resumeGame = ({ deferEngine = false } = {}) => {
@@ -1260,8 +1296,6 @@ export default function VoxelCrossing({
     if (!started && !gameOver) resumeGame();
     const accepted = gameRef.current?.queueMove(direction) === true;
     if (!accepted) runHaptic('blocked', settingsRef.current.hapticsEnabled);
-    deferAudioUnlock({ allowMusic: false }, 1400);
-    deferMusicResume(1800);
   };
 
   const handleControlPointer = (event, direction) => {
@@ -1393,12 +1427,16 @@ export default function VoxelCrossing({
         <div className="high-value">{highScore}</div>
       </div>
 
-      <div className="life-hud" aria-label={`Nyawa tersisa ${lives} dari ${MAX_LIVES}`}>
-        {Array.from({ length: MAX_LIVES }, (_, index) => {
-          const stateClass = index < lives ? 'active' : index === lifeBlinkIndex ? 'lost' : 'spent';
-          return <span key={index} className={stateClass} aria-hidden="true">♥</span>;
-        })}
-      </div>
+      {settings.cheatMode ? (
+        <div className="cheat-chip" role="status" aria-label="Cheat mode aktif">CHEAT MODE</div>
+      ) : (
+        <div className="life-hud" aria-label={`Nyawa tersisa ${lives} dari ${MAX_LIVES}`}>
+          {Array.from({ length: MAX_LIVES }, (_, index) => {
+            const stateClass = index < lives ? 'active' : index === lifeBlinkIndex ? 'lost' : 'spent';
+            return <span key={index} className={stateClass} aria-hidden="true">♥</span>;
+          })}
+        </div>
+      )}
 
       <button
         type="button"
@@ -1487,19 +1525,6 @@ export default function VoxelCrossing({
                 <i aria-hidden="true" />
               </label>
 
-              <label className="setting-row">
-                <span>
-                  <strong>QA cheat mode</strong>
-                  <small>Impact respawn di posisi sama, ghost 1 detik</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={settings.cheatMode}
-                  onChange={(event) => updateSetting('cheatMode', event.target.checked)}
-                />
-                <i aria-hidden="true" />
-              </label>
-
               <button type="button" className="reset-score-button" onClick={resetHighScore}>Reset high score</button>
             </div>
           )}
@@ -1511,10 +1536,10 @@ export default function VoxelCrossing({
       )}
 
       <div className="vc-controls" aria-label="Kontrol game">
-        <button type="button" className="control up" aria-label="Maju" onPointerDown={(event) => handleControlPointer(event, 'forward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}>▲</button>
-        <button type="button" className="control left" aria-label="Kiri" onPointerDown={(event) => handleControlPointer(event, 'left')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}>◀</button>
-        <button type="button" className="control down" aria-label="Mundur" onPointerDown={(event) => handleControlPointer(event, 'backward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}>▼</button>
-        <button type="button" className="control right" aria-label="Kanan" onPointerDown={(event) => handleControlPointer(event, 'right')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}>▶</button>
+        <button type="button" className="control up" aria-label="Maju" onPointerDown={(event) => handleControlPointer(event, 'forward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="control-visual" aria-hidden="true"><ControlArrowIcon direction="up" /></span></button>
+        <button type="button" className="control left" aria-label="Kiri" onPointerDown={(event) => handleControlPointer(event, 'left')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="control-visual" aria-hidden="true"><ControlArrowIcon direction="left" /></span></button>
+        <button type="button" className="control down" aria-label="Mundur" onPointerDown={(event) => handleControlPointer(event, 'backward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="control-visual" aria-hidden="true"><ControlArrowIcon direction="down" /></span></button>
+        <button type="button" className="control right" aria-label="Kanan" onPointerDown={(event) => handleControlPointer(event, 'right')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="control-visual" aria-hidden="true"><ControlArrowIcon direction="right" /></span></button>
       </div>
 
       {impacting && (

@@ -259,6 +259,37 @@ function generateLateGameStageRow(rowIndex, random) {
   }
 }
 
+
+function generateEarlyGameStageRow(rowIndex, rows) {
+  const random = mulberry32(hashSeed(rowIndex, 41));
+
+  // Curated opening sequence for child-friendly readability:
+  // start grass -> 2-lane road -> grass/trees -> river -> grass/trees -> 4-lane road
+  // This avoids unrealistic road-to-road adjacency in the first visible stage.
+  switch (rowIndex) {
+    case 4:
+      return generateTrafficRow(rowIndex, random, { bandId: 4, laneCount: 2, laneIndex: 0, reversed: false });
+    case 5:
+      return generateTrafficRow(rowIndex, random, { bandId: 4, laneCount: 2, laneIndex: 1, reversed: false });
+    case 6:
+      return generateForestRow(rowIndex, random);
+    case 7:
+      return generateWaterRow(rowIndex, random);
+    case 8:
+      return generateForestRow(rowIndex, random);
+    case 9:
+      return generateTrafficRow(rowIndex, random, { bandId: 9, laneCount: 4, laneIndex: 0, reversed: true });
+    case 10:
+      return generateTrafficRow(rowIndex, random, { bandId: 9, laneCount: 4, laneIndex: 1, reversed: true });
+    case 11:
+      return generateTrafficRow(rowIndex, random, { bandId: 9, laneCount: 4, laneIndex: 2, reversed: true });
+    case 12:
+      return generateTrafficRow(rowIndex, random, { bandId: 9, laneCount: 4, laneIndex: 3, reversed: true });
+    default:
+      return null;
+  }
+}
+
 function chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants = []) {
   const supercar = VEHICLE_VARIANTS.find((variant) => variant.kind === 'supercar');
   const superCount = chosenVariants.filter((variant) => variant.kind === 'supercar').length;
@@ -297,7 +328,7 @@ function chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants = []
 function generateTrafficRow(rowIndex, random, roadBand = null) {
   const { speedMultiplier } = difficultyForRow(rowIndex);
   const vehiclePool = vehiclePoolForRow(rowIndex);
-  const laneCount = roadBand?.laneCount || chooseRoadLaneCount(rowIndex, random);
+  const laneCount = Math.max(2, roadBand?.laneCount || chooseRoadLaneCount(rowIndex, random));
   const laneIndex = roadBand?.laneIndex || 0;
   const roadBandId = roadBand?.bandId ?? rowIndex;
   const reversed = roadBand?.reversed ?? random() > 0.5;
@@ -525,6 +556,9 @@ export function generateRow(rowIndex, rows) {
       blockers: createTreeBlockers(trees)
     };
   }
+
+  const curatedEarlyRow = rowIndex <= 12 ? generateEarlyGameStageRow(rowIndex, rows) : null;
+  if (curatedEarlyRow) return curatedEarlyRow;
 
   const random = mulberry32(hashSeed(rowIndex, 41));
 

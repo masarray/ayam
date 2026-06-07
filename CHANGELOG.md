@@ -1,5 +1,39 @@
 # Changelog
 
+## 3.4.0 - 2026-06-07
+
+### Fixed
+- Enforced traffic rows to use only 2-lane, 3-lane, or 4-lane roads so 1-lane roads can no longer appear.
+- Moved cheat-mode activation out of the Settings UI and onto a hidden Ctrl+Alt+Shift+X shortcut.
+- Added a visible "CHEAT MODE" chip in place of the life HUD while cheat mode is active.
+- Restored background music flow with lazy warm-up and delayed idle resume so music can load in the background without blocking the opening frames.
+
+### Improved
+- Redesigned the mobile arrow controls into cleaner individual circular buttons with SVG arrow icons and larger invisible touch targets.
+
+## 3.3.20 - 2026-06-07
+
+### Improved
+- Curated the opening stage rows so early gameplay now follows a realistic sequence: grass/trees, 2-lane road, grass/trees, river, grass/trees, then a 4-lane road.
+- Extended the bullet-train nose and tail so the high-speed train reads more like a longer bullet/pill profile.
+- Restored slimmer arrow-button visuals while keeping the larger invisible mobile touch target.
+- Thickened the road markings again to further reduce shimmer on moving camera shots.
+
+## 3.3.19 - 2026-06-07
+
+### Fixed
+- Removed delayed gameplay audio priming that was still causing freeze/hitch a few steps after Start on some mobile devices.
+- Slightly thickened yellow and white road markings to reduce shimmer while preserving the narrow-road look.
+- Restored slim arrow-button visuals while keeping a larger invisible touch target for mobile control input.
+- Lowered vehicle wheel centers slightly so vehicle bodies sit a bit higher above the wheels.
+
+## 3.3.18 - 2026-06-07
+
+### Improved
+- Reshaped the bullet train nose and tail to a broader aerodynamic high-speed profile inspired by modern trains, avoiding the previous needle-like spike.
+- Tightened the spacing of the yellow center lines on multi-lane roads so the double line reads closer and cleaner.
+- Increased the mobile arrow-pad hit area and button size for easier child-friendly control input with wider touch targets.
+
 ## 3.3.17 - 2026-06-07
 
 ### Improved

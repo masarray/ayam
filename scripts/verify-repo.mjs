@@ -47,7 +47,7 @@ if (!/railLine: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 3\.6, RAIL_HEAD_HE
   console.error('Rail geometry should use a slim raised rail-head profile and aligned wheel contact constants.');
   process.exit(1);
 }
-if (!/ROAD_EDGE_WHITE_LINE_WIDTH = 0\.68/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 0\.58/.test(rendererSource)) {
+if (!/ROAD_EDGE_WHITE_LINE_WIDTH = 0\.94/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 0\.78/.test(rendererSource) || !/ROAD_WHITE_LINE_WIDTH = 0\.74/.test(rendererSource)) {
   console.error('Road edge and yellow center markings should stay visually narrow but stable enough to avoid mobile shimmer.');
   process.exit(1);
 }
@@ -77,18 +77,11 @@ if (!/navigator\.vibrate/.test(crossingSource) || !/hapticsEnabled/.test(crossin
   process.exit(1);
 }
 
-if (!/primeGameplayAudioFromTrustedGesture/.test(crossingSource) || !/startedRef\.current/.test(crossingSource)) {
-  console.error('Audio priming must be gated behind startedRef so the Start/Menu buttons never create AudioContext work.');
+if (!/audioRef\.current\?\.unlock\?\.\(\{ allowMusic: false \}\)/.test(crossingSource) || !/warmMusic\?\.\(\)/.test(crossingSource) || !/resumeMusic\?\.\(\)/.test(crossingSource)) {
+  console.error('Start flow must unlock audio without BGM, then warm and resume music lazily in background idle work.');
   process.exit(1);
 }
-const primeAudioSource = crossingSource.slice(
-  crossingSource.indexOf('const primeGameplayAudioFromTrustedGesture'),
-  crossingSource.indexOf('    // Important: do not prime audio from the Start/Menu buttons')
-);
-if (/allowMusic:\s*true/.test(primeAudioSource) || !/isGameplayPointerTarget/.test(primeAudioSource)) {
-  console.error('Gameplay audio priming must avoid BGM and must ignore Start/Menu controls.');
-  process.exit(1);
-}
+
 const audioSource = readFileSync('src/game/audio.js', 'utf8');
 if (!/mushroom-dance\.mp3/.test(audioSource) || /mushroom-dance\.ogg`/.test(audioSource)) {
   console.error('Runtime background music should prefer mushroom-dance.mp3, not OGG, for faster mobile startup.');
@@ -98,12 +91,21 @@ if (!/userInteracted/.test(audioSource)) {
   console.error('Audio engine should gate autoplay until a real user gesture has occurred.');
   process.exit(1);
 }
+if (!/preload = 'auto'/.test(audioSource) || !/preload = 'metadata'/.test(audioSource)) {
+  console.error('BGM should warm lazily in the background using metadata/auto preload, not stay unloaded forever.');
+  process.exit(1);
+}
 if (!/wheel: new THREE\.BoxGeometry\(9\.5, 6, 9\.5\)/.test(rendererSource) || !/trainWheel: new THREE\.BoxGeometry\(10\.8, 6\.8, 10\.8\)/.test(rendererSource)) {
   console.error('Vehicle/train wheels should stay slightly enlarged and aligned to road/rail surfaces.');
   process.exit(1);
 }
-if (!/font-size: 40px;/.test(readFileSync('src/game/VoxelCrossing.css', 'utf8')) || !/background: transparent;/.test(readFileSync('src/game/VoxelCrossing.css', 'utf8'))) {
+const cssSource = readFileSync('src/game/VoxelCrossing.css', 'utf8');
+if (!/font-size: 40px;/.test(cssSource) || !/background: transparent;/.test(cssSource)) {
   console.error('Life HUD should use large bare hearts without background or border.');
+  process.exit(1);
+}
+if (!/CHEAT MODE/.test(crossingSource) || /QA cheat mode/.test(crossingSource) || !/ctrlKey && event\.altKey && event\.shiftKey/.test(crossingSource) || !/control-visual/.test(crossingSource) || !/border-radius: 999px;/.test(cssSource)) {
+  console.error('Cheat mode must be secret-hotkey only, and mobile controls should use circular individual buttons with an inner visual control.');
   process.exit(1);
 }
 const startFnSource = crossingSource.slice(
@@ -114,8 +116,12 @@ if (startFnSource.includes('reset(true)')) {
   console.error('Start button must not call reset(true); it rebuilds the whole scene and can freeze low-end devices. Use game.start() for first-play flow.');
   process.exit(1);
 }
-if (/deferMusicResume\s*\(|resumeMusic\?\.\(|startMusic\?\.\(|warmMusic\?\.\(/.test(startFnSource)) {
-  console.error('Start button must not start/warm background music; media probing can freeze the first game frame.');
+if (/allowMusic:\s*true/.test(startFnSource) || /startMusic\?\.\(/.test(startFnSource)) {
+  console.error('Start button must not directly start music in the critical click path. Only lazy background warm/resume is allowed.');
+  process.exit(1);
+}
+if (!/runWhenIdle\([\s\S]*warmMusic\?\.\(\)/.test(startFnSource) || !/setTimeout\([\s\S]*resumeMusic\?\.\(\)/.test(startFnSource)) {
+  console.error('Start flow should warm music and resume it only through delayed idle work.');
   process.exit(1);
 }
 if (/gameRef\.current\?\.start\(\)/.test(startFnSource) || !/startEngineAfterIntroPaint\(\)/.test(startFnSource)) {
@@ -150,11 +156,6 @@ if (!/RAIL_HEAD_Y_OFFSET = 17\.4/.test(rendererSource) || !/TRAIN_WHEEL_CENTER_Z
   process.exit(1);
 }
 
-if (/warmMusic\?\.\(\)/.test(crossingSource)) {
-  console.error('Do not warm background music from the ready path; it can collide with Start on mobile.');
-  process.exit(1);
-}
-
 const gameSource = readFileSync('src/game/RoadQuestGame.js', 'utf8');
 if (!/isUiPaused/.test(gameSource) || !/lastPausedRenderAt/.test(gameSource)) {
   console.error('Engine should throttle WebGL rendering while menu/overlay has paused gameplay.');
@@ -174,6 +175,17 @@ if (musicSize > 600 * 1024) {
 const rows = createInitialRows(48);
 extendRows(rows, 180);
 const passabilityErrors = [];
+
+const openingTypes = rows.slice(4, 13).map((row) => row?.type);
+const expectedOpeningTypes = ['traffic', 'traffic', 'forest', 'water', 'forest', 'traffic', 'traffic', 'traffic', 'traffic'];
+if (JSON.stringify(openingTypes) !== JSON.stringify(expectedOpeningTypes)) {
+  console.error(`Opening world flow mismatch: ${openingTypes.join(', ')}`);
+  process.exit(1);
+}
+if ((rows[4]?.roadLaneCount !== 2) || (rows[5]?.roadLaneCount !== 2) || ![9,10,11,12].every((index) => rows[index]?.roadLaneCount === 4)) {
+  console.error('Opening rows must be 2-lane road, forest, river, forest, then 4-lane road.');
+  process.exit(1);
+}
 for (let rowIndex = 0; rowIndex < 4; rowIndex += 1) {
   const row = rows[rowIndex];
   if (!row?.trees?.length) {

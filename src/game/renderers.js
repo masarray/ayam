@@ -23,9 +23,9 @@ const TRAIN_WHEEL_CENTER_Z = RAIL_HEAD_TOP_Z + TRAIN_WHEEL_HALF_Z;
 const TRAIN_BOGIE_CENTER_Z = TRAIN_WHEEL_CENTER_Z - 1.05;
 const TRAIN_UNDERCARRIAGE_Z = TRAIN_WHEEL_CENTER_Z - 0.65;
 const TRAIN_BODY_LIFT_Z = 18.8;
-const ROAD_WHITE_LINE_WIDTH = 0.58;
-const ROAD_EDGE_WHITE_LINE_WIDTH = 0.68;
-const ROAD_YELLOW_LINE_WIDTH = 0.58;
+const ROAD_WHITE_LINE_WIDTH = 0.74;
+const ROAD_EDGE_WHITE_LINE_WIDTH = 0.94;
+const ROAD_YELLOW_LINE_WIDTH = 0.78;
 const ROAD_DASH_SCALE_Y = 0.54;
 const ROAD_MARK_Z = 0.28;
 const ROAD_EDGE_MARK_Z = 0.36;
@@ -321,7 +321,7 @@ export function createTree(tileIndex, rowIndex, geometries, materials, variant =
 
 function addWheelPair(group, geometries, materials, x, z = 6, wide = false) {
   const wheelGeometry = wide ? geometries.wheelWide : geometries.wheel;
-  const wheelZ = z + (wide ? 0.75 : 0.35);
+  const wheelZ = z + (wide ? 0.18 : 0.05);
   const tireY = wide ? 17.4 : 17;
   const hubY = wide ? 21.2 : 20.7;
   [-1, 1].forEach((side) => {
@@ -728,34 +728,40 @@ function addCoupler(group, geometries, materials, x) {
 
 
 function createBulletTrain(group, train, geometries, materials, bodyMaterial, accentMaterial) {
-  const headLength = Math.max(136, train.locomotiveWidth);
+  const headLength = Math.max(162, train.locomotiveWidth + 18);
   const carLength = train.carriageWidth;
   const frontX = train.width / 2 - 10;
   const rearX = -train.width / 2 + 10;
-  const noseOffset = 30;
+
+  function addAerodynamicNose(anchorX, dir, isFront) {
+    // Broad stepped nose inspired by real high-speed trains such as Italo/AGV:
+    // rounded, aerodynamic, and tapered — but not a needle-like spike.
+    box(group, geometries.modernNose, bodyMaterial, anchorX + dir * 16, 0, 16.2, { scale: { x: 1.52, y: 1.1, z: 1.2 } });
+    box(group, geometries.modernNose, bodyMaterial, anchorX + dir * 34, 0, 16.4, { scale: { x: 1.18, y: 0.98, z: 1.08 } });
+    box(group, geometries.modernNose, bodyMaterial, anchorX + dir * 52, 0, 16.8, { scale: { x: 0.88, y: 0.88, z: 0.98 } });
+    box(group, geometries.modernNose, bodyMaterial, anchorX + dir * 66, 0, 17.1, { scale: { x: 0.54, y: 0.72, z: 0.78 } });
+    box(group, geometries.modernNose, accentMaterial, anchorX + dir * 24, 0, 9.3, { scale: { x: 1.36, y: 1.02, z: 0.72 }, castShadow: false });
+    box(group, geometries.modernNose, accentMaterial, anchorX + dir * 42, 0, 8.8, { scale: { x: 1.0, y: 0.82, z: 0.64 }, castShadow: false });
+    box(group, geometries.modernNose, accentMaterial, anchorX + dir * 57, 0, 8.4, { scale: { x: 0.64, y: 0.72, z: 0.54 }, castShadow: false });
+    box(group, geometries.truckWindshield, materials.glassDark, anchorX + dir * 12, 0, 27.8, { scale: { x: 1.24, y: 1.44, z: 1.18 }, castShadow: false });
+    box(group, geometries.modernCabinGlass, materials.glassDark, anchorX + dir * 28, 0, 26.8, { scale: { x: 1.18, y: 1.5, z: 1.06 }, castShadow: false });
+    box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 46, -10.6, 16.8, { scale: { x: 0.96, y: 0.8, z: 0.98 }, castShadow: false });
+    box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 46, 10.6, 16.8, { scale: { x: 0.96, y: 0.8, z: 0.98 }, castShadow: false });
+  }
 
   function addBulletHead(anchorX, isFront) {
     const dir = isFront ? 1 : -1;
-    const centerX = anchorX - dir * (headLength * 0.34);
+    const centerX = anchorX - dir * (headLength * 0.42);
 
-    box(group, geometries.bulletLoco, bodyMaterial, centerX, 0, 14.8, { scale: { x: headLength / 126, y: 1, z: 1 } });
-    box(group, geometries.bulletRoof, materials.trimLight, centerX - dir * 8, 0, 31.6, { scale: { x: headLength / 126, y: 1, z: 0.52 }, castShadow: false });
-    box(group, geometries.bulletWindowStrip, materials.glassDark, centerX - dir * 2, -18.8, 26.2, { scale: { x: headLength / 134, y: 1, z: 1 }, castShadow: false });
-    box(group, geometries.bulletWindowStrip, materials.glassDark, centerX - dir * 2, 18.8, 26.2, { scale: { x: headLength / 134, y: 1, z: 1 }, castShadow: false });
-    box(group, geometries.bulletStripe, accentMaterial, centerX - dir * 1, -20.6, 20.5, { scale: { x: headLength / 102, y: 1, z: 0.75 }, castShadow: false });
-    box(group, geometries.bulletStripe, accentMaterial, centerX - dir * 1, 20.6, 20.5, { scale: { x: headLength / 102, y: 1, z: 0.75 }, castShadow: false });
-    box(group, geometries.sideSkirt, materials.railShadow, centerX - dir * 8, -20.8, 9.5, { scale: { x: headLength / 62, y: 1, z: 0.8 }, castShadow: false });
-    box(group, geometries.sideSkirt, materials.railShadow, centerX - dir * 8, 20.8, 9.5, { scale: { x: headLength / 62, y: 1, z: 0.8 }, castShadow: false });
-
-    const nose = setupMesh(new THREE.Mesh(geometries.bulletNose, accentMaterial));
-    nose.position.set(anchorX + dir * noseOffset, 0, 16);
-    if (!isFront) nose.rotation.z = Math.PI;
-    group.add(nose);
-
-    // Cockpit glass wedge, inspired by modern high-speed trains with pointed nose at both ends.
-    box(group, geometries.truckWindshield, materials.glassDark, anchorX + dir * 12, 0, 24.5, { scale: { x: 0.78, y: 0.88, z: 0.9 }, castShadow: false });
-    box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 24, -9, 17.8, { scale: { x: 0.9, y: 0.76, z: 0.95 }, castShadow: false });
-    box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 24, 9, 17.8, { scale: { x: 0.9, y: 0.76, z: 0.95 }, castShadow: false });
+    box(group, geometries.bulletLoco, bodyMaterial, centerX, 0, 16.2, { scale: { x: headLength / 126, y: 1, z: 1 } });
+    box(group, geometries.bulletRoof, materials.trimLight, centerX - dir * 10, 0, 32.8, { scale: { x: headLength / 126, y: 1, z: 0.56 }, castShadow: false });
+    box(group, geometries.bulletWindowStrip, materials.glassDark, centerX - dir * 10, -18.8, 26.5, { scale: { x: headLength / 132, y: 1, z: 1 }, castShadow: false });
+    box(group, geometries.bulletWindowStrip, materials.glassDark, centerX - dir * 10, 18.8, 26.5, { scale: { x: headLength / 132, y: 1, z: 1 }, castShadow: false });
+    box(group, geometries.bulletStripe, accentMaterial, centerX - dir * 8, -20.4, 20.6, { scale: { x: headLength / 100, y: 1, z: 0.76 }, castShadow: false });
+    box(group, geometries.bulletStripe, accentMaterial, centerX - dir * 8, 20.4, 20.6, { scale: { x: headLength / 100, y: 1, z: 0.76 }, castShadow: false });
+    box(group, geometries.sideSkirt, materials.railShadow, centerX - dir * 12, -20.8, 10.4, { scale: { x: headLength / 60, y: 1, z: 0.92 }, castShadow: false });
+    box(group, geometries.sideSkirt, materials.railShadow, centerX - dir * 12, 20.8, 10.4, { scale: { x: headLength / 60, y: 1, z: 0.92 }, castShadow: false });
+    addAerodynamicNose(anchorX, dir, isFront);
     addTrainBogie(group, geometries, materials, centerX, headLength, 19);
 
     return { centerX };
@@ -765,14 +771,14 @@ function createBulletTrain(group, train, geometries, materials, bodyMaterial, ac
   let cursor = frontHead.centerX - headLength / 2 - 8;
   for (let i = 0; i < train.carriageCount; i += 1) {
     cursor -= carLength / 2;
-    box(group, geometries.bulletCarriage, bodyMaterial, cursor, 0, 14.5, { scale: { x: carLength / 112, y: 1, z: 1 } });
-    box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, -19.5, 26.8, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
-    box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, 19.5, 26.8, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
-    box(group, geometries.bulletStripe, accentMaterial, cursor, -20.8, 20.8, { scale: { x: carLength / 98, y: 1, z: 0.74 }, castShadow: false });
-    box(group, geometries.bulletStripe, accentMaterial, cursor, 20.8, 20.8, { scale: { x: carLength / 98, y: 1, z: 0.74 }, castShadow: false });
-    box(group, geometries.sideSkirt, materials.railShadow, cursor, -20.8, 9.2, { scale: { x: carLength / 58, y: 1, z: 0.72 }, castShadow: false });
-    box(group, geometries.sideSkirt, materials.railShadow, cursor, 20.8, 9.2, { scale: { x: carLength / 58, y: 1, z: 0.72 }, castShadow: false });
-    box(group, geometries.bulletRoof, materials.trimLight, cursor, 0, 31.7, { scale: { x: carLength / 126, y: 1, z: 0.46 }, castShadow: false });
+    box(group, geometries.bulletCarriage, bodyMaterial, cursor, 0, 15.8, { scale: { x: carLength / 112, y: 1, z: 1 } });
+    box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, -19.5, 27.1, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
+    box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, 19.5, 27.1, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
+    box(group, geometries.bulletStripe, accentMaterial, cursor, -20.8, 20.9, { scale: { x: carLength / 98, y: 1, z: 0.74 }, castShadow: false });
+    box(group, geometries.bulletStripe, accentMaterial, cursor, 20.8, 20.9, { scale: { x: carLength / 98, y: 1, z: 0.74 }, castShadow: false });
+    box(group, geometries.sideSkirt, materials.railShadow, cursor, -20.8, 10.2, { scale: { x: carLength / 58, y: 1, z: 0.8 }, castShadow: false });
+    box(group, geometries.sideSkirt, materials.railShadow, cursor, 20.8, 10.2, { scale: { x: carLength / 58, y: 1, z: 0.8 }, castShadow: false });
+    box(group, geometries.bulletRoof, materials.trimLight, cursor, 0, 32.1, { scale: { x: carLength / 126, y: 1, z: 0.48 }, castShadow: false });
     addTrainBogie(group, geometries, materials, cursor, carLength, 19);
     addCoupler(group, geometries, materials, cursor + carLength / 2 + 3);
     cursor -= carLength / 2 + 8;
@@ -1198,7 +1204,7 @@ export function createRowGroup(row, geometries, materials) {
         : row.direction;
       const separatesOpposingTraffic = row.roadLaneCount >= 3 && !isLastLane && nextLaneDirection !== row.direction;
       if (separatesOpposingTraffic) {
-        const yellowGap = 3.5;
+        const yellowGap = 2.4;
         makeRoadLine(y + ROW_DEPTH / 2 - yellowGap, materials.asphaltYellow, ROAD_YELLOW_LINE_WIDTH, ROAD_YELLOW_MARK_Z);
         makeRoadLine(y + ROW_DEPTH / 2 + yellowGap, materials.asphaltYellow, ROAD_YELLOW_LINE_WIDTH, ROAD_YELLOW_MARK_Z);
       } else if (!isLastLane && row.roadLaneCount !== 2) {
