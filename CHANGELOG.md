@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.4.6 - 2026-06-08
+
+### Fixed
+- Audited plank support detection so landing on a plank cannot instantly trigger water splash from one-frame contact jitter.
+- Added a short water landing grace window for missed-plank detection to avoid same-frame splash after a hop.
+- Kept the active plank as valid support while it is sinking, so the chicken rides the sinking animation first and only falls after the plank has visibly dropped.
+
+### Improved
+- Added slightly wider landing contact tolerance for planks so normal landings feel consistent while still allowing real misses to fail shortly after.
+
 ## 3.4.5 - 2026-06-08
 
 ### Improved

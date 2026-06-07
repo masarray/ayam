@@ -43,6 +43,11 @@ const DIR_TO_DELTA = {
   right: { row: 0, tile: 1 }
 };
 
+const WATER_MISS_LANDING_GRACE_MS = 160;
+const ACTIVE_PLANK_SINK_SPLASH_DELAY_MS = 680;
+const PLANK_LANDING_WIDTH_PAD = 10;
+const PLANK_LANDING_DEPTH_PAD = 5;
+
 function createOrthoCamera() {
   const camera = new THREE.OrthographicCamera(-400, 400, 280, -280, 1, 2200);
   camera.up.set(0, 0, 1);
@@ -480,6 +485,7 @@ export class RoadQuestGame {
     this.moveQueue = [];
     this.movement = null;
     this.activeRidePlankId = null;
+    this.pendingWaterMissUntil = 0;
     this.cheatRespawnPending = false;
     this.cheatRespawnPosition = null;
 
@@ -747,15 +753,23 @@ export class RoadQuestGame {
       this.activeRidePlankId = null;
     }
     if (landedRow?.type === 'water') {
-      const supportingPlank = this._findSupportingPlank();
+      const now = performance.now();
+      const supportingPlank = this._findSupportingPlank({
+        widthPadding: PLANK_LANDING_WIDTH_PAD,
+        depthPadding: PLANK_LANDING_DEPTH_PAD
+      });
       if (!supportingPlank) {
-        this._updateWaterState(0);
-        if (this.isImpacting || this.isGameOver) return;
+        // Never splash on the same frame as the landing. A tiny grace window
+        // prevents false-negative plank contact when the plank has moved a few
+        // pixels during the hop and makes misses feel intentional instead of buggy.
+        this.pendingWaterMissUntil = now + WATER_MISS_LANDING_GRACE_MS;
+        this.waterGraceUntil = this.pendingWaterMissUntil;
       } else {
-        const now = performance.now();
         this.activeRidePlankId = supportingPlank.uuid;
         supportingPlank.userData.riderSince = now;
-        this.waterGraceUntil = now + 180;
+        supportingPlank.userData.sinkImpactArmed = false;
+        this.pendingWaterMissUntil = 0;
+        this.waterGraceUntil = now + 220;
       }
     }
 
@@ -1377,19 +1391,26 @@ export class RoadQuestGame {
   }
 
 
-  _findSupportingPlankAt(playerX, playerY) {
+  _findSupportingPlankAt(playerX, playerY, options = {}) {
+    const {
+      includeActiveSinking = false,
+      widthPadding = 0,
+      depthPadding = 0
+    } = options;
+
     for (const plank of this.planks) {
       const { width, depth, sinking } = plank.userData;
-      if (sinking) continue;
-      if (Math.abs(playerY - plank.position.y) > (depth + PLAYER_DEPTH) * 0.62) continue;
-      if (Math.abs(playerX - plank.position.x) <= (width + PLAYER_WIDTH) * 0.54) return plank;
+      const isActiveSinkingPlank = includeActiveSinking && sinking && plank.uuid === this.activeRidePlankId;
+      if (sinking && !isActiveSinkingPlank) continue;
+      if (Math.abs(playerY - plank.position.y) > (depth + PLAYER_DEPTH) * 0.62 + depthPadding) continue;
+      if (Math.abs(playerX - plank.position.x) <= (width + PLAYER_WIDTH) * 0.54 + widthPadding) return plank;
     }
     return null;
   }
 
-  _findSupportingPlank() {
+  _findSupportingPlank(options = {}) {
     if (!this.player) return null;
-    return this._findSupportingPlankAt(this.player.position.x, this.player.position.y);
+    return this._findSupportingPlankAt(this.player.position.x, this.player.position.y, options);
   }
 
   _updateWaterState(delta) {
@@ -1399,26 +1420,41 @@ export class RoadQuestGame {
     if (!row || row.type !== 'water') return;
     if (performance.now() < this.waterGraceUntil) return;
 
-    const supportingPlank = this._findSupportingPlank();
+    const now = performance.now();
+    const supportingPlank = this._findSupportingPlank({ includeActiveSinking: true });
     if (!supportingPlank) {
       this.activeRidePlankId = null;
+      if (now < this.pendingWaterMissUntil) return;
       this._triggerImpact('water', null);
       return;
     }
 
-    const now = performance.now();
+    this.pendingWaterMissUntil = 0;
+
     if (this.activeRidePlankId !== supportingPlank.uuid) {
       this.activeRidePlankId = supportingPlank.uuid;
       supportingPlank.userData.riderSince = now;
+      supportingPlank.userData.sinkImpactArmed = false;
     } else if (!supportingPlank.userData.riderSince) {
       supportingPlank.userData.riderSince = now;
     }
 
-    const drift = supportingPlank.userData.direction * supportingPlank.userData.currentSpeed * delta;
+    const drift = supportingPlank.userData.direction * (supportingPlank.userData.currentSpeed || supportingPlank.userData.baseSpeed || 0) * delta;
     this.player.position.x += drift;
     this.player.position.z = supportingPlank.position.z + PLAYER_PLANK_STAND_Z;
     const tile = clamp(Math.round(this.player.position.x / TILE_SIZE), MIN_TILE, MAX_TILE);
     this.playerPosition.tile = tile;
+
+    if (supportingPlank.userData.sinking) {
+      const sinkStartedAt = supportingPlank.userData.sinkStartedAt || now;
+      const sinkAge = now - sinkStartedAt;
+      this.player.position.z = supportingPlank.position.z + PLAYER_PLANK_STAND_Z;
+      if (sinkAge >= ACTIVE_PLANK_SINK_SPLASH_DELAY_MS || supportingPlank.position.z <= -15) {
+        supportingPlank.userData.sinkImpactArmed = false;
+        this._triggerImpact('water', supportingPlank);
+      }
+      return;
+    }
 
     const rideAge = now - (supportingPlank.userData.riderSince || now);
     const sinkWarning = clamp((rideAge - 850) / Math.max(1, PLANK_RIDE_LIMIT_MS - 850), 0, 1);
@@ -1436,14 +1472,14 @@ export class RoadQuestGame {
       || supportingPlank.position.x + supportingPlank.userData.width * 0.5 > boardMax - PLANK_EDGE_SINK_MARGIN;
 
     if (rideAge > PLANK_RIDE_LIMIT_MS || nearEdge) {
+      supportingPlank.userData.sinkImpactArmed = true;
       this._sinkPlank(supportingPlank, true);
-      this._triggerImpact('water', supportingPlank);
       return;
     }
 
     if (this.player.position.x < boardMin - 18 || this.player.position.x > boardMax + 18) {
+      supportingPlank.userData.sinkImpactArmed = true;
       this._sinkPlank(supportingPlank, true);
-      this._triggerImpact('water', supportingPlank);
     }
   }
 
