@@ -408,6 +408,7 @@ export class RoadQuestGame {
   }
 
   _beginNextMove() {
+    if (this.isImpacting || this.isGameOver || !this.isPlaying) return;
     if (this.movement || this.moveQueue.length === 0) return;
     const direction = this.moveQueue.shift();
     const delta = DIR_TO_DELTA[direction];
@@ -440,7 +441,10 @@ export class RoadQuestGame {
     // queue the next hop and let the chicken cross water without touching a plank.
     this.waterGraceUntil = landedRow?.type === 'water' ? 0 : performance.now() + 105;
     this.movement = null;
-    if (landedRow?.type === 'water') this._updateWaterState(0);
+    if (landedRow?.type === 'water') {
+      this._updateWaterState(0);
+      if (this.isImpacting || this.isGameOver) return;
+    }
 
     if (this.playerPosition.row > this.highestRow) {
       this.highestRow = this.playerPosition.row;

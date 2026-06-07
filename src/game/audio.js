@@ -105,10 +105,23 @@ export class GameAudio {
   setMusicSuppressed(suppressed) {
     this.musicSuppressed = Boolean(suppressed);
     if (this.musicSuppressed) {
-      this.pauseMusic(120);
+      this.pauseMusic(0);
       return;
     }
     this.resumeMusic();
+  }
+
+  forceStopMusic() {
+    this.stopMusicTimer();
+    this.musicSuppressed = true;
+    if (!this.bgm) return;
+    try {
+      this.bgm.pause();
+      this.bgm.muted = true;
+      this.bgm.volume = 0;
+    } catch {
+      // HTML audio is best-effort. Quiz and SFX remain playable.
+    }
   }
 
   pauseMusic(fadeMs = 160) {
@@ -267,13 +280,22 @@ export class GameAudio {
     if (!bgm) return;
 
     this.bgmRequested = true;
+    if (this.musicSuppressed || !this.musicEnabled) {
+      bgm.muted = true;
+      bgm.pause();
+      bgm.volume = 0;
+      return;
+    }
+
     bgm.muted = false;
     bgm.volume = this.musicVolume;
 
     // HTMLAudioElement streams the supplied OGG lazily. Gameplay never waits for this promise.
     const playPromise = bgm.play();
-    if (playPromise?.catch) {
-      playPromise.catch(() => {
+    if (playPromise?.then) {
+      playPromise.then(() => {
+        if (this.musicSuppressed || !this.musicEnabled) this.forceStopMusic();
+      }).catch(() => {
         // Browser autoplay can still block playback until the next trusted tap/key press.
       });
     }

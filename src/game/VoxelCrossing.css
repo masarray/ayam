@@ -3079,3 +3079,164 @@
   .badge-board-summary div { min-height: 52px; }
   .badge-tile { min-height: 96px; }
 }
+
+/* v2.9 desktop/laptop/tablet responsive ownership */
+@media (min-width: 900px) {
+  .vc-shell.landscape {
+    border-radius: 28px;
+  }
+
+  .vc-shell.landscape .vc-controls {
+    left: auto;
+    right: max(26px, env(safe-area-inset-right));
+    bottom: max(26px, env(safe-area-inset-bottom));
+    transform: none;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 48px);
+  }
+
+  .vc-shell.landscape .vc-actions {
+    left: auto;
+    right: max(26px, env(safe-area-inset-right));
+    bottom: calc(max(26px, env(safe-area-inset-bottom)) + 114px);
+    transform: none;
+  }
+
+  .vc-shell.landscape .settings-button {
+    top: max(22px, env(safe-area-inset-top));
+  }
+
+  .vc-shell.landscape .settings-panel {
+    top: calc(max(22px, env(safe-area-inset-top)) + 62px);
+  }
+
+  .vc-overlay.quiz .quiz-card {
+    max-width: min(1180px, calc(100% - 36px));
+    max-height: min(820px, calc(100% - 36px));
+    margin: auto;
+  }
+
+  .badge-board-card {
+    max-width: min(1120px, calc(100% - 36px));
+    max-height: min(820px, calc(100% - 36px));
+  }
+}
+
+@media (min-width: 1200px) {
+  .vc-hud {
+    min-width: 84px;
+    padding: 14px 16px 13px;
+  }
+
+  .score-value,
+  .high-value {
+    font-size: 32px;
+  }
+
+  .score-label,
+  .high-label {
+    font-size: 11px;
+  }
+}
+
+/* v3.0 ownership layer: safe badge timing, tactile controls, 40% quiz board, and bold score readability. */
+.vc-shell button,
+.vc-shell .control,
+.vc-shell .menu-button {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+  user-select: none !important;
+}
+
+.vc-shell .menu-button {
+  left: calc(50% - 25px) !important;
+  transform: none !important;
+  transform-origin: center center !important;
+  transition:
+    transform 115ms cubic-bezier(0.16, 1.48, 0.28, 1),
+    filter 115ms ease,
+    box-shadow 115ms ease,
+    background 115ms ease !important;
+}
+
+.vc-shell .menu-button:not(:disabled):active {
+  transform: scale(0.86) !important;
+  filter: brightness(0.96) saturate(1.1) !important;
+  box-shadow: 0 7px 18px rgba(17, 26, 25, 0.24) !important;
+}
+
+.vc-shell .control {
+  transform-origin: center center !important;
+  touch-action: none !important;
+  transition:
+    transform 85ms cubic-bezier(0.12, 1.7, 0.24, 1),
+    filter 85ms ease,
+    box-shadow 85ms ease !important;
+}
+
+.vc-shell .control:not(:disabled):active {
+  transform: translateY(4px) scale(0.88) !important;
+  filter: brightness(0.98) saturate(1.12) !important;
+  box-shadow:
+    0 3px 0 rgba(19, 28, 30, 0.18),
+    0 8px 18px rgba(0, 0, 0, 0.13) !important;
+}
+
+.vc-shell .score-value,
+.vc-shell .high-value,
+.vc-shell .impact-stinger span,
+.vc-shell .near-miss-stinger span,
+.vc-shell .quiz-score-pill strong,
+.vc-shell .quiz-complete h2,
+.vc-shell .result-card h2,
+.vc-shell .result-card h2 strong {
+  font-weight: 650 !important;
+}
+
+.vc-shell .quiz-feedback-title,
+.vc-shell .quiz-option.correct .quiz-option-text,
+.vc-shell .quiz-option.wrong .quiz-option-text,
+.vc-shell .quiz-mark {
+  font-weight: 650 !important;
+}
+
+.vc-overlay.quiz .quiz-card {
+  --quiz-board-height: clamp(158px, 40dvh, 330px) !important;
+}
+
+.vc-overlay.quiz .quiz-question {
+  height: var(--quiz-board-height) !important;
+  min-height: var(--quiz-board-height) !important;
+  max-height: var(--quiz-board-height) !important;
+  overflow: hidden !important;
+}
+
+.vc-overlay.quiz .quiz-question h2 {
+  font-size: clamp(17px, var(--question-fit-size, 26px), 44px) !important;
+  line-height: clamp(1.04, 1.09, 1.16) !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+.vc-overlay.quiz .quiz-question.q-short h2 { font-size: clamp(29px, var(--question-fit-size, 38px), 46px) !important; }
+.vc-overlay.quiz .quiz-question.q-medium h2 { font-size: clamp(24px, var(--question-fit-size, 32px), 40px) !important; }
+.vc-overlay.quiz .quiz-question.q-long h2 { font-size: clamp(20px, var(--question-fit-size, 27px), 34px) !important; }
+.vc-overlay.quiz .quiz-question.q-xlong h2 { font-size: clamp(17px, var(--question-fit-size, 23px), 29px) !important; }
+.vc-overlay.quiz .quiz-question.q-xxlong h2 { font-size: clamp(14px, var(--question-fit-size, 19px), 24px) !important; }
+
+.badge-unlock-overlay {
+  animation: badge-overlay-in 500ms ease both !important;
+}
+
+.badge-unlock-card {
+  animation: badge-card-pop 720ms cubic-bezier(0.12, 1.42, 0.2, 1) both !important;
+}
+
+@media (max-height: 700px) and (max-width: 560px) {
+  .vc-overlay.quiz .quiz-card {
+    --quiz-board-height: clamp(140px, 40dvh, 250px) !important;
+  }
+  .vc-overlay.quiz .quiz-question h2 {
+    font-size: clamp(13px, var(--question-fit-size, 18px), 25px) !important;
+  }
+}

@@ -303,11 +303,18 @@ function BadgeBoardOverlay({ profile, onClose }) {
 }
 
 function questionLengthClass(questionText = '') {
-  const length = questionText.length;
-  if (length > 150) return 'q-xlong';
+  const length = String(questionText || '').length;
+  if (length > 190) return 'q-xxlong';
+  if (length > 145) return 'q-xlong';
   if (length > 105) return 'q-long';
   if (length > 72) return 'q-medium';
   return 'q-short';
+}
+
+function questionFitStyle(questionText = '') {
+  const length = String(questionText || '').length;
+  const size = Math.max(17, Math.min(44, Math.round(560 / Math.max(13, Math.sqrt(length) * 3.25))));
+  return { '--question-fit-size': `${size}px` };
 }
 
 
@@ -333,6 +340,8 @@ export default function VoxelCrossing({
   const nearMissTimerRef = useRef(null);
   const badgeQueueRef = useRef([]);
   const badgeTimerRef = useRef(null);
+  const pendingBadgeShowTimerRef = useRef(null);
+  const badgePausedGameRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -381,6 +390,7 @@ export default function VoxelCrossing({
     if (confettiTimerRef.current) window.clearTimeout(confettiTimerRef.current);
     if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
     if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
+    if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
   }, []);
 
   const triggerConfetti = (level = 'rainbow') => {
@@ -390,9 +400,17 @@ export default function VoxelCrossing({
   };
 
   const showNextBadge = () => {
-    if (activeBadge || badgeQueueRef.current.length === 0) return;
+    if (badgeQueueRef.current.length === 0) return;
+    if (pendingBadgeShowTimerRef.current) {
+      window.clearTimeout(pendingBadgeShowTimerRef.current);
+      pendingBadgeShowTimerRef.current = null;
+    }
+
     const [nextBadge, ...remaining] = badgeQueueRef.current;
     badgeQueueRef.current = remaining;
+    badgePausedGameRef.current = Boolean(started && !gameOver && !impacting);
+    if (badgePausedGameRef.current) gameRef.current?.pause();
+
     setActiveBadge(nextBadge);
     triggerConfetti(nextBadge.tier >= 3 ? 'gold' : 'rainbow');
     audioRef.current?.kidsYayReward?.(nextBadge.tier >= 3 ? 3 : 2);
@@ -401,20 +419,31 @@ export default function VoxelCrossing({
   const enqueueBadges = (badges) => {
     if (!badges?.length) return;
     badgeQueueRef.current = [...badgeQueueRef.current, ...badges];
-    window.requestAnimationFrame(showNextBadge);
+  };
+
+  const schedulePendingBadgeCelebration = () => {
+    if (badgeQueueRef.current.length === 0) return;
+    if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
+    pendingBadgeShowTimerRef.current = window.setTimeout(() => {
+      pendingBadgeShowTimerRef.current = null;
+      showNextBadge();
+    }, 500);
   };
 
   const closeBadge = () => {
     setActiveBadge(null);
     if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
     badgeTimerRef.current = window.setTimeout(() => {
-      if (badgeQueueRef.current.length === 0) return;
-      const [nextBadge, ...remaining] = badgeQueueRef.current;
-      badgeQueueRef.current = remaining;
-      setActiveBadge(nextBadge);
-      triggerConfetti(nextBadge.tier >= 3 ? 'gold' : 'rainbow');
-      audioRef.current?.kidsYayReward?.(nextBadge.tier >= 3 ? 3 : 2);
-    }, 120);
+      if (badgeQueueRef.current.length > 0) {
+        showNextBadge();
+        return;
+      }
+
+      if (badgePausedGameRef.current && !gameOver && !impacting && !menuOpen) {
+        gameRef.current?.resume();
+      }
+      badgePausedGameRef.current = false;
+    }, 500);
   };
 
   const trackProfileEvent = (eventName, payload = {}) => {
@@ -422,9 +451,7 @@ export default function VoxelCrossing({
     playerProfileRef.current = next.profile;
     savePlayerProfile(next.profile);
     setPlayerProfile(next.profile);
-    if (next.newBadges.length) {
-      window.setTimeout(() => enqueueBadges(next.newBadges), 0);
-    }
+    if (next.newBadges.length) enqueueBadges(next.newBadges);
   };
 
   const triggerNearMiss = () => {
@@ -559,6 +586,7 @@ export default function VoxelCrossing({
   useEffect(() => {
     const quizMusicLocked = quizDue || ACTIVE_QUIZ_STATES.has(quiz.status);
     audioRef.current?.setMusicSuppressed?.(quizMusicLocked);
+    if (quizMusicLocked) audioRef.current?.forceStopMusic?.();
   }, [quiz.status, quizDue]);
 
   useEffect(() => {
@@ -598,7 +626,10 @@ export default function VoxelCrossing({
     setStarted(true);
     setScore(0);
     setLastRunScore(0);
-    window.setTimeout(() => audioRef.current?.setMusicSuppressed?.(false), 0);
+    window.setTimeout(() => {
+      audioRef.current?.setMusicSuppressed?.(false);
+      schedulePendingBadgeCelebration();
+    }, 0);
   };
 
   const resumeGame = () => {
@@ -650,16 +681,22 @@ export default function VoxelCrossing({
   };
 
   const move = (direction) => {
-    if (impacting || menuOpen || gameOver) return;
+    if (impacting || menuOpen || gameOver || activeBadge) return;
     unlockAudio();
     if (!started && !gameOver) resumeGame();
     gameRef.current?.queueMove(direction);
+  };
+
+  const handleControlPointer = (event, direction) => {
+    event.preventDefault();
+    move(direction);
   };
 
   const answerCurrentQuestion = (answerKey) => {
     if (quiz.status !== 'running' || quiz.selectedKey) return;
     unlockAudio({ allowMusic: false });
     audioRef.current?.setMusicSuppressed?.(true);
+    audioRef.current?.forceStopMusic?.();
     const question = quiz.questions[quiz.index];
     const isCorrect = answerKey === question.answerKey;
     if (isCorrect) {
@@ -678,6 +715,7 @@ export default function VoxelCrossing({
 
   const nextQuizStep = () => {
     audioRef.current?.setMusicSuppressed?.(true);
+    audioRef.current?.forceStopMusic?.();
     if (quiz.status !== 'running' || !quiz.selectedKey) return;
     if (quiz.index >= quiz.questions.length - 1) {
       const stars = quiz.correctCount >= 5 ? 3 : quiz.correctCount >= 3 ? 2 : quiz.correctCount >= 1 ? 1 : 0;
@@ -702,7 +740,7 @@ export default function VoxelCrossing({
     const handler = (event) => {
       const tag = document.activeElement?.tagName?.toLowerCase();
       const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select';
-      if (isTyping || menuOpen || !ready || impacting) return;
+      if (isTyping || menuOpen || !ready || impacting || activeBadge) return;
       if (gameOver && (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status))) return;
       if ((gameOver || !started) && isPlayKey(event)) {
         event.preventDefault();
@@ -772,7 +810,8 @@ export default function VoxelCrossing({
         className={`menu-button ${menuOpen ? 'active' : ''}`}
         aria-label="Buka menu"
         aria-expanded={menuOpen}
-        onClick={() => {
+        onPointerDown={(event) => {
+          event.preventDefault();
           if (menuOpen) closeMenu({ resume: menuPausedRef.current });
           else openMenu();
         }}
@@ -846,10 +885,10 @@ export default function VoxelCrossing({
       )}
 
       <div className="vc-controls" aria-label="Kontrol game">
-        <button type="button" className="control up" aria-label="Maju" onClick={() => move('forward')} disabled={impacting || menuOpen || gameOver}>▲</button>
-        <button type="button" className="control left" aria-label="Kiri" onClick={() => move('left')} disabled={impacting || menuOpen || gameOver}>◀</button>
-        <button type="button" className="control down" aria-label="Mundur" onClick={() => move('backward')} disabled={impacting || menuOpen || gameOver}>▼</button>
-        <button type="button" className="control right" aria-label="Kanan" onClick={() => move('right')} disabled={impacting || menuOpen || gameOver}>▶</button>
+        <button type="button" className="control up" aria-label="Maju" onPointerDown={(event) => handleControlPointer(event, 'forward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}>▲</button>
+        <button type="button" className="control left" aria-label="Kiri" onPointerDown={(event) => handleControlPointer(event, 'left')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}>◀</button>
+        <button type="button" className="control down" aria-label="Mundur" onPointerDown={(event) => handleControlPointer(event, 'backward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}>▼</button>
+        <button type="button" className="control right" aria-label="Kanan" onPointerDown={(event) => handleControlPointer(event, 'right')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}>▶</button>
       </div>
 
       {impacting && (
@@ -904,7 +943,7 @@ export default function VoxelCrossing({
 
             {quiz.status === 'running' && currentQuizQuestion && (
               <>
-                <div className={`quiz-question ${questionLengthClass(currentQuizQuestion.questionText)}`}>
+                <div className={`quiz-question ${questionLengthClass(currentQuizQuestion.questionText)}`} style={questionFitStyle(currentQuizQuestion.questionText)}>
                   <div className="quiz-question-count">Soal {quiz.index + 1} dari {quizTotal}</div>
                   <h2>{currentQuizQuestion.questionText}</h2>
                 </div>

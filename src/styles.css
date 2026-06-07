@@ -223,3 +223,93 @@ select {
     padding: 0;
   }
 }
+
+/* v2.9 responsive stage ownership
+   Desktop/laptop/tablet get a wide playable canvas; phone keeps native fullscreen. */
+.clean-game-shell {
+  width: min(1520px, calc(100% - 40px));
+  min-height: 100dvh;
+  padding: 20px 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  place-items: center;
+}
+
+.clean-game-shell .game-stage {
+  width: 100%;
+  height: clamp(620px, calc(100dvh - 40px), 860px);
+  min-height: 0;
+  padding: 12px;
+  border-radius: 38px;
+}
+
+@media (min-width: 1540px) {
+  .clean-game-shell {
+    width: min(1640px, calc(100% - 56px));
+  }
+
+  .clean-game-shell .game-stage {
+    height: clamp(660px, calc(100dvh - 56px), 920px);
+  }
+}
+
+@media (max-width: 1180px) {
+  .clean-game-shell {
+    width: min(1040px, calc(100% - 28px));
+    padding: 14px 0;
+  }
+
+  .clean-game-shell .game-stage {
+    height: calc(100dvh - 28px);
+    min-height: 680px;
+    padding: 10px;
+    border-radius: 34px;
+  }
+}
+
+@media (max-width: 900px) {
+  .clean-game-shell {
+    width: min(820px, calc(100% - 20px));
+    padding: 10px 0;
+  }
+
+  .clean-game-shell .game-stage {
+    height: calc(100dvh - 20px);
+    min-height: 0;
+    border-radius: 32px;
+  }
+}
+
+@media (max-width: 720px) {
+  .clean-game-shell {
+    width: 100%;
+    padding: 0;
+  }
+
+  .clean-game-shell .game-stage {
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .clean-game-shell {
+    width: 100%;
+    padding: 0;
+  }
+
+  .clean-game-shell .game-stage {
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
