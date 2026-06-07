@@ -34,16 +34,17 @@ function isPlayKey(event) {
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { musicEnabled: true, sfxEnabled: true, hapticsEnabled: true, cheatMode: false };
+    if (!raw) return { musicEnabled: true, sfxEnabled: true, hapticsEnabled: true, cheatMode: false, movePadSide: 'right' };
     const parsed = JSON.parse(raw);
     return {
       musicEnabled: parsed.musicEnabled !== false,
       sfxEnabled: parsed.sfxEnabled !== false,
       hapticsEnabled: parsed.hapticsEnabled !== false,
-      cheatMode: parsed.cheatMode === true
+      cheatMode: parsed.cheatMode === true,
+      movePadSide: parsed.movePadSide === 'left' ? 'left' : 'right'
     };
   } catch {
-    return { musicEnabled: true, sfxEnabled: true, hapticsEnabled: true, cheatMode: false };
+    return { musicEnabled: true, sfxEnabled: true, hapticsEnabled: true, cheatMode: false, movePadSide: 'right' };
   }
 }
 
@@ -284,26 +285,62 @@ function FittedQuestionText({ text }) {
 }
 
 
-function MenuIcon() {
+// Google Material Icons SVG path data (Apache-2.0) used inline for an
+// offline-safe public game build. Do not replace with hand-drawn paths.
+const MATERIAL_ICON_PATHS = Object.freeze({
+  menu: 'M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z',
+  close: 'M18.3 5.71 12 12l6.3 6.29-1.41 1.41L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z',
+  keyboard_arrow_up: 'M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z',
+  keyboard_arrow_down: 'M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z',
+  keyboard_arrow_left: 'M15.41 7.41 10.83 12l4.58 4.59L14 18l-6-6 6-6z',
+  keyboard_arrow_right: 'M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z',
+  play_arrow: 'M8 5v14l11-7z',
+  refresh: 'M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8S7.58 20 12 20c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h8V3z',
+  save: 'M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10z',
+  restore: 'M13 3c-4.97 0-9 4.03-9 9H1l4 4 4-4H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.78-4.95-2.05l-1.42 1.42C8.27 20 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.25 2.52.75-1.23-3.5-2.08V8z',
+  workspace_premium: 'M12 3 14.39 8.26 20 8.91 15.86 12.7 16.97 18.25 12 15.46 7.03 18.25 8.14 12.7 4 8.91 9.61 8.26zM9 19.39 12 18l3 1.39V22l-3-1.4L9 22z',
+  download: 'M5 20h14v-2H5zm14-9h-4V3H9v8H5l7 7z',
+  settings: 'M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z'
+});
+
+function MaterialIcon({ name, size = 24, className = '' }) {
+  const path = MATERIAL_ICON_PATHS[name] || MATERIAL_ICON_PATHS.menu;
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
-      <path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z" fill="currentColor" />
+    <svg className={className} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
+      <path d={path} fill="currentColor" />
     </svg>
   );
 }
 
+function MenuIcon() {
+  return <MaterialIcon name="menu" />;
+}
+
+function CloseIcon() {
+  return <MaterialIcon name="close" size={22} />;
+}
+
 function ControlArrowIcon({ direction }) {
-  const paths = {
-    up: 'M12 7.2 6.6 12.6l1.4 1.4 4-4.01V19h2V9.99l4 4.01 1.4-1.4Z',
-    down: 'M12 16.8 17.4 11.4 16 10l-4 4.01V5h-2v9.01L6 10l-1.4 1.4Z',
-    left: 'M7.2 12 12.6 17.4l1.4-1.4-4.01-4H19v-2H9.99L14 6l-1.4-1.4Z',
-    right: 'M16.8 12 11.4 6.6 10 8l4.01 4H5v2h9.01L10 18l1.4 1.4Z'
-  };
-  return (
-    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
-      <path d={paths[direction]} fill="currentColor" />
-    </svg>
-  );
+  const iconName = {
+    up: 'keyboard_arrow_up',
+    down: 'keyboard_arrow_down',
+    left: 'keyboard_arrow_left',
+    right: 'keyboard_arrow_right'
+  }[direction] || 'keyboard_arrow_up';
+  return <MaterialIcon name={iconName} size={32} />;
+}
+
+function MenuActionIcon({ name }) {
+  const iconName = {
+    play: 'play_arrow',
+    restart: 'refresh',
+    save: 'save',
+    continue: 'restore',
+    badge: 'workspace_premium',
+    install: 'download',
+    settings: 'settings'
+  }[name] || 'settings';
+  return <MaterialIcon name={iconName} size={18} className="menu-action-icon" />;
 }
 
 function ProgressDots({ total, current }) {
@@ -1174,10 +1211,9 @@ export default function VoxelCrossing({
     setLastRunScore(0);
     startEngineAfterIntroPaint();
 
-    // Keep the Start tap visually light, but still mark the page as user-interacted
-    // so background music can be lazily warmed and resumed later without requiring
-    // a visible extra gesture from the child.
-    audioRef.current?.unlock?.({ allowMusic: false });
+    // Keep the Start tap visually light. Mark the page as user-interacted
+    // without creating/resuming AudioContext; that work caused recurring Start freezes.
+    audioRef.current?.markUserInteracted?.();
 
     // Background music is warmed and resumed only on idle work after gameplay has
     // already painted, so it should not steal the first rendered frames.
@@ -1287,8 +1323,13 @@ export default function VoxelCrossing({
   };
 
   const updateSetting = (key, value) => {
-    deferAudioUnlock({ allowMusic: !ACTIVE_QUIZ_STATES.has(quiz.status) && !quizDue }, 1400);
-    setSettings((current) => ({ ...current, [key]: Boolean(value) }));
+    if (key !== 'movePadSide') {
+      deferAudioUnlock({ allowMusic: !ACTIVE_QUIZ_STATES.has(quiz.status) && !quizDue }, 1400);
+    }
+    setSettings((current) => ({
+      ...current,
+      [key]: key === 'movePadSide' ? (value === 'left' ? 'left' : 'right') : Boolean(value)
+    }));
   };
 
   const move = (direction) => {
@@ -1392,7 +1433,7 @@ export default function VoxelCrossing({
   const learningStars = quiz.correctCount >= 5 ? 3 : quiz.correctCount >= 3 ? 2 : quiz.correctCount >= 1 ? 1 : 0;
 
   return (
-    <section className={`vc-shell ${orientationHint} ${menuOpen ? 'menu-open' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
+    <section className={`vc-shell ${orientationHint} move-pad-${settings.movePadSide === 'left' ? 'left' : 'right'} ${menuOpen ? 'menu-open' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
       <div ref={hostRef} className="vc-host" />
       <ConfettiBurst burst={confettiBurst} />
       <BadgeUnlockOverlay badge={activeBadge} onClose={closeBadge} />
@@ -1459,7 +1500,7 @@ export default function VoxelCrossing({
               <strong>Menu</strong>
               <span>{menuPausedRef.current ? 'Game dijeda' : 'Atur game'}</span>
             </div>
-            <button type="button" className="icon-close" onClick={() => closeMenu({ resume: menuPausedRef.current })} aria-label="Tutup menu">×</button>
+            <button type="button" className="icon-close" onClick={() => closeMenu({ resume: menuPausedRef.current })} aria-label="Tutup menu"><CloseIcon /></button>
           </div>
 
           <div className="badge-progress-pill" aria-label={`Badge terbuka ${playerProfile.unlockedBadges.length} dari ${getBadgeCount()}`}>
@@ -1470,16 +1511,16 @@ export default function VoxelCrossing({
 
           <div className="menu-actions">
             {menuPausedRef.current ? (
-              <button type="button" className="menu-action primary" onClick={() => resumeGame({ deferEngine: true })}>Lanjutkan</button>
+              <button type="button" className="menu-action primary" onClick={() => resumeGame({ deferEngine: true })}><MenuActionIcon name="play" />Lanjutkan</button>
             ) : (
-              <button type="button" className="menu-action primary" onClick={startGame} disabled={!ready}>Mulai Main</button>
+              <button type="button" className="menu-action primary" onClick={startGame} disabled={!ready}><MenuActionIcon name="play" />Mulai Main</button>
             )}
-            <button type="button" className="menu-action" onClick={startGame} disabled={!ready}>Restart</button>
-            <button type="button" className="menu-action" onClick={saveGame} disabled={!ready || gameOver}>Save</button>
-            <button type="button" className="menu-action" onClick={continueSavedGame} disabled={!ready || !savedGame}>Continue</button>
-            <button type="button" className={`menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}>Papan Badge</button>
-            {!standalonePwa && <button type="button" className="menu-action install" onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(false); setPwaPromptVisible(true); }}>Install App</button>}
-            <button type="button" className={`menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}>Settings</button>
+            <button type="button" className="menu-action" onClick={startGame} disabled={!ready}><MenuActionIcon name="restart" />Restart</button>
+            <button type="button" className="menu-action" onClick={saveGame} disabled={!ready || gameOver}><MenuActionIcon name="save" />Save</button>
+            <button type="button" className="menu-action" onClick={continueSavedGame} disabled={!ready || !savedGame}><MenuActionIcon name="continue" />Continue</button>
+            <button type="button" className={`menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}><MenuActionIcon name="badge" />Papan Badge</button>
+            {!standalonePwa && <button type="button" className="menu-action install" onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(false); setPwaPromptVisible(true); }}><MenuActionIcon name="install" />Install App</button>}
+            <button type="button" className={`menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}><MenuActionIcon name="settings" />Settings</button>
           </div>
 
           {saveNotice && <div className="menu-save-note" role="status">{saveNotice}</div>}
@@ -1524,6 +1565,17 @@ export default function VoxelCrossing({
                 />
                 <i aria-hidden="true" />
               </label>
+
+              <div className="setting-row move-pad-setting">
+                <span>
+                  <strong>Move pad</strong>
+                  <small>Pilih posisi tombol gerak sesuai tangan yang nyaman</small>
+                </span>
+                <div className="move-pad-toggle" role="group" aria-label="Pilih posisi move pad">
+                  <button type="button" className={settings.movePadSide === 'left' ? 'active' : ''} onClick={() => updateSetting('movePadSide', 'left')}>Left</button>
+                  <button type="button" className={settings.movePadSide === 'right' ? 'active' : ''} onClick={() => updateSetting('movePadSide', 'right')}>Right</button>
+                </div>
+              </div>
 
               <button type="button" className="reset-score-button" onClick={resetHighScore}>Reset high score</button>
             </div>

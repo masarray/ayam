@@ -26,3 +26,6 @@ Audio:
 Trademark note:
 
 - Crossy Road is a third-party game and brand. This project does not include the Crossy Road name, logo, official characters, official artwork, or official audio. Do not add those assets unless you have permission from the rights holder.
+
+- Google Material Icons / Material Symbols SVG path data — Apache License 2.0. Icons are embedded inline as SVG path data for offline-safe UI rendering; no external icon font package is bundled.
+

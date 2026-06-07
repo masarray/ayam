@@ -42,6 +42,12 @@ if (!/export const PLAYER_RAIL_STAND_Z = 7\.2;/.test(constantsSource)) {
   process.exit(1);
 }
 
+const worldSource = readFileSync('src/game/world.js', 'utf8');
+if (!/Math\.max\(2, roadBand\?\.laneCount/.test(worldSource)) {
+  console.error('Traffic generator must clamp road lane count to minimum 2 so 1-lane roads cannot appear.');
+  process.exit(1);
+}
+
 const rendererSource = readFileSync('src/game/renderers.js', 'utf8');
 if (!/railLine: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 3\.6, RAIL_HEAD_HEIGHT\)/.test(rendererSource)) {
   console.error('Rail geometry should use a slim raised rail-head profile and aligned wheel contact constants.');
@@ -77,8 +83,8 @@ if (!/navigator\.vibrate/.test(crossingSource) || !/hapticsEnabled/.test(crossin
   process.exit(1);
 }
 
-if (!/audioRef\.current\?\.unlock\?\.\(\{ allowMusic: false \}\)/.test(crossingSource) || !/warmMusic\?\.\(\)/.test(crossingSource) || !/resumeMusic\?\.\(\)/.test(crossingSource)) {
-  console.error('Start flow must unlock audio without BGM, then warm and resume music lazily in background idle work.');
+if (!/audioRef\.current\?\.markUserInteracted\?\.\(\)/.test(crossingSource) || !/warmMusic\?\.\(\)/.test(crossingSource) || !/resumeMusic\?\.\(\)/.test(crossingSource)) {
+  console.error('Start flow must avoid AudioContext creation, then warm and resume music lazily in background idle work.');
   process.exit(1);
 }
 
@@ -104,8 +110,12 @@ if (!/font-size: 40px;/.test(cssSource) || !/background: transparent;/.test(cssS
   console.error('Life HUD should use large bare hearts without background or border.');
   process.exit(1);
 }
-if (!/CHEAT MODE/.test(crossingSource) || /QA cheat mode/.test(crossingSource) || !/ctrlKey && event\.altKey && event\.shiftKey/.test(crossingSource) || !/control-visual/.test(crossingSource) || !/border-radius: 999px;/.test(cssSource)) {
-  console.error('Cheat mode must be secret-hotkey only, and mobile controls should use circular individual buttons with an inner visual control.');
+if (!/CHEAT MODE/.test(crossingSource) || /QA cheat mode/.test(crossingSource) || !/ctrlKey && event\.altKey && event\.shiftKey/.test(crossingSource) || !/control-visual/.test(crossingSource) || !/ControlArrowIcon/.test(crossingSource) || !/MenuActionIcon/.test(crossingSource) || !/movePadSide/.test(crossingSource) || !/move-pad-left/.test(cssSource) || !/border-radius: 999px;/.test(cssSource)) {
+  console.error('Cheat mode must be secret-hotkey only, controls should support left/right move pad, and menu/move buttons need consistent icon styling.');
+  process.exit(1);
+}
+if (!/MATERIAL_ICON_PATHS/.test(crossingSource) || !/keyboard_arrow_up/.test(crossingSource) || !/workspace_premium/.test(crossingSource) || !/Google Material Icons/.test(crossingSource)) {
+  console.error('UI icons must use Google Material Icons path data, not hand-drawn custom paths.');
   process.exit(1);
 }
 const startFnSource = crossingSource.slice(
@@ -116,7 +126,7 @@ if (startFnSource.includes('reset(true)')) {
   console.error('Start button must not call reset(true); it rebuilds the whole scene and can freeze low-end devices. Use game.start() for first-play flow.');
   process.exit(1);
 }
-if (/allowMusic:\s*true/.test(startFnSource) || /startMusic\?\.\(/.test(startFnSource)) {
+if (/unlock\?\.\(/.test(startFnSource) || /allowMusic:\s*true/.test(startFnSource) || /startMusic\?\.\(/.test(startFnSource)) {
   console.error('Start button must not directly start music in the critical click path. Only lazy background warm/resume is allowed.');
   process.exit(1);
 }

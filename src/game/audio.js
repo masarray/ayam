@@ -45,6 +45,10 @@ export class GameAudio {
     this.userInteracted = false;
   }
 
+  markUserInteracted() {
+    this.userInteracted = true;
+  }
+
   unlock({ allowMusic = true } = {}) {
     const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
 

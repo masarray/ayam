@@ -326,6 +326,17 @@
   -webkit-backdrop-filter: none;
 }
 
+
+.vc-shell.move-pad-left .vc-controls {
+  left: calc(max(20px, env(safe-area-inset-left)) + 12px);
+  right: auto;
+}
+
+.vc-shell.move-pad-right .vc-controls {
+  right: calc(max(20px, env(safe-area-inset-right)) + 12px);
+  left: auto;
+}
+
 .control {
   appearance: none;
   border: 0;
@@ -911,6 +922,10 @@
   appearance: none;
   min-height: 43px;
   padding: 10px 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 16px;
   color: #f8fbff;
@@ -919,6 +934,13 @@
   font-size: 13px;
   font-weight: 800;
   transition: transform 150ms ease, background 150ms ease, filter 150ms ease;
+}
+
+.menu-action-icon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  opacity: 0.92;
 }
 
 .menu-action.primary {
@@ -957,6 +979,35 @@
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.move-pad-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.move-pad-toggle button {
+  appearance: none;
+  border: 0;
+  min-width: 50px;
+  min-height: 30px;
+  border-radius: 999px;
+  color: rgba(248, 251, 255, 0.72);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.move-pad-toggle button.active {
+  color: #1f2530;
+  background: linear-gradient(135deg, #ffe891, #f5d36d);
+  box-shadow: 0 7px 16px rgba(87, 69, 22, 0.13);
 }
 
 .vc-controls button:disabled {
@@ -3701,4 +3752,16 @@
 .vc-shell.menu-open .menu-button {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+@media (max-width: 760px) and (orientation: landscape) {
+  .vc-shell.move-pad-left .vc-controls {
+    left: max(18px, env(safe-area-inset-left));
+    right: auto;
+  }
+
+  .vc-shell.move-pad-right .vc-controls {
+    right: max(18px, env(safe-area-inset-right));
+    left: auto;
+  }
 }

@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.4.2 - 2026-06-07
+
+### Fixed
+- Replaced hand-drawn menu and movement-control SVG paths with Google Material Icons path data.
+- Replaced the menu close button glyph with a Material close icon for consistent visual language.
+- Added third-party notice entry for embedded Google Material Icons SVG path data.
+
+## 3.4.1 - 2026-06-07
+
+### Fixed
+- Removed AudioContext creation from the Start button path; Start now only marks user interaction and schedules music warm/resume later through idle work.
+- Kept the no-1-lane-road guard active in generator verification.
+
+### Added
+- Added Move Pad side setting with Left/Right options for left-handed and right-handed mobile play.
+- Added consistent inline SVG icons to the menu action buttons.
+
+### Improved
+- Kept individual circular mobile move buttons while supporting left/right placement.
+
 ## 3.4.0 - 2026-06-07
 
 ### Fixed
