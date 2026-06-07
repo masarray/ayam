@@ -98,10 +98,15 @@ export function createGeometryCache() {
     chickenLeg: new THREE.BoxGeometry(3.5, 3.5, 8),
     chickenFoot: new THREE.BoxGeometry(7, 5, 3),
     chickenEye: new THREE.BoxGeometry(2.2, 2.2, 2.2),
+    chickenEyeCute: new THREE.BoxGeometry(3.6, 2.4, 3.6),
+    chickenCheek: new THREE.BoxGeometry(3.8, 2, 3),
+    chickenTail: new THREE.BoxGeometry(5, 9, 8),
 
     treeTrunk: new THREE.BoxGeometry(14, 14, 26),
+    treeTrunkTop: new THREE.BoxGeometry(11, 11, 20),
     treeCrown: new THREE.BoxGeometry(34, 34, 42),
     treeTop: new THREE.BoxGeometry(28, 28, 28),
+    treeCrownSmall: new THREE.BoxGeometry(24, 24, 24),
 
     wheel: new THREE.BoxGeometry(8, 5, 8),
     wheelWide: new THREE.BoxGeometry(9, 6, 9),
@@ -124,6 +129,11 @@ export function createGeometryCache() {
     lightBar: new THREE.BoxGeometry(20, 9, 5),
     spoiler: new THREE.BoxGeometry(24, 5, 7),
     aeroFin: new THREE.BoxGeometry(5, 22, 7),
+    sideIntake: new THREE.BoxGeometry(24, 3, 8),
+    sideSkirt: new THREE.BoxGeometry(46, 3, 4),
+    wheelArch: new THREE.BoxGeometry(15, 3, 10),
+    mirror: new THREE.BoxGeometry(4, 5, 5),
+    licensePlate: new THREE.BoxGeometry(2, 12, 5),
     pickupBed: new THREE.BoxGeometry(34, 26, 13),
     pickupRail: new THREE.BoxGeometry(34, 4, 8),
     vanBody: new THREE.BoxGeometry(86, 34, 27),
@@ -214,6 +224,8 @@ export function createFoundation(geometries, materials) {
 export function createPlayer(geometries, materials) {
   const group = new THREE.Group();
   group.name = 'Chicken Player';
+  const eyeMaterial = dynamicMaterial(0x101217);
+  const cheekMaterial = dynamicMaterial(0xf2b8a8);
 
   // Local +Y is the chicken face/front. The engine rotates this group per move direction.
   box(group, geometries.chickenLeg, materials.chickenLeg, -5, 0, 5);
@@ -223,19 +235,26 @@ export function createPlayer(geometries, materials) {
 
   box(group, geometries.chickenBody, materials.chickenWhite, 0, 0, 17);
   box(group, geometries.chickenBelly, materials.chickenShade, 0, 6, 15.5, { castShadow: false });
-  box(group, geometries.chickenWing, materials.chickenWing, -11, -1, 16);
-  box(group, geometries.chickenWing, materials.chickenWing, 11, -1, 16);
+  box(group, geometries.chickenWing, materials.chickenWing, -11, 0, 16, { scale: { x: 1, y: 1.15, z: 1.05 } });
+  box(group, geometries.chickenWing, materials.chickenWing, 11, 0, 16, { scale: { x: 1, y: 1.15, z: 1.05 } });
+  box(group, geometries.chickenTail, materials.chickenWing, -6, -12, 22, { scale: { x: 0.9, y: 0.9, z: 1.15 } });
+  box(group, geometries.chickenTail, materials.chickenWing, 0, -13.5, 24, { scale: { x: 1, y: 0.8, z: 1.25 } });
+  box(group, geometries.chickenTail, materials.chickenWing, 6, -12, 22, { scale: { x: 0.9, y: 0.9, z: 1.15 } });
 
-  box(group, geometries.chickenHead, materials.chickenWhite, 0, 10.5, 30.5);
+  box(group, geometries.chickenHead, materials.chickenWhite, 0, 10.5, 31, { scale: { x: 1.12, y: 1.1, z: 1.08 } });
+  box(group, geometries.chickenBelly, materials.chickenShade, 0, 18, 31, { scale: { x: 0.52, y: 0.34, z: 0.52 }, castShadow: false });
   box(group, geometries.chickenBeak, materials.chickenBeak, 0, 19.3, 30.3);
   box(group, geometries.chickenWattle, materials.chickenComb, 0, 16.7, 24.3);
   box(group, geometries.chickenComb, materials.chickenComb, 0, 9.5, 40.5);
   box(group, geometries.chickenCombSmall, materials.chickenComb, -4, 8.8, 38.5);
   box(group, geometries.chickenCombSmall, materials.chickenComb, 4, 8.8, 38.5);
 
-  const eyeMaterial = dynamicMaterial(0x111111);
-  box(group, geometries.chickenEye, eyeMaterial, -4.2, 17.8, 32.6, { castShadow: false });
-  box(group, geometries.chickenEye, eyeMaterial, 4.2, 17.8, 32.6, { castShadow: false });
+  box(group, geometries.chickenEyeCute, eyeMaterial, -4.6, 18.1, 33.4, { castShadow: false });
+  box(group, geometries.chickenEyeCute, eyeMaterial, 4.6, 18.1, 33.4, { castShadow: false });
+  box(group, geometries.chickenEye, materials.white, -5.2, 19.4, 34.3, { scale: { x: 0.55, y: 0.45, z: 0.55 }, castShadow: false });
+  box(group, geometries.chickenEye, materials.white, 4, 19.4, 34.3, { scale: { x: 0.55, y: 0.45, z: 0.55 }, castShadow: false });
+  box(group, geometries.chickenCheek, cheekMaterial, -6.4, 18.9, 28.8, { castShadow: false });
+  box(group, geometries.chickenCheek, cheekMaterial, 6.4, 18.9, 28.8, { castShadow: false });
 
   // Keep the character readable but no longer oversized against cars and rail.
   group.scale.setScalar(0.62);
@@ -248,10 +267,20 @@ export function createTree(tileIndex, rowIndex, geometries, materials, variant =
   const group = new THREE.Group();
   group.position.set(tileToX(tileIndex, TILE_SIZE), rowToY(rowIndex, TILE_SIZE), 0);
   group.name = `Tree ${rowIndex}:${tileIndex}`;
+  const fruitMaterial = dynamicMaterial(variant % 2 ? 0xf1c84b : 0xe76f51);
+  const leafA = variant % 2 ? materials.treeAlt : materials.tree;
+  const leafB = variant % 2 ? materials.tree : materials.treeAlt;
 
   box(group, geometries.treeTrunk, materials.trunk, 0, 0, 13);
-  box(group, geometries.treeCrown, variant % 2 ? materials.treeAlt : materials.tree, 0, 0, 42);
-  if (variant % 3 === 0) box(group, geometries.treeTop, variant % 2 ? materials.tree : materials.treeAlt, 0, 0, 65);
+  box(group, geometries.treeTrunkTop, materials.trunk, variant % 2 ? 3 : -3, 1, 33, { scale: { x: 0.9, y: 0.86, z: 1 } });
+  box(group, geometries.treeCrown, leafA, 0, 0, 48, { scale: { x: 1.05, y: 1.02, z: 0.9 } });
+  box(group, geometries.treeTop, leafB, -10, -4, 63, { scale: { x: 1.04, y: 0.96, z: 0.86 } });
+  box(group, geometries.treeTop, leafA, 10, 6, 61, { scale: { x: 0.92, y: 0.88, z: 0.78 } });
+  box(group, geometries.treeCrownSmall, leafB, 0, 1, 77, { scale: { x: 0.88, y: 0.84, z: 0.74 } });
+  if (variant % 3 === 0) {
+    box(group, geometries.chickenEye, fruitMaterial, -12, 12, 55, { scale: { x: 1.4, y: 1.4, z: 1.4 }, castShadow: false });
+    box(group, geometries.chickenEye, fruitMaterial, 13, -10, 66, { scale: { x: 1.25, y: 1.25, z: 1.25 }, castShadow: false });
+  }
 
   return group;
 }
@@ -262,6 +291,25 @@ function addWheelPair(group, geometries, materials, x, z = 6, wide = false) {
     box(group, wheelGeometry, materials.wheel, x, side * 17, z);
     box(group, geometries.smallHub, materials.tireHub, x, side * 20.5, z, { castShadow: false });
   });
+}
+
+function addWheelArchPair(group, geometries, material, x, y = 17, z = 10) {
+  [-1, 1].forEach((side) => {
+    box(group, geometries.wheelArch, material, x, side * y, z, { castShadow: false });
+  });
+}
+
+function addVehicleGrounding(group, vehicle, geometries, materials) {
+  const trim = dynamicMaterial(0x111820);
+  const widthScale = Math.max(1.35, vehicle.width / 44);
+  const depthScale = Math.max(5.4, vehicle.depth / 6);
+  box(group, geometries.roadStripe, trim, 0, 0, 3.4, { scale: { x: widthScale, y: depthScale, z: 1.35 }, castShadow: false });
+  box(group, geometries.licensePlate, materials.trimLight, vehicle.width * 0.5 + 1, 0, 10.8, { castShadow: false });
+}
+
+function addMirrors(group, geometries, material, x = 22, y = 18, z = 24) {
+  box(group, geometries.mirror, material, x, -y, z, { castShadow: false });
+  box(group, geometries.mirror, material, x, y, z, { castShadow: false });
 }
 
 function addLights(group, geometries, materials, frontX, rearX, frontY = 8, rearY = 7) {
@@ -307,6 +355,8 @@ function createPassengerCar(group, vehicle, geometries, materials, bodyMaterial,
   const rearWheelX = isWagon ? -28 : -22;
   addWheelPair(group, geometries, materials, rearWheelX, 5);
   addWheelPair(group, geometries, materials, frontWheelX, 5);
+  addWheelArchPair(group, geometries, darkerBodyMaterial, rearWheelX);
+  addWheelArchPair(group, geometries, darkerBodyMaterial, frontWheelX);
   addLights(group, geometries, materials, frontX, rearX);
   box(group, geometries.bumper, materials.chrome, frontX + 2, 0, 7, { castShadow: false });
   box(group, geometries.bumper, materials.chrome, rearX - 2, 0, 7, { castShadow: false });
@@ -357,6 +407,7 @@ function createSportsCar(group, vehicle, geometries, materials, bodyMaterial, da
 
     [-31, 31].forEach((x) => {
       addWheelPair(group, geometries, materials, x, 5, true);
+      addWheelArchPair(group, geometries, bodyMaterial, x, 18.6, 9.6);
       box(group, geometries.smallHub, wheelAccent, x, -21.4, 5.2, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
       box(group, geometries.smallHub, wheelAccent, x, 21.4, 5.2, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
     });
@@ -376,6 +427,8 @@ function createSportsCar(group, vehicle, geometries, materials, bodyMaterial, da
   }
   addWheelPair(group, geometries, materials, -25, 5, isSuper);
   addWheelPair(group, geometries, materials, 25, 5, isSuper);
+  addWheelArchPair(group, geometries, darkerBodyMaterial, -25);
+  addWheelArchPair(group, geometries, darkerBodyMaterial, 25);
   addLights(group, geometries, materials, 42, -42, 10, 8);
   box(group, geometries.roadStripe, accent, 2, 0, 17.8, { scale: { x: 1.65, y: 0.36, z: 0.45 }, castShadow: false });
 }
@@ -403,6 +456,8 @@ function createPickup(group, vehicle, geometries, materials, bodyMaterial, darke
   addSideGlass(group, geometries, materials, [18], 16, 24.5);
   addWheelPair(group, geometries, materials, -28, 5);
   addWheelPair(group, geometries, materials, 28, 5);
+  addWheelArchPair(group, geometries, darkerBodyMaterial, -28);
+  addWheelArchPair(group, geometries, darkerBodyMaterial, 28);
   addLights(group, geometries, materials, 44, -44);
   box(group, geometries.bumper, materials.chrome, 46, 0, 7, { castShadow: false });
 }
@@ -427,6 +482,8 @@ function createVan(group, vehicle, geometries, materials, bodyMaterial) {
   box(group, geometries.busDoor, materials.trimDark, 20, -18.5, 16, { castShadow: false });
   addWheelPair(group, geometries, materials, -31, 6, true);
   addWheelPair(group, geometries, materials, 31, 6, true);
+  addWheelArchPair(group, geometries, bodyMaterial, -31, 18.2, 11);
+  addWheelArchPair(group, geometries, bodyMaterial, 31, 18.2, 11);
   addLights(group, geometries, materials, 46, -46, 10, 8);
   box(group, geometries.bumper, materials.chrome, 48, 0, 8, { castShadow: false });
 }
@@ -441,6 +498,7 @@ function createBus(group, vehicle, geometries, materials, bodyMaterial) {
   box(group, geometries.roadStripe, materials.glassDark, -8, -20.5, 29, { scale: { x: 2.7, y: 0.7, z: 1 }, castShadow: false });
   box(group, geometries.roadStripe, materials.glassDark, -8, 20.5, 29, { scale: { x: 2.7, y: 0.7, z: 1 }, castShadow: false });
   [-43, 0, 43].forEach((x) => addWheelPair(group, geometries, materials, x, 6, true));
+  [-43, 0, 43].forEach((x) => addWheelArchPair(group, geometries, bodyMaterial, x, 20.2, 12));
   addLights(group, geometries, materials, 63, -63, 10, 8);
 }
 
@@ -598,11 +656,17 @@ export function createVehicle(vehicle, row, geometries, materials) {
       break;
   }
 
+  addVehicleGrounding(group, vehicle, geometries, materials);
+  if (!['bus', 'boxTruck', 'dumpTruck', 'tankerTruck', 'containerTruck', 'articulatedTruck'].includes(vehicle.kind)) {
+    addMirrors(group, geometries, materials.trimDark, Math.min(vehicle.width * 0.28, 34), Math.max(16, vehicle.depth * 0.52), 23);
+  }
+
   return group;
 }
 
 function addTrainBogie(group, geometries, materials, centerX, bodyLength, yOffset = 20) {
   const spread = Math.max(18, bodyLength * 0.34);
+  box(group, geometries.roadStripe, materials.railShadow, centerX, 0, 7, { scale: { x: Math.max(1.2, bodyLength / 32), y: 9.5, z: 1.4 }, castShadow: false });
   [centerX - spread, centerX + spread].forEach((x) => {
     box(group, geometries.trainBogie, materials.railShadow, x, 0, 5, { castShadow: false });
     [-1, 1].forEach((side) => box(group, geometries.trainWheel, materials.wheel, x, side * yOffset, 6));
@@ -638,6 +702,8 @@ function createBulletTrain(group, train, geometries, materials, bodyMaterial, ac
     box(group, geometries.bulletWindowStrip, materials.glassDark, centerX - dir * 2, 18.8, 26.2, { scale: { x: headLength / 134, y: 1, z: 1 }, castShadow: false });
     box(group, geometries.bulletStripe, accentMaterial, centerX - dir * 1, -20.6, 20.5, { scale: { x: headLength / 102, y: 1, z: 0.75 }, castShadow: false });
     box(group, geometries.bulletStripe, accentMaterial, centerX - dir * 1, 20.6, 20.5, { scale: { x: headLength / 102, y: 1, z: 0.75 }, castShadow: false });
+    box(group, geometries.sideSkirt, materials.railShadow, centerX - dir * 8, -20.8, 9.5, { scale: { x: headLength / 62, y: 1, z: 0.8 }, castShadow: false });
+    box(group, geometries.sideSkirt, materials.railShadow, centerX - dir * 8, 20.8, 9.5, { scale: { x: headLength / 62, y: 1, z: 0.8 }, castShadow: false });
 
     const nose = setupMesh(new THREE.Mesh(geometries.bulletNose, accentMaterial));
     nose.position.set(anchorX + dir * noseOffset, 0, 16);
@@ -662,6 +728,8 @@ function createBulletTrain(group, train, geometries, materials, bodyMaterial, ac
     box(group, geometries.bulletWindowStrip, materials.glassDark, cursor, 19.5, 26.8, { scale: { x: carLength / 112, y: 1, z: 1 }, castShadow: false });
     box(group, geometries.bulletStripe, accentMaterial, cursor, -20.8, 20.8, { scale: { x: carLength / 98, y: 1, z: 0.74 }, castShadow: false });
     box(group, geometries.bulletStripe, accentMaterial, cursor, 20.8, 20.8, { scale: { x: carLength / 98, y: 1, z: 0.74 }, castShadow: false });
+    box(group, geometries.sideSkirt, materials.railShadow, cursor, -20.8, 9.2, { scale: { x: carLength / 58, y: 1, z: 0.72 }, castShadow: false });
+    box(group, geometries.sideSkirt, materials.railShadow, cursor, 20.8, 9.2, { scale: { x: carLength / 58, y: 1, z: 0.72 }, castShadow: false });
     box(group, geometries.bulletRoof, materials.trimLight, cursor, 0, 31.7, { scale: { x: carLength / 126, y: 1, z: 0.46 }, castShadow: false });
     addTrainBogie(group, geometries, materials, cursor, carLength, 19);
     addCoupler(group, geometries, materials, cursor + carLength / 2 + 3);
