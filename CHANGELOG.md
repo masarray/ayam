@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.4.5 - 2026-06-08
+
+### Improved
+- Thickened road markings again for better visibility and lower shimmer during camera movement.
+- Added earlier near-miss feedback for fast bullet trains while keeping slow-train and car near-miss distance tighter.
+- Prioritized lazy SFX audio priming over background music; BGM no longer resumes from the Start path.
+- Set landscape move-pad grid cells to 60px for cleaner alignment.
+- Added visible plank pre-sink behavior: wooden planks gradually sink while ridden too long before the final splash impact.
+
+### Stability
+- Preserved the no-start-freeze rule: no background music resume or heavy media playback is triggered by the Start click path.
+
+## 3.4.4 - 2026-06-08
+
+### Fixed
+- Fixed blocker bounce not being wired into the game engine method path.
+- Made blocker feedback more visible and playful with a longer partial hop, rebound motion, squash/stretch, stronger tilt, and clearer doeng SFX.
+
+### Stability
+- Preserved the no-start-freeze path. No audio/media/scene rebuild work was added to the Start button handler.
+
+## 3.4.3 - 2026-06-08
+
+### Improved
+- Upgraded menu action icons to soft colorful game-style icon chips while keeping Google Material Icons for the glyphs.
+- Added a responsive blocker bounce so the chicken hops slightly into blockers, rebounds back, and plays a soft "doeng" style SFX.
+- Improved the close-menu button centering and responsiveness by using a pointer-down close interaction and better centering styles.
+
+### Stability
+- Preserved the existing no-start-freeze strategy. No heavy media work was moved back into the Start click path.
+
 ## 3.4.2 - 2026-06-07
 
 ### Fixed

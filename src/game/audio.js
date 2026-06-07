@@ -388,6 +388,15 @@ export class GameAudio {
     this._tone({ type: 'sine', frequency: 740, endFrequency: 520, duration: 0.055, gain: 0.032, delay: 0.018, decay: 0.035 });
   }
 
+  blockedBounce() {
+    if (!this._cooldown('blocked-bounce', 110)) return;
+    // Cartoonish "doeng": quick elastic thump, not a crash.
+    this._tone({ type: 'triangle', frequency: 520, endFrequency: 250, duration: 0.13, gain: 0.07, attack: 0.002, decay: 0.075 });
+    this._tone({ type: 'sine', frequency: 220, endFrequency: 145, duration: 0.18, gain: 0.055, delay: 0.035, attack: 0.003, decay: 0.1 });
+    this._tone({ type: 'square', frequency: 660, endFrequency: 390, duration: 0.055, gain: 0.024, delay: 0.018, attack: 0.002, decay: 0.04 });
+    this._noise({ duration: 0.035, gain: 0.018, frequency: 1200, type: 'bandpass', delay: 0.008 });
+  }
+
   carHorn() {
     if (!this._cooldown('horn', 620)) return;
     // Short dual-tone car horn: two close square-wave notes, slight tremolo bite, fast attack.

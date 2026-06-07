@@ -177,7 +177,8 @@ export class RoadQuestGame {
       onMoveStart: options.onMoveStart || (() => {}),
       onHazardSound: options.onHazardSound || (() => {}),
       onNearMiss: options.onNearMiss || (() => {}),
-      onRespawn: options.onRespawn || (() => {})
+      onRespawn: options.onRespawn || (() => {}),
+      onBlocked: options.onBlocked || (() => {})
     };
 
     this.scene = new THREE.Scene();
@@ -510,7 +511,10 @@ export class RoadQuestGame {
     const from = this._plannedPosition();
     const delta = DIR_TO_DELTA[direction];
     const to = { row: from.row + delta.row, tile: from.tile + delta.tile };
-    if (!this._canMoveTo(to.row, to.tile)) return false;
+    if (!this._canMoveTo(to.row, to.tile)) {
+      this._triggerBlockedBump(direction, from);
+      return false;
+    }
 
     this.moveQueue.push(direction);
     if (!this.movement) this._beginNextMove();
@@ -650,6 +654,47 @@ export class RoadQuestGame {
     return row.blockers?.has(tile) === true;
   }
 
+  _triggerBlockedBump(direction, from = this.playerPosition) {
+    if (this.isImpacting || this.isGameOver || !this.isPlaying || !this.player) return false;
+
+    const delta = DIR_TO_DELTA[direction];
+    if (!delta) return false;
+
+    // If the user taps into a blocker while the chicken is still doing a normal
+    // hop, do not silently queue a move into the blocker. The next tap after
+    // landing will get a full visible bump.
+    if (this.movement && !this.movement.blocked) {
+      this.moveQueue = [];
+      return false;
+    }
+
+    const baseRow = Number.isFinite(from.row) ? from.row : this.playerPosition.row;
+    const baseTile = Number.isFinite(from.tile) ? from.tile : this.playerPosition.tile;
+    const fromX = tileToX(baseTile, TILE_SIZE);
+    const fromY = rowToY(baseRow, TILE_SIZE);
+    const standZ = this._getPlayerStandZ(baseRow, baseTile);
+    const bumpDistance = TILE_SIZE * 0.46;
+
+    this.movement = {
+      blocked: true,
+      direction,
+      startedAt: performance.now(),
+      duration: Math.max(235, MOVE_DURATION * 1.42),
+      from: { row: baseRow, tile: baseTile },
+      to: { row: baseRow, tile: baseTile },
+      fromX,
+      fromY,
+      fromZ: standZ,
+      toX: fromX + delta.tile * bumpDistance,
+      toY: fromY + delta.row * bumpDistance,
+      toZ: standZ
+    };
+
+    this.moveQueue = [];
+    this.callbacks.onBlocked({ direction, from: { row: baseRow, tile: baseTile } });
+    return true;
+  }
+
   _beginNextMove() {
     if (this.isImpacting || this.isGameOver || !this.isPlaying) return;
     if (this.movement || this.moveQueue.length === 0) return;
@@ -696,6 +741,11 @@ export class RoadQuestGame {
     // queue the next hop and let the chicken cross water without touching a plank.
     this.waterGraceUntil = landedRow?.type === 'water' ? 0 : performance.now() + 105;
     this.movement = null;
+    if (landedRow?.type !== 'water' && this.activeRidePlankId) {
+      const lastPlank = this.planks.find((plank) => plank.uuid === this.activeRidePlankId);
+      if (lastPlank) lastPlank.userData.riderSince = 0;
+      this.activeRidePlankId = null;
+    }
     if (landedRow?.type === 'water') {
       const supportingPlank = this._findSupportingPlank();
       if (!supportingPlank) {
@@ -860,7 +910,36 @@ export class RoadQuestGame {
     }
 
     const elapsed = performance.now() - this.movement.startedAt;
-    const t = clamp(elapsed / MOVE_DURATION, 0, 1);
+    const duration = this.movement.blocked ? (this.movement.duration || Math.max(235, MOVE_DURATION * 1.42)) : MOVE_DURATION;
+    const t = clamp(elapsed / duration, 0, 1);
+
+    if (this.movement.blocked) {
+      const duration = this.movement.duration || Math.max(235, MOVE_DURATION * 1.42);
+      const tt = clamp(elapsed / duration, 0, 1);
+      const outPhase = tt < 0.38 ? easeOutCubic(tt / 0.38) : 1 - easeOutCubic((tt - 0.38) / 0.62);
+      const rebound = Math.sin(Math.PI * tt * 3.1) * Math.max(0, 1 - tt) * 0.13;
+      const outward = Math.max(0, Math.min(1.12, outPhase + rebound));
+      const hop = Math.sin(Math.PI * outward) * 15 + Math.sin(Math.PI * tt) * 3;
+      const x = lerp(this.movement.fromX, this.movement.toX, outward);
+      const y = lerp(this.movement.fromY, this.movement.toY, outward);
+      this.player.position.set(x, y, (this.movement.fromZ || 0) + hop);
+
+      const baseScale = this.player.userData.baseScale || 0.72;
+      const squash = Math.sin(Math.PI * tt) * 0.16;
+      const pop = Math.sin(Math.PI * Math.min(1, tt * 1.35)) * 0.08;
+      this.player.scale.set(baseScale * (1 + squash), baseScale * (1 + squash * 0.72), baseScale * (1 - squash * 0.55 + pop));
+
+      const tiltAmount = (0.22 * Math.sin(Math.PI * outward)) + (0.08 * Math.sin(Math.PI * tt * 4) * (1 - tt));
+      const tilt = this.movement.direction === 'backward' ? -tiltAmount : tiltAmount;
+      this._facePlayer(this.movement.direction, tilt);
+
+      if (t >= 1) {
+        this._setPlayerWorldPosition(this.movement.from.row, this.movement.from.tile, this.movement.direction);
+        this.movement = null;
+      }
+      return;
+    }
+
     const eased = easeInOutCubic(t);
     const hop = Math.sin(Math.PI * easeInOutQuad(t)) * 13;
 
@@ -1051,6 +1130,12 @@ export class RoadQuestGame {
     items.forEach((plank) => {
       const data = plank.userData;
       if (data.sinking) return;
+      if (!data.riderSince && Math.abs(plank.position.z) > 0.05) {
+        plank.position.z = lerp(plank.position.z, 0, 0.12);
+        plank.rotation.x = lerp(plank.rotation.x, 0, 0.12);
+        plank.scale.z = lerp(plank.scale.z, 1, 0.12);
+        plank.scale.y = lerp(plank.scale.y, 1, 0.12);
+      }
       plank.position.x += direction * (data.currentSpeed || data.baseSpeed) * delta;
       if (direction > 0 && plank.position.x > wrapMax + data.width * 0.5) {
         plank.position.x = wrapMin - data.width * 0.5;
@@ -1336,6 +1421,15 @@ export class RoadQuestGame {
     this.playerPosition.tile = tile;
 
     const rideAge = now - (supportingPlank.userData.riderSince || now);
+    const sinkWarning = clamp((rideAge - 850) / Math.max(1, PLANK_RIDE_LIMIT_MS - 850), 0, 1);
+    if (sinkWarning > 0) {
+      const easedSink = easeInOutQuad(sinkWarning);
+      supportingPlank.position.z = -12 * easedSink;
+      supportingPlank.rotation.x = Math.sin(sinkWarning * Math.PI * 3) * 0.055 * supportingPlank.userData.direction;
+      supportingPlank.scale.z = Math.max(0.74, 1 - easedSink * 0.18);
+      supportingPlank.scale.y = Math.max(0.88, 1 - easedSink * 0.08);
+      this.player.position.z = supportingPlank.position.z + PLAYER_PLANK_STAND_Z;
+    }
     const boardMin = MIN_TILE * TILE_SIZE;
     const boardMax = MAX_TILE * TILE_SIZE;
     const nearEdge = supportingPlank.position.x - supportingPlank.userData.width * 0.5 < boardMin + PLANK_EDGE_SINK_MARGIN
@@ -1388,22 +1482,28 @@ export class RoadQuestGame {
     if (nowMs - this.lastNearMissAt < 1250) return;
 
     const row = this.rows[this.playerPosition.row];
-    if (!row || row.type !== 'traffic') return;
+    if (!row || !['traffic', 'rail'].includes(row.type)) return;
 
     const playerX = this.player.position.x;
     for (const obstacle of this.vehicles) {
-      const { rowIndex, width, type, direction, currentSpeed, baseSpeed } = obstacle.userData;
-      if (type !== 'vehicle' || rowIndex !== this.playerPosition.row) continue;
+      const { rowIndex, width, type, direction, currentSpeed, baseSpeed, trainClass } = obstacle.userData;
+      if (rowIndex !== this.playerPosition.row) continue;
+      if (type !== 'vehicle' && type !== 'train') continue;
 
       const speed = currentSpeed || baseSpeed || 0;
       const frontClearance = width * 0.5 + PLAYER_WIDTH * 0.5;
       const leadDistance = direction * (playerX - obstacle.position.x);
-      const nearWindow = Math.min(44, Math.max(28, speed * 0.18));
+      const baseNearWindow = Math.min(44, Math.max(28, speed * 0.18));
+      const nearWindow = type === 'train'
+        ? (trainClass === 'bullet'
+          ? Math.min(190, Math.max(115, speed * 0.24))
+          : baseNearWindow)
+        : baseNearWindow;
       const almostHit = leadDistance > frontClearance && leadDistance < frontClearance + nearWindow;
 
       if (almostHit) {
         this.lastNearMissAt = nowMs;
-        this.callbacks.onNearMiss({ score: this.score, row: this.playerPosition.row, speed });
+        this.callbacks.onNearMiss({ score: this.score, row: this.playerPosition.row, speed, kind: type === 'train' ? trainClass || 'train' : 'vehicle' });
         break;
       }
     }

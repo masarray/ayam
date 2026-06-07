@@ -340,7 +340,11 @@ function MenuActionIcon({ name }) {
     install: 'download',
     settings: 'settings'
   }[name] || 'settings';
-  return <MaterialIcon name={iconName} size={18} className="menu-action-icon" />;
+  return (
+    <span className={`menu-action-icon-wrap ${name}`} aria-hidden="true">
+      <MaterialIcon name={iconName} size={18} className="menu-action-icon" />
+    </span>
+  );
 }
 
 function ProgressDots({ total, current }) {
@@ -626,6 +630,8 @@ export default function VoxelCrossing({
   const deferredAudioTaskRef = useRef(null);
   const deferredAudioTimerRef = useRef(null);
   const deferredAudioFrameRef = useRef(null);
+  const sfxPrimeTaskRef = useRef(null);
+  const sfxPrimedRef = useRef(false);
   const resumeFramesRef = useRef([]);
   const startFramesRef = useRef([]);
   const startedRef = useRef(false);
@@ -916,6 +922,7 @@ export default function VoxelCrossing({
   const triggerNearMiss = () => {
     if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
     setNearMissBurst({ id: Date.now() });
+    primeSfxAudio();
     runHaptic('nearMiss', settingsRef.current.hapticsEnabled);
     audioRef.current?.nearMiss?.();
     trackProfileEvent('near_miss');
@@ -926,6 +933,16 @@ export default function VoxelCrossing({
     const quizMusicLocked = quizDue || ACTIVE_QUIZ_STATES.has(quiz.status);
     audioRef.current?.setMusicSuppressed?.(!allowMusic || quizMusicLocked);
     audioRef.current?.unlock({ allowMusic: allowMusic && !quizMusicLocked });
+  };
+
+  const primeSfxAudio = () => {
+    if (sfxPrimedRef.current || !audioRef.current) return;
+    if (sfxPrimeTaskRef.current) return;
+    sfxPrimeTaskRef.current = runWhenIdle(() => {
+      sfxPrimeTaskRef.current = null;
+      unlockAudio({ allowMusic: false });
+      sfxPrimedRef.current = true;
+    }, 650);
   };
 
   const deferAudioUnlock = (options = {}, delayMs = 1600, idleTimeout = 2400) => {
@@ -1052,15 +1069,22 @@ export default function VoxelCrossing({
       },
       onHighScore: (nextHighScore) => setHighScore(nextHighScore),
       onImpact: ({ reason }) => {
+        primeSfxAudio();
         setImpactReason(reason);
         setImpacting(true);
         runHaptic(reason === 'train' ? 'train' : reason === 'water' ? 'water' : 'traffic', settingsRef.current.hapticsEnabled);
         audioRef.current?.hit(reason);
       },
       onMoveStart: () => {
+        primeSfxAudio();
         runHaptic('jump', settingsRef.current.hapticsEnabled);
         audioRef.current?.jump();
-        deferMusicResume(7000);
+        deferMusicResume(12000);
+      },
+      onBlocked: () => {
+        primeSfxAudio();
+        runHaptic('blocked', settingsRef.current.hapticsEnabled);
+        audioRef.current?.blockedBounce?.();
       },
       onHazardSound: ({ kind }) => {
         if (kind === 'carHorn') audioRef.current?.carHorn();
@@ -1223,17 +1247,8 @@ export default function VoxelCrossing({
         trackProfileEvent('run_started');
         schedulePendingBadgeCelebration();
         audioRef.current?.warmMusic?.();
-        if (settingsRef.current.musicEnabled && !quizDue) {
-          if (startMusicTimerRef.current) window.clearTimeout(startMusicTimerRef.current);
-          startMusicTimerRef.current = window.setTimeout(() => {
-            startMusicTimerRef.current = null;
-            runWhenIdle(() => {
-              if (!impacting && !gameOver && !quizDue && !ACTIVE_QUIZ_STATES.has(quiz.status)) {
-                audioRef.current?.resumeMusic?.();
-              }
-            }, 900);
-          }, 2400);
-        }
+        // SFX gets priority over BGM. Music is not resumed from Start; it is
+        // resumed later from gameplay after SFX audio has had time to prime.
       }, 1000);
     });
   };
@@ -1500,7 +1515,7 @@ export default function VoxelCrossing({
               <strong>Menu</strong>
               <span>{menuPausedRef.current ? 'Game dijeda' : 'Atur game'}</span>
             </div>
-            <button type="button" className="icon-close" onClick={() => closeMenu({ resume: menuPausedRef.current })} aria-label="Tutup menu"><CloseIcon /></button>
+            <button type="button" className="icon-close" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); closeMenu({ resume: menuPausedRef.current }); }} aria-label="Tutup menu"><CloseIcon /></button>
           </div>
 
           <div className="badge-progress-pill" aria-label={`Badge terbuka ${playerProfile.unlockedBadges.length} dari ${getBadgeCount()}`}>

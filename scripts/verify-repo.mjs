@@ -53,7 +53,7 @@ if (!/railLine: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 3\.6, RAIL_HEAD_HE
   console.error('Rail geometry should use a slim raised rail-head profile and aligned wheel contact constants.');
   process.exit(1);
 }
-if (!/ROAD_EDGE_WHITE_LINE_WIDTH = 0\.94/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 0\.78/.test(rendererSource) || !/ROAD_WHITE_LINE_WIDTH = 0\.74/.test(rendererSource)) {
+if (!/ROAD_EDGE_WHITE_LINE_WIDTH = 1\.08/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 0\.9/.test(rendererSource) || !/ROAD_WHITE_LINE_WIDTH = 0\.86/.test(rendererSource)) {
   console.error('Road edge and yellow center markings should stay visually narrow but stable enough to avoid mobile shimmer.');
   process.exit(1);
 }
@@ -83,8 +83,8 @@ if (!/navigator\.vibrate/.test(crossingSource) || !/hapticsEnabled/.test(crossin
   process.exit(1);
 }
 
-if (!/audioRef\.current\?\.markUserInteracted\?\.\(\)/.test(crossingSource) || !/warmMusic\?\.\(\)/.test(crossingSource) || !/resumeMusic\?\.\(\)/.test(crossingSource)) {
-  console.error('Start flow must avoid AudioContext creation, then warm and resume music lazily in background idle work.');
+if (!/audioRef\.current\?\.markUserInteracted\?\.\(\)/.test(crossingSource) || !/warmMusic\?\.\(\)/.test(crossingSource) || !/deferMusicResume/.test(crossingSource)) {
+  console.error('Start flow must avoid AudioContext creation, warm music only, and leave BGM resume to delayed gameplay flow.');
   process.exit(1);
 }
 
@@ -130,8 +130,8 @@ if (/unlock\?\.\(/.test(startFnSource) || /allowMusic:\s*true/.test(startFnSourc
   console.error('Start button must not directly start music in the critical click path. Only lazy background warm/resume is allowed.');
   process.exit(1);
 }
-if (!/runWhenIdle\([\s\S]*warmMusic\?\.\(\)/.test(startFnSource) || !/setTimeout\([\s\S]*resumeMusic\?\.\(\)/.test(startFnSource)) {
-  console.error('Start flow should warm music and resume it only through delayed idle work.');
+if (!/runWhenIdle\([\s\S]*warmMusic\?\.\(\)/.test(startFnSource) || /resumeMusic\?\.\(\)/.test(startFnSource)) {
+  console.error('Start flow should only warm music in idle work and must not resume BGM directly.');
   process.exit(1);
 }
 if (/gameRef\.current\?\.start\(\)/.test(startFnSource) || !/startEngineAfterIntroPaint\(\)/.test(startFnSource)) {
@@ -169,6 +169,11 @@ if (!/RAIL_HEAD_Y_OFFSET = 17\.4/.test(rendererSource) || !/TRAIN_WHEEL_CENTER_Z
 const gameSource = readFileSync('src/game/RoadQuestGame.js', 'utf8');
 if (!/isUiPaused/.test(gameSource) || !/lastPausedRenderAt/.test(gameSource)) {
   console.error('Engine should throttle WebGL rendering while menu/overlay has paused gameplay.');
+  process.exit(1);
+}
+
+if (!/_triggerBlockedBump\(direction/.test(gameSource) || !/blocked:\s*true/.test(gameSource) || !/duration:\s*Math\.max\(235/.test(gameSource) || !/player\.scale\.set/.test(gameSource) || !/blockedBounce/.test(audioSource)) {
+  console.error('Blocked movement must create a visible juicy bump animation with squash/stretch and doeng SFX.');
   process.exit(1);
 }
 
