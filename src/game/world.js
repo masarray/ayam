@@ -3,6 +3,7 @@ import {
   MIN_TILE,
   PLANK_PALETTE,
   STARTING_ROWS,
+  TRAFFIC_MIN_GAP,
   TILE_SIZE,
   TRAIN_PALETTE,
   TRAIN_PROFILES,
@@ -30,6 +31,36 @@ function weightedPick(random, list) {
     if (roll <= 0) return item;
   }
   return list[list.length - 1];
+}
+
+function trafficTierWeights(rowIndex) {
+  if (rowIndex < 40) {
+    return { slow: 12, medium: 4, fast: 1.1, super: 0.05 };
+  }
+  if (rowIndex < 80) {
+    const t = (rowIndex - 40) / 40;
+    return {
+      slow: 6 - t * 3.2,
+      medium: 7 + t * 1.8,
+      fast: 3.2 + t * 4.4,
+      super: rowIndex < 50 ? 0.35 + t * 0.55 : 0.45 + t * 0.9
+    };
+  }
+  const t = Math.min(1, (rowIndex - 80) / 70);
+  return {
+    slow: 1.2,
+    medium: 2.8 - t * 0.8,
+    fast: 5.2 + t * 1.8,
+    super: 8 + t * 7
+  };
+}
+
+function vehiclePoolForRow(rowIndex) {
+  const tierWeights = trafficTierWeights(rowIndex);
+  return VEHICLE_VARIANTS.map((variant) => ({
+    ...variant,
+    weight: (variant.weight || 1) * (tierWeights[variant.tier || 'medium'] || 1)
+  }));
 }
 
 function difficultyForRow(rowIndex) {
@@ -88,6 +119,7 @@ function roadBandContinuation(rows, rowIndex) {
 
 function chooseRoadLaneCount(rowIndex, random) {
   if (rowIndex < 10) return 1;
+  if (rowIndex >= 100) return 4;
   const roll = random();
   if (rowIndex > 18 && roll < 0.22) return 4;
   if (rowIndex > 12 && roll < 0.44) return 3;
@@ -102,8 +134,57 @@ function laneDirectionForBand(laneCount, laneIndex, reversed) {
   return reversed ? -direction : direction;
 }
 
+function railBandContinuation(rows, rowIndex) {
+  const previous = rows[rowIndex - 1];
+  if (!previous || previous.type !== 'rail') return null;
+  if (!previous.railTrackCount || previous.railTrackCount <= 1) return null;
+  if (previous.railTrackIndex >= previous.railTrackCount - 1) return null;
+  return {
+    bandId: previous.railBandId,
+    trackCount: previous.railTrackCount,
+    trackIndex: previous.railTrackIndex + 1,
+    reversed: previous.railReversed
+  };
+}
+
+function chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants = []) {
+  const supercar = VEHICLE_VARIANTS.find((variant) => variant.kind === 'supercar');
+  const superCount = chosenVariants.filter((variant) => variant.kind === 'supercar').length;
+  const superLimit = rowIndex < 50
+    ? 0
+    : rowIndex < 80
+      ? 1
+      : rowIndex < 100
+        ? 1
+        : 2;
+
+  if (supercar && rowIndex >= 50) {
+    const chance = rowIndex < 80
+      ? 0.015 + Math.min(0.04, (rowIndex - 50) * 0.0014)
+      : 0.18 + Math.min(0.22, (rowIndex - 80) * 0.0035);
+    if (superCount < superLimit && random() < chance) return supercar;
+  }
+
+  const usedKinds = new Set(chosenVariants.map((variant) => variant.kind));
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const variant = weightedPick(random, vehiclePool);
+    if (variant.kind === 'supercar' && superCount >= superLimit) continue;
+    if (!usedKinds.has(variant.kind) || usedKinds.size >= Math.min(5, vehiclePool.length - 1)) return variant;
+  }
+
+  const fallbackPool = vehiclePool.filter((variant) => {
+    if (variant.kind === 'supercar' && superCount >= superLimit) return false;
+    return !usedKinds.has(variant.kind);
+  });
+  if (fallbackPool.length) return weightedPick(random, fallbackPool);
+
+  const legalPool = vehiclePool.filter((variant) => variant.kind !== 'supercar' || superCount < superLimit);
+  return weightedPick(random, legalPool.length ? legalPool : vehiclePool);
+}
+
 function generateTrafficRow(rowIndex, random, roadBand = null) {
   const { speedMultiplier } = difficultyForRow(rowIndex);
+  const vehiclePool = vehiclePoolForRow(rowIndex);
   const laneCount = roadBand?.laneCount || chooseRoadLaneCount(rowIndex, random);
   const laneIndex = roadBand?.laneIndex || 0;
   const roadBandId = roadBand?.bandId ?? rowIndex;
@@ -114,15 +195,16 @@ function generateTrafficRow(rowIndex, random, roadBand = null) {
   const minX = MIN_TILE * TILE_SIZE - VEHICLE_SAFE_MARGIN;
 
   // Later rows get denser lanes, but spacing still prevents pile-ups.
+  const highwayBonus = rowIndex >= 100 && laneCount === 4 ? 2 : 0;
   const densityBonus = laneCount > 1 && rowIndex > 18 ? 1 : 0;
-  const desiredCount = 2 + Math.floor(random() * 4) + densityBonus + (rowIndex > 28 && random() > 0.58 ? 1 : 0);
+  const desiredCount = 2 + Math.floor(random() * 4) + densityBonus + highwayBonus + (rowIndex > 28 && random() > 0.58 ? 1 : 0);
   const vehicles = [];
   const chosenVariants = [];
   let safetyBudget = span - 140;
 
   for (let i = 0; i < desiredCount; i += 1) {
-    const variant = weightedPick(random, VEHICLE_VARIANTS);
-    const minGap = variant.width > 115 ? 114 : 84;
+    const variant = chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants);
+    const minGap = Math.max(rowIndex >= 100 ? 104 : 92, variant.width * 0.72);
     if (safetyBudget - variant.width - minGap < 0 && chosenVariants.length >= 2) break;
     chosenVariants.push(variant);
     safetyBudget -= variant.width + minGap;
@@ -130,13 +212,20 @@ function generateTrafficRow(rowIndex, random, roadBand = null) {
 
   const count = Math.max(2, chosenVariants.length);
   const spacing = span / count;
-  const laneCruiseBias = 0.86 + random() * 0.32;
+  const laneCruiseBias = (rowIndex >= 100 && laneCount === 4 ? 1.02 : 0.86) + random() * 0.32;
 
   for (let i = 0; i < count; i += 1) {
-    const variant = chosenVariants[i] || weightedPick(random, VEHICLE_VARIANTS);
+    const variant = chosenVariants[i] || chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants);
     const maxJitter = Math.min(spacing * 0.12, TILE_SIZE * 0.82);
     const x = minX + spacing * (i + 0.5) + (random() - 0.5) * maxJitter;
     const baseSpeed = variant.speedMin + random() * (variant.speedMax - variant.speedMin);
+    const aggression = variant.tier === 'super'
+      ? 0.82 + random() * 0.18
+      : variant.tier === 'fast'
+        ? 0.56 + random() * 0.26
+        : variant.tier === 'slow'
+          ? 0.12 + random() * 0.28
+          : 0.34 + random() * 0.28;
     const speed = clamp(
       baseSpeed * laneCruiseBias * speedMultiplier,
       variant.speedMin * 0.82,
@@ -152,6 +241,13 @@ function generateTrafficRow(rowIndex, random, roadBand = null) {
       depth: variant.depth,
       speed,
       baseSpeed: speed,
+      cruiseSpeed: speed * (0.92 + random() * 0.22),
+      maxSpeed: speed * (1.1 + aggression * 0.34),
+      acceleration: 18 + aggression * 82 + random() * 22,
+      brakePower: 92 + aggression * 96 + random() * 35,
+      aggression,
+      reaction: 0.14 + random() * 0.18,
+      minFollowGap: Math.max(TRAFFIC_MIN_GAP, variant.width * (0.42 + (1 - aggression) * 0.26)),
       color: variant.fixedColor || pick(random, VEHICLE_PALETTE),
       trimColor: random() > 0.5 ? 0xd2d8df : 0x9eabb8
     });
@@ -171,10 +267,15 @@ function generateTrafficRow(rowIndex, random, roadBand = null) {
   };
 }
 
-function generateRailRow(rowIndex, random) {
+function generateRailRow(rowIndex, random, railBand = null) {
   const { speedMultiplier, trainIntensity } = difficultyForRow(rowIndex);
-  const direction = random() > 0.5 ? 1 : -1;
-  const laneOffset = (random() - 0.5) * 4;
+  const trackCount = railBand?.trackCount || (rowIndex >= 100 && random() < 0.68 ? 2 : 1);
+  const trackIndex = railBand?.trackIndex || 0;
+  const reversed = railBand?.reversed ?? random() > 0.5;
+  const direction = trackCount > 1
+    ? (trackIndex % 2 === 0 ? 1 : -1) * (reversed ? -1 : 1)
+    : (random() > 0.5 ? 1 : -1);
+  const laneOffset = trackCount > 1 ? (trackIndex === 0 ? -5 : 5) : (random() - 0.5) * 4;
   const availableProfiles = TRAIN_PROFILES
     .filter((profile) => !profile.unlockRow || rowIndex >= profile.unlockRow)
     .map((profile) => ({
@@ -182,7 +283,7 @@ function generateRailRow(rowIndex, random) {
       // Later rows should feel more tense: faster modern/bullet trains appear more often.
       weight: profile.trainClass === 'bullet'
         ? profile.weight + trainIntensity * 5.5
-        : profile.trainClass === 'modern'
+        : profile.trainClass === 'electric'
           ? profile.weight + trainIntensity * 1.6
           : profile.trainClass === 'classic'
             ? Math.max(1.2, profile.weight - trainIntensity * 1.8)
@@ -228,6 +329,10 @@ function generateRailRow(rowIndex, random) {
     direction,
     speed,
     laneOffset,
+    railTrackCount: trackCount,
+    railTrackIndex: trackIndex,
+    railBandId: railBand?.bandId ?? rowIndex,
+    railReversed: reversed,
     trains,
     blockers: new Set()
   };
@@ -285,6 +390,8 @@ export function generateRow(rowIndex, rows) {
 
   const continuation = roadBandContinuation(rows, rowIndex);
   if (continuation) return generateTrafficRow(rowIndex, random, continuation);
+  const railContinuation = railBandContinuation(rows, rowIndex);
+  if (railContinuation) return generateRailRow(rowIndex, random, railContinuation);
 
   // First playable rows must feel fair for children: light traffic and trees only, no rail/water surprise.
   if (rowIndex < 9) {
@@ -294,6 +401,43 @@ export function generateRow(rowIndex, rows) {
   const lastThree = previousTypes(rows, rowIndex, 3);
   const lastTwo = lastThree.slice(-2);
   const { hazardBonus, waterChance, railChance } = difficultyForRow(rowIndex);
+
+  if (rowIndex >= 100) {
+    const previous = rows[rowIndex - 1]?.type;
+    const roll = random();
+    if (previous === 'water') {
+      return roll < 0.48 ? generateTrafficRow(rowIndex, random) : roll < 0.78 ? generateRailRow(rowIndex, random) : generateForestRow(rowIndex, random);
+    }
+    if (previous === 'traffic') {
+      return roll < 0.42 ? generateRailRow(rowIndex, random) : roll < 0.72 ? generateWaterRow(rowIndex, random) : generateForestRow(rowIndex, random);
+    }
+    if (previous === 'rail') {
+      return roll < 0.44 ? generateTrafficRow(rowIndex, random) : roll < 0.72 ? generateWaterRow(rowIndex, random) : generateForestRow(rowIndex, random);
+    }
+    if (roll < 0.46) return generateTrafficRow(rowIndex, random);
+    if (roll < 0.76) return generateRailRow(rowIndex, random);
+    if (roll < 0.9) return generateWaterRow(rowIndex, random);
+    return generateForestRow(rowIndex, random);
+  }
+
+  if (rowIndex >= 80) {
+    const previous = rows[rowIndex - 1]?.type;
+    const roll = random();
+    if (previous === 'water') {
+      return roll < 0.58 ? generateTrafficRow(rowIndex, random) : roll < 0.82 ? generateRailRow(rowIndex, random) : generateForestRow(rowIndex, random);
+    }
+    if (previous === 'traffic') {
+      return roll < 0.36 ? generateRailRow(rowIndex, random) : roll < 0.62 ? generateWaterRow(rowIndex, random) : generateForestRow(rowIndex, random);
+    }
+    if (previous === 'rail') {
+      return roll < 0.52 ? generateTrafficRow(rowIndex, random) : roll < 0.76 ? generateWaterRow(rowIndex, random) : generateForestRow(rowIndex, random);
+    }
+    if (roll < 0.52) return generateTrafficRow(rowIndex, random);
+    if (roll < 0.76) return generateRailRow(rowIndex, random);
+    if (roll < 0.9) return generateWaterRow(rowIndex, random);
+    return generateForestRow(rowIndex, random);
+  }
+
   const hazardTypes = new Set(['traffic', 'rail', 'water']);
   const hazardStreak = lastTwo.every((type) => hazardTypes.has(type));
   const forestStreak = lastTwo.every((type) => type === 'forest');

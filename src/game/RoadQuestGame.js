@@ -620,19 +620,30 @@ export class RoadQuestGame {
       const frontData = front.vehicle.userData;
       const frontProgress = front.progress + (i === sorted.length - 1 ? span : 0);
       const rawGap = frontProgress - item.progress - (currentData.width + frontData.width) * 0.5;
-      const comfortGap = TRAFFIC_COMFORT_GAP + currentData.width * 0.25;
-      const hardGap = TRAFFIC_MIN_GAP + currentData.width * 0.1;
-      let targetSpeed = currentData.baseSpeed;
+      const aggression = currentData.aggression ?? 0.35;
+      const currentSpeed = currentData.currentSpeed || currentData.baseSpeed;
+      const frontSpeed = frontData.currentSpeed || frontData.baseSpeed;
+      const dynamicGap = Math.min(118, currentSpeed * (0.16 + (1 - aggression) * 0.18));
+      const hardGap = Math.max(currentData.minFollowGap || TRAFFIC_MIN_GAP, TRAFFIC_MIN_GAP + currentData.width * 0.1);
+      const comfortGap = hardGap + TRAFFIC_COMFORT_GAP + dynamicGap;
+      const openRoadGap = comfortGap + 92 + aggression * 90;
+      let targetSpeed = currentData.cruiseSpeed || currentData.baseSpeed;
 
       if (rawGap < hardGap) {
-        targetSpeed = Math.min(targetSpeed, Math.max(0, (frontData.currentSpeed || frontData.baseSpeed) * 0.52));
+        targetSpeed = Math.min(targetSpeed, Math.max(0, frontSpeed * (0.42 + aggression * 0.18)));
       } else if (rawGap < comfortGap) {
         const ratio = clamp((rawGap - hardGap) / (comfortGap - hardGap), 0, 1);
-        const followSpeed = (frontData.currentSpeed || frontData.baseSpeed) * (0.84 + 0.16 * ratio);
-        targetSpeed = Math.min(targetSpeed, followSpeed + 8 * ratio);
+        const followSpeed = frontSpeed * (0.72 + 0.24 * ratio);
+        targetSpeed = Math.min(targetSpeed, followSpeed + (8 + aggression * 18) * ratio);
+      } else if (rawGap > openRoadGap && aggression > 0.48) {
+        const overtakePulse = Math.sin((performance.now() * 0.0017) + currentData.rowIndex + currentData.width) * 0.5 + 0.5;
+        targetSpeed = Math.min(currentData.maxSpeed || currentData.baseSpeed, targetSpeed * (1.04 + aggression * 0.18 + overtakePulse * 0.08));
       }
 
-      currentData.currentSpeed = lerp(currentData.currentSpeed || currentData.baseSpeed, targetSpeed, 0.22);
+      const speedDelta = targetSpeed - currentSpeed;
+      const accel = speedDelta >= 0 ? currentData.acceleration || 46 : currentData.brakePower || 128;
+      const maxStep = accel * delta;
+      currentData.currentSpeed = clamp(currentSpeed + clamp(speedDelta, -maxStep, maxStep), 0, currentData.maxSpeed || currentData.baseSpeed * 1.2);
     }
 
     items.forEach((vehicle) => {
@@ -645,6 +656,29 @@ export class RoadQuestGame {
         vehicle.position.x = wrapMax + width * 0.5;
       }
     });
+
+    const settled = items
+      .map((vehicle) => ({
+        vehicle,
+        progress: laneProgress(vehicle, direction, wrapMin, wrapMax)
+      }))
+      .sort((a, b) => a.progress - b.progress);
+
+    for (let i = settled.length - 1; i >= 0; i -= 1) {
+      const item = settled[i];
+      const front = i === settled.length - 1 ? settled[0] : settled[i + 1];
+      const currentData = item.vehicle.userData;
+      const frontData = front.vehicle.userData;
+      const frontProgress = front.progress + (i === settled.length - 1 ? span : 0);
+      const minGap = TRAFFIC_MIN_GAP + Math.max(currentData.width, frontData.width) * 0.18;
+      const requiredProgress = frontProgress - (currentData.width + frontData.width) * 0.5 - minGap;
+      if (item.progress > requiredProgress) {
+        const clampedProgress = requiredProgress;
+        item.progress = clampedProgress;
+        item.vehicle.position.x = direction > 0 ? wrapMin + clampedProgress : wrapMax - clampedProgress;
+        currentData.currentSpeed = Math.min(currentData.currentSpeed || currentData.baseSpeed, frontData.currentSpeed || frontData.baseSpeed);
+      }
+    }
   }
 
 

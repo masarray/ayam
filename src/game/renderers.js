@@ -121,6 +121,9 @@ export function createGeometryCache() {
     bumper: new THREE.BoxGeometry(4, 25, 5),
     grille: new THREE.BoxGeometry(3, 15, 5),
     taxiSign: new THREE.BoxGeometry(17, 10, 4),
+    lightBar: new THREE.BoxGeometry(20, 9, 5),
+    spoiler: new THREE.BoxGeometry(24, 5, 7),
+    aeroFin: new THREE.BoxGeometry(5, 22, 7),
     pickupBed: new THREE.BoxGeometry(34, 26, 13),
     pickupRail: new THREE.BoxGeometry(34, 4, 8),
     vanBody: new THREE.BoxGeometry(86, 34, 27),
@@ -133,6 +136,10 @@ export function createGeometryCache() {
     truckWindshield: new THREE.BoxGeometry(4, 22, 9),
     truckCabinRoof: new THREE.BoxGeometry(24, 26, 5),
     truckCargoTop: new THREE.BoxGeometry(62, 28, 5),
+    dumpBed: new THREE.BoxGeometry(70, 34, 24),
+    dumpLoad: new THREE.BoxGeometry(55, 26, 10),
+    tractorHood: new THREE.BoxGeometry(34, 24, 15),
+    tractorCab: new THREE.BoxGeometry(24, 24, 27),
     tanker: tank,
     container: new THREE.BoxGeometry(90, 35, 31),
 
@@ -306,6 +313,82 @@ function createPassengerCar(group, vehicle, geometries, materials, bodyMaterial,
   box(group, geometries.roadStripe, materials.trimLight, 0, 0, 19.5, { scale: { x: bodyLength / 44, y: 0.42, z: 0.5 }, castShadow: false });
 }
 
+function createSportsCar(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
+  const isSuper = vehicle.kind === 'supercar';
+  if (isSuper) {
+    const black = dynamicMaterial(0x07090d);
+    const darkTrim = dynamicMaterial(0x111820);
+    const wheelAccent = dynamicMaterial(0xf06f16);
+    const bright = dynamicMaterial(0xfff7d4);
+    const whiteStripe = dynamicMaterial(0xffffff);
+
+    // Dedicated low, long supercar silhouette: pointed nose, black glass canopy,
+    // side intakes, splitter, rear diffuser, and wide performance wheels.
+    box(group, geometries.carLongBody, bodyMaterial, 0, 0, 6.4, { scale: { x: 1.24, y: 1.18, z: 0.62 } });
+    box(group, geometries.carHood, bodyMaterial, 34, 0, 12.4, { scale: { x: 1.04, y: 1.12, z: 0.42 } });
+    box(group, geometries.carHood, bodyMaterial, 49, 0, 9.8, { scale: { x: 0.52, y: 0.98, z: 0.28 } });
+    box(group, geometries.carTrunk, bodyMaterial, -36, 0, 12.2, { scale: { x: 1.05, y: 1.12, z: 0.42 } });
+    box(group, geometries.carCabin, black, -4, 0, 20.6, { scale: { x: 1.18, y: 1.02, z: 0.58 }, castShadow: false });
+    box(group, geometries.carRoof, black, -11, 0, 26.4, { scale: { x: 1.22, y: 1.04, z: 0.42 }, castShadow: false });
+    box(group, geometries.truckWindshield, black, 22, 0, 20.8, { scale: { x: 1.25, y: 1.18, z: 0.82 }, castShadow: false });
+    box(group, geometries.carRearWindow, black, -35, 0, 20.2, { scale: { x: 1.15, y: 1.08, z: 0.72 }, castShadow: false });
+
+    [-1, 1].forEach((side) => {
+      box(group, geometries.busWindow, black, -10, side * 20.2, 17.2, { scale: { x: 1.45, y: 0.42, z: 0.64 }, castShadow: false });
+      box(group, geometries.roadStripe, darkTrim, -1, side * 20.8, 10.6, { scale: { x: 1.95, y: 0.95, z: 1.18 }, castShadow: false });
+      box(group, geometries.roadStripe, whiteStripe, -4, side * 21.8, 6.4, { scale: { x: 2.15, y: 0.42, z: 0.58 }, castShadow: false });
+      box(group, geometries.carFrontLight, bright, 49, side * 10.6, 13.8, { scale: { x: 1.25, y: 0.62, z: 0.68 }, castShadow: false });
+      box(group, geometries.carRearLight, materials.tailLight, -51, side * 11, 13, { scale: { x: 1.08, y: 0.7, z: 0.72 }, castShadow: false });
+    });
+
+    box(group, geometries.bumper, black, 55, 0, 6, { scale: { x: 1.1, y: 1.28, z: 0.6 }, castShadow: false });
+    box(group, geometries.roadStripe, black, 49, 0, 5.2, { scale: { x: 1.7, y: 1.35, z: 0.8 }, castShadow: false });
+    box(group, geometries.bumper, black, -55, 0, 6.2, { scale: { x: 1.05, y: 1.25, z: 0.62 }, castShadow: false });
+    box(group, geometries.spoiler, black, -45, 0, 20.4, { scale: { x: 1.55, y: 1.18, z: 0.62 }, castShadow: false });
+    box(group, geometries.aeroFin, black, -45, -18.6, 16, { scale: { x: 0.85, y: 0.55, z: 1.08 }, castShadow: false });
+    box(group, geometries.aeroFin, black, -45, 18.6, 16, { scale: { x: 0.85, y: 0.55, z: 1.08 }, castShadow: false });
+
+    [42, 31, 20].forEach((x, index) => {
+      box(group, geometries.roadStripe, darkerBodyMaterial, x, 0, 16.2 + index * 0.9, { scale: { x: 0.7 + index * 0.22, y: 1.05 - index * 0.12, z: 0.4 }, castShadow: false });
+    });
+    [-26, -36, -46].forEach((x, index) => {
+      box(group, geometries.roadStripe, darkerBodyMaterial, x, 0, 16 + index * 0.7, { scale: { x: 0.72, y: 1.02 - index * 0.14, z: 0.36 }, castShadow: false });
+    });
+
+    [-31, 31].forEach((x) => {
+      addWheelPair(group, geometries, materials, x, 5, true);
+      box(group, geometries.smallHub, wheelAccent, x, -21.4, 5.2, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
+      box(group, geometries.smallHub, wheelAccent, x, 21.4, 5.2, { scale: { x: 1.2, y: 0.7, z: 1.2 }, castShadow: false });
+    });
+    return;
+  }
+
+  const accent = dynamicMaterial(isSuper ? 0x48d8ff : vehicle.trimColor || 0xd4d9df);
+  box(group, geometries.carLongBody, bodyMaterial, 0, 0, 7.2, { scale: { x: isSuper ? 0.96 : 0.88, y: 1.06, z: 0.72 } });
+  box(group, geometries.carHood, darkerBodyMaterial, 25, 0, 14.6, { scale: { x: 0.86, y: 1.04, z: 0.45 } });
+  box(group, geometries.carTrunk, darkerBodyMaterial, -25, 0, 14, { scale: { x: 0.78, y: 1.04, z: 0.38 } });
+  box(group, geometries.carCabin, materials.glassDark, -4, 0, 20.5, { scale: { x: 0.78, y: 0.9, z: 0.66 }, castShadow: false });
+  box(group, geometries.carRoof, darkerBodyMaterial, -4, 0, 26.3, { scale: { x: 0.82, y: 0.86, z: 0.45 }, castShadow: false });
+  box(group, geometries.spoiler, accent, -33, 0, 19, { scale: { x: isSuper ? 1.28 : 1, y: 1, z: 1 }, castShadow: false });
+  if (isSuper) {
+    box(group, geometries.aeroFin, accent, 2, -18, 12.5, { castShadow: false });
+    box(group, geometries.aeroFin, accent, 2, 18, 12.5, { castShadow: false });
+  }
+  addWheelPair(group, geometries, materials, -25, 5, isSuper);
+  addWheelPair(group, geometries, materials, 25, 5, isSuper);
+  addLights(group, geometries, materials, 42, -42, 10, 8);
+  box(group, geometries.roadStripe, accent, 2, 0, 17.8, { scale: { x: 1.65, y: 0.36, z: 0.45 }, castShadow: false });
+}
+
+function createPoliceCar(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
+  createPassengerCar(group, { ...vehicle, kind: 'sedan' }, geometries, materials, bodyMaterial, darkerBodyMaterial);
+  const blue = dynamicMaterial(0x2f7fd8);
+  box(group, geometries.lightBar, blue, -5, -4.5, 35.5, { scale: { x: 0.55, y: 0.5, z: 1 }, castShadow: false });
+  box(group, geometries.lightBar, materials.tailLight, -5, 4.5, 35.5, { scale: { x: 0.55, y: 0.5, z: 1 }, castShadow: false });
+  box(group, geometries.roadStripe, blue, 0, -16, 20.8, { scale: { x: 1.35, y: 0.7, z: 0.7 }, castShadow: false });
+  box(group, geometries.roadStripe, blue, 0, 16, 20.8, { scale: { x: 1.35, y: 0.7, z: 0.7 }, castShadow: false });
+}
+
 function createPickup(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
   box(group, geometries.carBody, bodyMaterial, 4, 0, 8.5, { scale: { x: 0.76, y: 1.08, z: 0.92 } });
   box(group, geometries.carHood, darkerBodyMaterial, 35, 0, 18, { scale: { x: 0.72, y: 1.02, z: 0.72 } });
@@ -322,6 +405,17 @@ function createPickup(group, vehicle, geometries, materials, bodyMaterial, darke
   addWheelPair(group, geometries, materials, 28, 5);
   addLights(group, geometries, materials, 44, -44);
   box(group, geometries.bumper, materials.chrome, 46, 0, 7, { castShadow: false });
+}
+
+function createAmbulance(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
+  createVan(group, vehicle, geometries, materials, bodyMaterial);
+  const red = dynamicMaterial(0xd92d34);
+  const blue = dynamicMaterial(0x2f7fd8);
+  box(group, geometries.lightBar, red, 22, 0, 36.5, { castShadow: false });
+  box(group, geometries.roadStripe, red, -9, -19.2, 20.5, { scale: { x: 2.4, y: 0.7, z: 1 }, castShadow: false });
+  box(group, geometries.roadStripe, blue, -9, 19.2, 20.5, { scale: { x: 2.4, y: 0.7, z: 1 }, castShadow: false });
+  box(group, geometries.carRearLight, red, -28, -19.5, 25, { scale: { x: 1, y: 0.5, z: 2.4 }, castShadow: false });
+  box(group, geometries.carRearLight, red, -28, 19.5, 25, { scale: { x: 1, y: 0.5, z: 2.4 }, castShadow: false });
 }
 
 function createVan(group, vehicle, geometries, materials, bodyMaterial) {
@@ -350,6 +444,30 @@ function createBus(group, vehicle, geometries, materials, bodyMaterial) {
   addLights(group, geometries, materials, 63, -63, 10, 8);
 }
 
+function createDumpTruck(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
+  box(group, geometries.dumpBed, bodyMaterial, -28, 0, 16.5, { scale: { x: 1, y: 1, z: 1.08 } });
+  box(group, geometries.dumpLoad, materials.railShadow, -32, 0, 34, { castShadow: false });
+  box(group, geometries.truckCabin, darkerBodyMaterial, 42, 0, 12.5);
+  box(group, geometries.truckCabinRoof, bodyMaterial, 39, 0, 28, { castShadow: false });
+  box(group, geometries.truckWindshield, materials.glassDark, 60, 0, 26, { castShadow: false });
+  box(group, geometries.busWindow, materials.glassDark, 34, -17.2, 24, { castShadow: false });
+  box(group, geometries.busWindow, materials.glassDark, 34, 17.2, 24, { castShadow: false });
+  [-50, -18, 42].forEach((x) => addWheelPair(group, geometries, materials, x, 6, true));
+  addLights(group, geometries, materials, 61, -66, 10, 8);
+}
+
+function createTractor(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
+  box(group, geometries.tractorHood, bodyMaterial, 18, 0, 13);
+  box(group, geometries.tractorCab, darkerBodyMaterial, -13, 0, 22);
+  box(group, geometries.trainWindow, materials.glassDark, -13, -14, 28, { castShadow: false });
+  box(group, geometries.trainWindow, materials.glassDark, -13, 14, 28, { castShadow: false });
+  box(group, geometries.carWindshield, materials.glassDark, 33, 0, 20, { scale: { x: 0.8, y: 0.9, z: 0.9 }, castShadow: false });
+  box(group, geometries.carRearLight, materials.trimDark, 2, 0, 35, { scale: { x: 0.55, y: 0.55, z: 3.2 }, castShadow: false });
+  addWheelPair(group, geometries, materials, -22, 7, true);
+  addWheelPair(group, geometries, materials, 25, 5);
+  addLights(group, geometries, materials, 38, -36, 8, 7);
+}
+
 function createBoxTruck(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
   box(group, geometries.truckTrailer, bodyMaterial, -22, 0, 14.5);
   box(group, geometries.truckCargoTop, materials.trimLight, -22, 0, 31, { castShadow: false });
@@ -360,6 +478,22 @@ function createBoxTruck(group, vehicle, geometries, materials, bodyMaterial, dar
   box(group, geometries.busWindow, materials.glassDark, 35, 17.2, 24, { castShadow: false });
   [-50, -12, 44].forEach((x) => addWheelPair(group, geometries, materials, x, 6, true));
   addLights(group, geometries, materials, 61, -62, 10, 8);
+}
+
+function createArticulatedTruck(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
+  box(group, geometries.truckCabin, darkerBodyMaterial, 68, 0, 12.5);
+  box(group, geometries.truckCabinRoof, bodyMaterial, 65, 0, 28, { castShadow: false });
+  box(group, geometries.truckWindshield, materials.glassDark, 86, 0, 26, { castShadow: false });
+  box(group, geometries.busWindow, materials.glassDark, 59, -17.2, 24, { castShadow: false });
+  box(group, geometries.busWindow, materials.glassDark, 59, 17.2, 24, { castShadow: false });
+  box(group, geometries.truckTrailer, bodyMaterial, 12, 0, 15, { scale: { x: 0.9, y: 1, z: 1 } });
+  box(group, geometries.truckTrailer, bodyMaterial, -68, 0, 15, { scale: { x: 0.9, y: 1, z: 1 } });
+  box(group, geometries.truckCargoTop, materials.trimLight, 12, 0, 31, { scale: { x: 0.9, y: 1, z: 1 }, castShadow: false });
+  box(group, geometries.truckCargoTop, materials.trimLight, -68, 0, 31, { scale: { x: 0.9, y: 1, z: 1 }, castShadow: false });
+  box(group, geometries.trainCoupler, materials.railShadow, -29, 0, 10, { scale: { x: 1.4, y: 1.2, z: 0.8 }, castShadow: false });
+  box(group, geometries.trainCoupler, materials.railShadow, 38, 0, 10, { scale: { x: 1.2, y: 1.1, z: 0.8 }, castShadow: false });
+  [-96, -56, -14, 27, 70].forEach((x) => addWheelPair(group, geometries, materials, x, 6, true));
+  addLights(group, geometries, materials, 87, -108, 10, 8);
 }
 
 function createTankerTruck(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial) {
@@ -404,7 +538,14 @@ export function createVehicle(vehicle, row, geometries, materials) {
     direction: row.direction,
     speed: vehicle.speed,
     baseSpeed: vehicle.baseSpeed || vehicle.speed,
-    currentSpeed: vehicle.speed,
+    cruiseSpeed: vehicle.cruiseSpeed || vehicle.speed,
+    maxSpeed: vehicle.maxSpeed || vehicle.speed * 1.16,
+    acceleration: vehicle.acceleration || 44,
+    brakePower: vehicle.brakePower || 118,
+    aggression: vehicle.aggression || 0.35,
+    reaction: vehicle.reaction || 0.2,
+    minFollowGap: vehicle.minFollowGap || 42,
+    currentSpeed: vehicle.speed * (0.92 + (vehicle.aggression || 0.35) * 0.12),
     width: vehicle.width,
     depth: vehicle.depth,
     type: vehicle.type,
@@ -415,6 +556,16 @@ export function createVehicle(vehicle, row, geometries, materials) {
   const darkerBodyMaterial = dynamicMaterial(vehicle.color, 0.82);
 
   switch (vehicle.kind) {
+    case 'sports':
+    case 'supercar':
+      createSportsCar(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
+      break;
+    case 'police':
+      createPoliceCar(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
+      break;
+    case 'ambulance':
+      createAmbulance(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
+      break;
     case 'pickup':
       createPickup(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
       break;
@@ -426,6 +577,15 @@ export function createVehicle(vehicle, row, geometries, materials) {
       break;
     case 'boxTruck':
       createBoxTruck(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
+      break;
+    case 'articulatedTruck':
+      createArticulatedTruck(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
+      break;
+    case 'dumpTruck':
+      createDumpTruck(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
+      break;
+    case 'tractor':
+      createTractor(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
       break;
     case 'tankerTruck':
       createTankerTruck(group, vehicle, geometries, materials, bodyMaterial, darkerBodyMaterial);
@@ -515,6 +675,13 @@ function createModernTrain(group, train, geometries, materials, bodyMaterial, da
   const carLength = train.carriageWidth;
   const frontX = train.width / 2 - 14;
   const rearX = -train.width / 2 + 14;
+  const electricAccent = dynamicMaterial(0x37c6d8);
+
+  function addPantograph(centerX, width = 28) {
+    box(group, geometries.roadStripe, materials.trimDark, centerX, -6, 38.5, { scale: { x: width / 22, y: 0.55, z: 1.4 }, castShadow: false });
+    box(group, geometries.roadStripe, materials.trimDark, centerX, 6, 38.5, { scale: { x: width / 22, y: 0.55, z: 1.4 }, castShadow: false });
+    box(group, geometries.roadStripe, electricAccent, centerX, 0, 43, { scale: { x: 0.32, y: 3.1, z: 1.2 }, castShadow: false });
+  }
 
   function addCommuterCab(anchorX, isFront) {
     const dir = isFront ? 1 : -1;
@@ -526,6 +693,8 @@ function createModernTrain(group, train, geometries, materials, bodyMaterial, da
     box(group, geometries.modernNose, darkerBodyMaterial, anchorX - dir * 10, 0, 15.5, { scale: { x: 0.96, y: 1.04, z: 1.14 } });
     box(group, geometries.truckWindshield, materials.glassDark, anchorX + dir * 1, 0, 28.5, { scale: { x: 0.78, y: 1.35, z: 1.15 }, castShadow: false });
     box(group, geometries.roadStripe, darkerBodyMaterial, anchorX + dir * 2, 0, 8.2, { scale: { x: 1.1, y: 8.7, z: 1.2 }, castShadow: false });
+    box(group, geometries.bulletStripe, electricAccent, centerX - dir * 4, -20.8, 21, { scale: { x: cabLength / 98, y: 1, z: 0.72 }, castShadow: false });
+    box(group, geometries.bulletStripe, electricAccent, centerX - dir * 4, 20.8, 21, { scale: { x: cabLength / 98, y: 1, z: 0.72 }, castShadow: false });
     box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 7, -12, 18.4, { castShadow: false });
     box(group, geometries.carFrontLight, isFront ? materials.headlight : materials.tailLight, anchorX + dir * 7, 12, 18.4, { castShadow: false });
     addTrainWindows(group, geometries, materials, centerX - dir * 10, 3, 17.5, -20.2, 27.2);
@@ -543,6 +712,9 @@ function createModernTrain(group, train, geometries, materials, bodyMaterial, da
     box(group, geometries.trainWindowStrip, materials.glassDark, cursor, -20, 27, { scale: { x: carLength / 96, y: 1, z: 1 }, castShadow: false });
     box(group, geometries.trainWindowStrip, materials.glassDark, cursor, 20, 27, { scale: { x: carLength / 96, y: 1, z: 1 }, castShadow: false });
     box(group, geometries.modernRoof, materials.trimLight, cursor, 0, 32, { scale: { x: carLength / 104, y: 1, z: 0.55 }, castShadow: false });
+    box(group, geometries.bulletStripe, electricAccent, cursor, -20.8, 21, { scale: { x: carLength / 96, y: 1, z: 0.72 }, castShadow: false });
+    box(group, geometries.bulletStripe, electricAccent, cursor, 20.8, 21, { scale: { x: carLength / 96, y: 1, z: 0.72 }, castShadow: false });
+    if (i % 2 === 0) addPantograph(cursor, 24);
     addTrainBogie(group, geometries, materials, cursor, carLength, 20);
     addCoupler(group, geometries, materials, cursor + carLength / 2 + 4);
     cursor -= carLength / 2 + 8;

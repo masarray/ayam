@@ -94,16 +94,23 @@ export const VEHICLE_PALETTE = [
 ];
 
 export const VEHICLE_VARIANTS = Object.freeze([
-  { kind: 'sedan', width: 66, depth: 30, speedMin: 86, speedMax: 148, weight: 16 },
-  { kind: 'hatchback', width: 58, depth: 29, speedMin: 92, speedMax: 158, weight: 12 },
-  { kind: 'wagon', width: 78, depth: 31, speedMin: 78, speedMax: 136, weight: 9 },
-  { kind: 'taxi', width: 66, depth: 30, speedMin: 84, speedMax: 146, weight: 7, fixedColor: 0xe2b93c },
-  { kind: 'pickup', width: 82, depth: 32, speedMin: 72, speedMax: 126, weight: 9 },
-  { kind: 'van', width: 90, depth: 34, speedMin: 66, speedMax: 118, weight: 8 },
-  { kind: 'bus', width: 120, depth: 38, speedMin: 54, speedMax: 96, weight: 6 },
-  { kind: 'boxTruck', width: 120, depth: 38, speedMin: 52, speedMax: 94, weight: 7 },
-  { kind: 'tankerTruck', width: 130, depth: 39, speedMin: 50, speedMax: 90, weight: 4 },
-  { kind: 'containerTruck', width: 146, depth: 40, speedMin: 48, speedMax: 86, weight: 4 }
+  { kind: 'sedan', width: 66, depth: 30, speedMin: 86, speedMax: 148, weight: 16, tier: 'medium' },
+  { kind: 'hatchback', width: 58, depth: 29, speedMin: 92, speedMax: 158, weight: 12, tier: 'medium' },
+  { kind: 'wagon', width: 78, depth: 31, speedMin: 78, speedMax: 136, weight: 9, tier: 'medium' },
+  { kind: 'taxi', width: 66, depth: 30, speedMin: 84, speedMax: 146, weight: 7, fixedColor: 0xe2b93c, tier: 'medium' },
+  { kind: 'pickup', width: 82, depth: 32, speedMin: 72, speedMax: 126, weight: 9, tier: 'slow' },
+  { kind: 'van', width: 90, depth: 34, speedMin: 66, speedMax: 118, weight: 8, tier: 'slow' },
+  { kind: 'bus', width: 120, depth: 38, speedMin: 54, speedMax: 96, weight: 6, tier: 'slow' },
+  { kind: 'boxTruck', width: 120, depth: 38, speedMin: 52, speedMax: 94, weight: 7, tier: 'slow' },
+  { kind: 'articulatedTruck', width: 168, depth: 40, speedMin: 44, speedMax: 82, weight: 5, tier: 'slow' },
+  { kind: 'dumpTruck', width: 126, depth: 39, speedMin: 48, speedMax: 88, weight: 6, fixedColor: 0xe2b93c, tier: 'slow' },
+  { kind: 'tractor', width: 74, depth: 36, speedMin: 42, speedMax: 76, weight: 4, fixedColor: 0xd92d34, tier: 'slow' },
+  { kind: 'tankerTruck', width: 130, depth: 39, speedMin: 50, speedMax: 90, weight: 4, tier: 'slow' },
+  { kind: 'containerTruck', width: 146, depth: 40, speedMin: 48, speedMax: 86, weight: 4, tier: 'slow' },
+  { kind: 'police', width: 72, depth: 31, speedMin: 122, speedMax: 190, weight: 5, fixedColor: 0xf4f7fb, tier: 'fast' },
+  { kind: 'ambulance', width: 98, depth: 35, speedMin: 108, speedMax: 174, weight: 4, fixedColor: 0xf4f7fb, tier: 'fast' },
+  { kind: 'sports', width: 70, depth: 31, speedMin: 146, speedMax: 222, weight: 5, tier: 'fast' },
+  { kind: 'supercar', width: 98, depth: 36, speedMin: 190, speedMax: 292, weight: 2, fixedColor: 0xf39a12, tier: 'super' }
 ]);
 
 export const PLANK_PALETTE = [
@@ -138,7 +145,7 @@ export const TRAIN_PROFILES = Object.freeze([
     depth: 37
   },
   {
-    trainClass: 'modern',
+    trainClass: 'electric',
     weight: 5,
     speedMin: 258,
     speedMax: 356,
