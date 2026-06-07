@@ -7,10 +7,17 @@ export const ROW_DEPTH = TILE_SIZE;
 export const PLAYER_WIDTH = 10;
 export const PLAYER_DEPTH = 10;
 export const PLAYER_HEIGHT = 22;
-export const MOVE_DURATION = 145;
+// Visual standing offsets keep the chicken's feet above raised geometry.
+// These values are model-space z offsets for the player group origin, tuned
+// against the current voxel chicken foot, rail, sleeper, and plank heights.
+export const PLAYER_RAIL_STAND_Z = 7.2;
+export const PLAYER_PLANK_STAND_Z = 11.8;
+export const MOVE_DURATION = 166;
 export const STARTING_ROWS = 4;
 export const PREGENERATE_ROWS = 48;
-export const CAMERA_LERP = 0.105;
+export const CAMERA_LERP = 0.08;
+export const CAMERA_FOLLOW_STIFFNESS = 12.5;
+export const CAMERA_TARGET_STIFFNESS = 13.5;
 export const VEHICLE_SAFE_MARGIN = 260;
 export const TRAIN_SAFE_MARGIN = 520;
 export const WATER_SAFE_MARGIN = 360;

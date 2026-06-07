@@ -1,6 +1,7 @@
-const CACHE_VERSION = 'v3.3.0';
+const CACHE_VERSION = 'v3.3.5';
 const CACHE_NAME = `ayam-sd-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `ayam-sd-runtime-${CACHE_VERSION}`;
+// Keep install light: big quiz/audio files are cached on first use instead of precached.
 
 function scopedUrl(path) {
   return new URL(path.replace(/^\//, ''), self.registration.scope).toString();
@@ -13,10 +14,7 @@ const PRECACHE_URLS = [
   './favicon.svg',
   './og-image.svg',
   './icons/icon-192.png',
-  './icons/icon-512.png',
-  './data/questionBanks.json',
-  './audio/mushroom-dance.ogg',
-  './audio/kids-yay.mp3'
+  './icons/icon-512.png'
 ].map(scopedUrl);
 
 async function precacheBuiltAssets(cache) {

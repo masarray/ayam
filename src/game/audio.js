@@ -73,7 +73,9 @@ export class GameAudio {
       try { await this.ctx.resume(); } catch { /* ignore */ }
     }
 
-    if (this.sfxEnabled) this._ensureKidsYay();
+    // Do not create/preload sampled reward audio during Start. On lower-end
+    // phones, media setup can block the first game frame. Procedural SFX will
+    // work immediately; kids-yay is created lazily only when a reward needs it.
     if (allowMusic && this.musicEnabled && !this.musicSuppressed) this.startMusic();
   }
 
@@ -204,7 +206,7 @@ export class GameAudio {
     const audio = new Audio();
     audio.src = this.kidsYayUrl;
     audio.loop = false;
-    audio.preload = 'auto';
+    audio.preload = 'none';
     audio.volume = 0;
     this.kidsYay = audio;
     return this.kidsYay;

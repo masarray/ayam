@@ -37,7 +37,7 @@ Keep this attribution visible in repository notices, release notes, or an in-app
 
 ### `public/audio/kids-yay.mp3`
 
-This is a user-supplied celebratory sound effect. Keep it in the repository only when its source and distribution license are confirmed. If the license is unknown, replace it with a CC0 / CC BY / MIT / Apache-compatible sound effect and document the source here.
+This is a user-supplied celebratory sound effect and has been confirmed by the maintainer as Creative Commons licensed. Because Creative Commons attribution quality matters for public repositories, keep the original title, author, source URL, and exact CC variant here when those details are available.
 
 ## Safe future asset policy
 

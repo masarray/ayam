@@ -34,15 +34,16 @@ function isPlayKey(event) {
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { musicEnabled: true, sfxEnabled: true, cheatMode: false };
+    if (!raw) return { musicEnabled: true, sfxEnabled: true, hapticsEnabled: true, cheatMode: false };
     const parsed = JSON.parse(raw);
     return {
       musicEnabled: parsed.musicEnabled !== false,
       sfxEnabled: parsed.sfxEnabled !== false,
+      hapticsEnabled: parsed.hapticsEnabled !== false,
       cheatMode: parsed.cheatMode === true
     };
   } catch {
-    return { musicEnabled: true, sfxEnabled: true, cheatMode: false };
+    return { musicEnabled: true, sfxEnabled: true, hapticsEnabled: true, cheatMode: false };
   }
 }
 
@@ -507,6 +508,43 @@ function questionFitStyle(questionText = '') {
   return { '--question-fit-size': `${size}px` };
 }
 
+function runWhenIdle(callback, timeout = 900) {
+  if (typeof window === 'undefined') return 0;
+  if ('requestIdleCallback' in window) {
+    return window.requestIdleCallback(callback, { timeout });
+  }
+  return window.setTimeout(() => callback({ didTimeout: true, timeRemaining: () => 0 }), 32);
+}
+
+function cancelIdleTask(id) {
+  if (!id || typeof window === 'undefined') return;
+  if ('cancelIdleCallback' in window) window.cancelIdleCallback(id);
+  else window.clearTimeout(id);
+}
+
+const HAPTIC_PATTERNS = Object.freeze({
+  start: 12,
+  jump: 8,
+  blocked: [10, 24, 10],
+  nearMiss: 16,
+  traffic: [28, 32, 34],
+  train: [45, 38, 58],
+  water: [22, 30, 28],
+  reward: [18, 35, 18],
+  quizCorrect: 10,
+  quizWrong: [18, 38, 24]
+});
+
+function runHaptic(patternName, enabled = true) {
+  if (!enabled || typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return false;
+  const pattern = HAPTIC_PATTERNS[patternName] ?? patternName;
+  try {
+    return navigator.vibrate(pattern);
+  } catch {
+    return false;
+  }
+}
+
 
 export default function VoxelCrossing({
   title = 'Ayam SD',
@@ -532,6 +570,10 @@ export default function VoxelCrossing({
   const badgeTimerRef = useRef(null);
   const pendingBadgeShowTimerRef = useRef(null);
   const badgePausedGameRef = useRef(false);
+  const startMusicTimerRef = useRef(null);
+  const restartPrepareTaskRef = useRef(null);
+  const deferredAudioTaskRef = useRef(null);
+  const resumeFramesRef = useRef([]);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -547,6 +589,7 @@ export default function VoxelCrossing({
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(() => loadSettings());
+  const settingsRef = useRef(settings);
   const [savedGame, setSavedGame] = useState(() => loadSavedGame());
   const [saveNotice, setSaveNotice] = useState('');
   const [quizDue, setQuizDue] = useState(false);
@@ -586,6 +629,9 @@ export default function VoxelCrossing({
       if (!shouldInvite) return;
       if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
       pwaPromptTimerRef.current = window.setTimeout(() => {
+        // Never compete with the first gameplay frame. Install prompts can wait
+        // until the player opens menu or reaches a calm state.
+        if (gameRef.current?.isPlaying && !gameRef.current?.isGameOver) return;
         setPwaPromptVisible(true);
       }, delay);
     };
@@ -658,11 +704,31 @@ export default function VoxelCrossing({
   }, []);
 
   useEffect(() => {
+    settingsRef.current = settings;
     saveSettings(settings);
     audioRef.current?.setMusicEnabled(settings.musicEnabled);
     audioRef.current?.setSfxEnabled(settings.sfxEnabled);
     gameRef.current?.setCheatMode?.(settings.cheatMode);
   }, [settings]);
+
+  const cancelDeferredResume = () => {
+    if (!resumeFramesRef.current.length) return;
+    resumeFramesRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId));
+    resumeFramesRef.current = [];
+  };
+
+  const resumeEngineAfterMenuPaint = () => {
+    cancelDeferredResume();
+    const firstFrame = window.requestAnimationFrame(() => {
+      const secondFrame = window.requestAnimationFrame(() => {
+        resumeFramesRef.current = [];
+        if (gameOver || impacting || !gameRef.current) return;
+        gameRef.current.resume();
+      });
+      resumeFramesRef.current = [secondFrame];
+    });
+    resumeFramesRef.current = [firstFrame];
+  };
 
   useEffect(() => () => {
     if (confettiTimerRef.current) window.clearTimeout(confettiTimerRef.current);
@@ -671,6 +737,10 @@ export default function VoxelCrossing({
     if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
     if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
     if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
+    if (startMusicTimerRef.current) window.clearTimeout(startMusicTimerRef.current);
+    if (restartPrepareTaskRef.current) cancelIdleTask(restartPrepareTaskRef.current);
+    if (deferredAudioTaskRef.current) cancelIdleTask(deferredAudioTaskRef.current);
+    cancelDeferredResume();
   }, []);
 
   const triggerConfetti = (level = 'rainbow') => {
@@ -737,6 +807,7 @@ export default function VoxelCrossing({
   const triggerNearMiss = () => {
     if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
     setNearMissBurst({ id: Date.now() });
+    runHaptic('nearMiss', settingsRef.current.hapticsEnabled);
     audioRef.current?.nearMiss?.();
     trackProfileEvent('near_miss');
     nearMissTimerRef.current = window.setTimeout(() => setNearMissBurst(null), 980);
@@ -746,6 +817,20 @@ export default function VoxelCrossing({
     const quizMusicLocked = quizDue || ACTIVE_QUIZ_STATES.has(quiz.status);
     audioRef.current?.setMusicSuppressed?.(!allowMusic || quizMusicLocked);
     audioRef.current?.unlock({ allowMusic: allowMusic && !quizMusicLocked });
+  };
+
+  const deferAudioUnlock = (options = {}, timeout = 1200) => {
+    if (deferredAudioTaskRef.current) {
+      cancelIdleTask(deferredAudioTaskRef.current);
+      deferredAudioTaskRef.current = null;
+    }
+
+    window.requestAnimationFrame(() => {
+      deferredAudioTaskRef.current = runWhenIdle(() => {
+        deferredAudioTaskRef.current = null;
+        unlockAudio(options);
+      }, timeout);
+    });
   };
 
   async function loadQuestionPool() {
@@ -805,9 +890,13 @@ export default function VoxelCrossing({
       onImpact: ({ reason }) => {
         setImpactReason(reason);
         setImpacting(true);
+        runHaptic(reason === 'train' ? 'train' : reason === 'water' ? 'water' : 'traffic', settingsRef.current.hapticsEnabled);
         audioRef.current?.hit(reason);
       },
-      onMoveStart: () => audioRef.current?.jump(),
+      onMoveStart: () => {
+        runHaptic('jump', settingsRef.current.hapticsEnabled);
+        audioRef.current?.jump();
+      },
       onHazardSound: ({ kind }) => {
         if (kind === 'carHorn') audioRef.current?.carHorn();
         if (kind === 'train') audioRef.current?.trainPass(false);
@@ -859,6 +948,14 @@ export default function VoxelCrossing({
         setQuizReveal(false);
         setGameOversUntilQuiz(shouldStartQuiz ? 0 : GAME_OVERS_BEFORE_QUIZ - nextCycleCount);
         trackProfileEvent('game_over', { score: nextResult.score });
+        if (restartPrepareTaskRef.current) cancelIdleTask(restartPrepareTaskRef.current);
+        // Prepare the next run behind the result card, not when the child taps
+        // Mulai Main. A short idle timeout avoids restart-button freezes while the
+        // visible result overlay masks the rebuild cost on weaker phones.
+        restartPrepareTaskRef.current = runWhenIdle(() => {
+          restartPrepareTaskRef.current = null;
+          gameRef.current?.prepareRestart?.();
+        }, 180);
         onGameOver?.(nextResult);
       },
       onMilestone: (payload) => onQuestionGate?.(payload)
@@ -917,11 +1014,24 @@ export default function VoxelCrossing({
 
   const startGame = () => {
     const wasGameOver = gameOver && Boolean(result);
-    unlockAudio();
-    if (wasGameOver) trackProfileEvent('restart_after_game_over');
-    trackProfileEvent('run_started');
-    gameRef.current?.reset(true);
+
+    if (restartPrepareTaskRef.current) {
+      cancelIdleTask(restartPrepareTaskRef.current);
+      restartPrepareTaskRef.current = null;
+    }
+    if (startMusicTimerRef.current) {
+      window.clearTimeout(startMusicTimerRef.current);
+      startMusicTimerRef.current = null;
+    }
+
+    // Start must stay frame-safe. The engine is already prepared before the menu
+    // appears. Do not unlock audio, fetch media, or show install prompts here.
+    // The first visual frame must be just: hide overlay + start animation.
+    runHaptic('start', settingsRef.current.hapticsEnabled);
+    gameRef.current?.start();
     menuPausedRef.current = false;
+    setStarted(true);
+    setPwaPromptVisible(false);
     setMenuOpen(false);
     setSettingsOpen(false);
     setBadgeBoardOpen(false);
@@ -934,13 +1044,18 @@ export default function VoxelCrossing({
     setQuizDue(false);
     setQuizReveal(false);
     setQuiz(QUIZ_INITIAL);
-    setStarted(true);
     setScore(0);
     setLastRunScore(0);
-    window.setTimeout(() => {
-      audioRef.current?.setMusicSuppressed?.(false);
-      schedulePendingBadgeCelebration();
-    }, 0);
+
+    // Keep storage/profile work off the first visual frame. Audio is unlocked
+    // later on an idle task after movement/resume/settings, never on Start/Menu open.
+    window.requestAnimationFrame(() => {
+      runWhenIdle(() => {
+        if (wasGameOver) trackProfileEvent('restart_after_game_over');
+        trackProfileEvent('run_started');
+        schedulePendingBadgeCelebration();
+      }, 1000);
+    });
   };
 
   const saveGame = () => {
@@ -955,7 +1070,6 @@ export default function VoxelCrossing({
   const continueSavedGame = () => {
     const saveState = savedGame || loadSavedGame();
     if (!saveState) return;
-    unlockAudio();
     gameRef.current?.loadSaveState?.(saveState, true);
     menuPausedRef.current = false;
     setMenuOpen(false);
@@ -974,37 +1088,47 @@ export default function VoxelCrossing({
     setLifeBlinkIndex(null);
     setScore(saveState.score || saveState.row || 0);
     setLastRunScore(saveState.score || saveState.row || 0);
+    deferAudioUnlock({ allowMusic: true }, 1400);
   };
 
-  const resumeGame = () => {
+  const resumeGame = ({ deferEngine = false } = {}) => {
     if (impacting) return;
-    unlockAudio();
-    gameRef.current?.resume();
     menuPausedRef.current = false;
     setMenuOpen(false);
     setSettingsOpen(false);
+    setBadgeBoardOpen(false);
     setStarted(true);
+
+    // Closing the menu must paint first, then resume WebGL. Running the engine
+    // in the same input handler as the React menu unmount can make mobile
+    // browsers show a frozen frame for several seconds on weaker GPUs.
+    if (deferEngine) resumeEngineAfterMenuPaint();
+    else gameRef.current?.resume();
   };
 
-  const pauseGame = () => {
+  const pauseGame = ({ keepStarted = false } = {}) => {
     if (impacting) return;
+    cancelDeferredResume();
     gameRef.current?.pause();
-    setStarted(false);
+    if (!keepStarted) setStarted(false);
   };
 
   const openMenu = () => {
     if (impacting) return;
-    unlockAudio();
+    // Menu must be a pure UI transition. Do not unlock audio, preload media,
+    // write storage, or rebuild scene here; those can create long tasks on
+    // mobile and make the menu appear frozen.
     menuPausedRef.current = Boolean(started && !gameOver);
-    if (started && !gameOver) pauseGame();
+    if (started && !gameOver) pauseGame({ keepStarted: true });
     setSettingsOpen(false);
     setBadgeBoardOpen(false);
+    setPwaPromptVisible(false);
     setMenuOpen(true);
   };
 
   const closeMenu = ({ resume = false } = {}) => {
     if (resume && menuPausedRef.current && !gameOver && ready && !impacting) {
-      resumeGame();
+      resumeGame({ deferEngine: true });
       return;
     }
     menuPausedRef.current = false;
@@ -1020,15 +1144,16 @@ export default function VoxelCrossing({
   };
 
   const updateSetting = (key, value) => {
-    unlockAudio({ allowMusic: !ACTIVE_QUIZ_STATES.has(quiz.status) && !quizDue });
+    deferAudioUnlock({ allowMusic: !ACTIVE_QUIZ_STATES.has(quiz.status) && !quizDue }, 1400);
     setSettings((current) => ({ ...current, [key]: Boolean(value) }));
   };
 
   const move = (direction) => {
     if (impacting || menuOpen || gameOver || activeBadge) return;
-    unlockAudio();
     if (!started && !gameOver) resumeGame();
-    gameRef.current?.queueMove(direction);
+    const accepted = gameRef.current?.queueMove(direction) === true;
+    if (!accepted) runHaptic('blocked', settingsRef.current.hapticsEnabled);
+    deferAudioUnlock({ allowMusic: true }, 1400);
   };
 
   const handleControlPointer = (event, direction) => {
@@ -1044,9 +1169,11 @@ export default function VoxelCrossing({
     const question = quiz.questions[quiz.index];
     const isCorrect = answerKey === question.answerKey;
     if (isCorrect) {
+      runHaptic('quizCorrect', settingsRef.current.hapticsEnabled);
       audioRef.current?.quizCorrect();
       trackProfileEvent('quiz_correct');
     } else {
+      runHaptic('quizWrong', settingsRef.current.hapticsEnabled);
       audioRef.current?.quizWrong();
     }
     setQuiz((current) => ({
@@ -1065,6 +1192,7 @@ export default function VoxelCrossing({
       const stars = quiz.correctCount >= 5 ? 3 : quiz.correctCount >= 3 ? 2 : quiz.correctCount >= 1 ? 1 : 0;
       audioRef.current?.quizComplete(quiz.correctCount);
       if (stars >= 2) {
+        runHaptic('reward', settingsRef.current.hapticsEnabled);
         audioRef.current?.kidsYayReward(stars);
         triggerConfetti(stars >= 3 ? 'gold' : 'rainbow');
       }
@@ -1122,7 +1250,7 @@ export default function VoxelCrossing({
   const learningStars = quiz.correctCount >= 5 ? 3 : quiz.correctCount >= 3 ? 2 : quiz.correctCount >= 1 ? 1 : 0;
 
   return (
-    <section className={`vc-shell ${orientationHint} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
+    <section className={`vc-shell ${orientationHint} ${menuOpen ? 'menu-open' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
       <div ref={hostRef} className="vc-host" />
       <ConfettiBurst burst={confettiBurst} />
       <BadgeUnlockOverlay badge={activeBadge} onClose={closeBadge} />
@@ -1196,7 +1324,7 @@ export default function VoxelCrossing({
 
           <div className="menu-actions">
             {menuPausedRef.current ? (
-              <button type="button" className="menu-action primary" onClick={resumeGame}>Lanjutkan</button>
+              <button type="button" className="menu-action primary" onClick={() => resumeGame({ deferEngine: true })}>Lanjutkan</button>
             ) : (
               <button type="button" className="menu-action primary" onClick={startGame} disabled={!ready}>Mulai Main</button>
             )}
@@ -1234,6 +1362,19 @@ export default function VoxelCrossing({
                   type="checkbox"
                   checked={settings.sfxEnabled}
                   onChange={(event) => updateSetting('sfxEnabled', event.target.checked)}
+                />
+                <i aria-hidden="true" />
+              </label>
+
+              <label className="setting-row">
+                <span>
+                  <strong>Haptic vibration</strong>
+                  <small>Getar halus untuk lompat, hampir tertabrak, hit, dan reward di HP Android</small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.hapticsEnabled}
+                  onChange={(event) => updateSetting('hapticsEnabled', event.target.checked)}
                 />
                 <i aria-hidden="true" />
               </label>

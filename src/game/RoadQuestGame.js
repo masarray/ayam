@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 import {
+  CAMERA_FOLLOW_STIFFNESS,
   CAMERA_LERP,
+  CAMERA_TARGET_STIFFNESS,
   MAX_TILE,
   MIN_TILE,
   MOVE_DURATION,
   PLAYER_DEPTH,
   PLAYER_WIDTH,
+  PLAYER_PLANK_STAND_Z,
+  PLAYER_RAIL_STAND_Z,
   PLANK_EDGE_SINK_MARGIN,
   PLANK_RIDE_LIMIT_MS,
   PREGENERATE_ROWS,
@@ -29,7 +33,7 @@ import {
   createTrain,
   createVehicle
 } from './renderers.js';
-import { clamp, easeInOutQuad, easeOutCubic, lerp, rowToY, tileToX } from './math.js';
+import { clamp, easeInOutCubic, easeInOutQuad, easeOutCubic, lerp, rowToY, tileToX } from './math.js';
 
 const DIRECTIONS = new Set(['forward', 'backward', 'left', 'right']);
 const DIR_TO_DELTA = {
@@ -80,6 +84,52 @@ function laneProgress(vehicle, direction, wrapMin, wrapMax) {
 }
 
 const HIGH_SCORE_KEY = 'ayam-sd-high-score';
+
+function detectRenderProfile() {
+  const nav = typeof navigator !== 'undefined' ? navigator : {};
+  const deviceMemory = Number(nav.deviceMemory || 0);
+  const cores = Number(nav.hardwareConcurrency || 0);
+  const coarsePointer = typeof window !== 'undefined'
+    ? window.matchMedia?.('(pointer: coarse)')?.matches === true
+    : false;
+  const narrowScreen = typeof window !== 'undefined' ? Math.min(window.innerWidth || 0, window.innerHeight || 0) < 720 : false;
+  const reducedMotion = typeof window !== 'undefined'
+    ? window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
+    : false;
+
+  const lowMemory = deviceMemory > 0 && deviceMemory <= 4;
+  const lowCore = cores > 0 && cores <= 4;
+  const mobileLike = coarsePointer || narrowScreen;
+  const lowEnd = reducedMotion || (mobileLike && (lowMemory || lowCore));
+
+  if (lowEnd) {
+    return {
+      name: 'mobile-light',
+      antialias: false,
+      maxPixelRatio: 1.25,
+      shadowMapSize: 1024,
+      powerPreference: 'high-performance'
+    };
+  }
+
+  if (mobileLike) {
+    return {
+      name: 'mobile-balanced',
+      antialias: true,
+      maxPixelRatio: 1.5,
+      shadowMapSize: 1536,
+      powerPreference: 'high-performance'
+    };
+  }
+
+  return {
+    name: 'desktop-premium',
+    antialias: true,
+    maxPixelRatio: 1.75,
+    shadowMapSize: 2048,
+    powerPreference: 'high-performance'
+  };
+}
 
 function readHighScore() {
   try {
@@ -132,7 +182,12 @@ export class RoadQuestGame {
 
     this.scene = new THREE.Scene();
     this.camera = createOrthoCamera();
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    this.renderProfile = detectRenderProfile();
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: this.renderProfile.antialias,
+      alpha: false,
+      powerPreference: this.renderProfile.powerPreference
+    });
     applyRendererQuality(this.renderer);
     this.renderer.domElement.className = 'vc-canvas';
     this.renderer.domElement.setAttribute('aria-label', 'Ayam SD game canvas');
@@ -186,14 +241,22 @@ export class RoadQuestGame {
     this.lastWaterStruggleFx = 0;
     this.movement = null;
     this.cameraTarget = new THREE.Vector3(0, 0, 0);
+    this.cameraSmoothedTarget = new THREE.Vector3(0, 0, 0);
+    this.cameraRawTarget = new THREE.Vector3(0, 0, 0);
+    this.cameraOffset = new THREE.Vector3();
+    this.cameraDesired = new THREE.Vector3();
     this.renderRequested = null;
     this.lastMilestone = 0;
     this.lastNearMissAt = 0;
     this.touchStart = null;
+    this.isUiPaused = false;
+    this.lastPausedRenderAt = 0;
 
     this._handleKeyDown = this._handleKeyDown.bind(this);
     this._handlePointerDown = this._handlePointerDown.bind(this);
+    this._handlePointerMove = this._handlePointerMove.bind(this);
     this._handlePointerUp = this._handlePointerUp.bind(this);
+    this._handlePointerCancel = this._handlePointerCancel.bind(this);
     this._resize = this._resize.bind(this);
     this._animate = this._animate.bind(this);
 
@@ -201,14 +264,26 @@ export class RoadQuestGame {
     this.resizeObserver.observe(this.container);
     window.addEventListener('keydown', this._handleKeyDown);
     this.renderer.domElement.addEventListener('pointerdown', this._handlePointerDown, { passive: true });
+    this.renderer.domElement.addEventListener('pointermove', this._handlePointerMove, { passive: true });
     this.renderer.domElement.addEventListener('pointerup', this._handlePointerUp, { passive: true });
+    this.renderer.domElement.addEventListener('pointercancel', this._handlePointerCancel, { passive: true });
 
     this._setupLights();
     this.reset(false);
     this._resize();
+    this._warmUpRenderer();
     this.callbacks.onReady({ highScore: this.highScore });
     this.callbacks.onHighScore(this.highScore);
     this.renderRequested = requestAnimationFrame(this._animate);
+  }
+
+  _warmUpRenderer() {
+    try {
+      this.renderer.compile?.(this.scene, this.camera);
+      this.renderer.render(this.scene, this.camera);
+    } catch {
+      // Shader warm-up is a performance optimization only. Gameplay still works.
+    }
   }
 
   _setupLights() {
@@ -223,8 +298,8 @@ export class RoadQuestGame {
     sunlight.position.set(-180, -220, 420);
     sunlight.target = this.sunTarget;
     sunlight.castShadow = true;
-    sunlight.shadow.mapSize.width = 4096;
-    sunlight.shadow.mapSize.height = 4096;
+    sunlight.shadow.mapSize.width = this.renderProfile.shadowMapSize;
+    sunlight.shadow.mapSize.height = this.renderProfile.shadowMapSize;
     sunlight.shadow.camera.left = -1050;
     sunlight.shadow.camera.right = 1050;
     sunlight.shadow.camera.top = 1050;
@@ -242,7 +317,10 @@ export class RoadQuestGame {
   }
 
   reset(startImmediately = false) {
+    this.restartPrepared = false;
     this.isPlaying = Boolean(startImmediately);
+    this.isUiPaused = false;
+    this.lastPausedRenderAt = 0;
     this.isGameOver = false;
     this.isImpacting = false;
     this.impactStartedAt = 0;
@@ -298,16 +376,39 @@ export class RoadQuestGame {
   }
 
   start() {
-    if (this.isGameOver) this.reset(false);
+    if (this.isGameOver && !this.restartPrepared) this.reset(false);
+    this.isGameOver = false;
+    this.isImpacting = false;
     this.isPlaying = true;
+    this.isUiPaused = false;
+    this.lastPausedRenderAt = 0;
+    this.restartPrepared = false;
+  }
+
+  prepareRestart() {
+    if (!this.isGameOver || this.isImpacting || this.restartPrepared) return false;
+    this.reset(false);
+    this.restartPrepared = true;
+    this.isGameOver = true;
+    this.isPlaying = false;
+    return true;
   }
 
   pause() {
-    if (!this.isImpacting) this.isPlaying = false;
+    if (!this.isImpacting) {
+      this.isPlaying = false;
+      this.isUiPaused = true;
+      this.lastPausedRenderAt = 0;
+    }
   }
 
   resume() {
-    if (!this.isGameOver && !this.isImpacting) this.isPlaying = true;
+    if (!this.isGameOver && !this.isImpacting) {
+      this.isPlaying = true;
+      this.isUiPaused = false;
+      this.lastPausedRenderAt = 0;
+      this.clock.getDelta();
+    }
   }
 
   resetHighScore() {
@@ -354,6 +455,8 @@ export class RoadQuestGame {
     this.isGameOver = false;
     this.isImpacting = false;
     this.isPlaying = Boolean(startImmediately);
+    this.isUiPaused = false;
+    this.lastPausedRenderAt = 0;
     this.activeRidePlankId = null;
     this.invulnerableUntil = performance.now() + 1200;
     this.waterGraceUntil = this.invulnerableUntil;
@@ -371,6 +474,8 @@ export class RoadQuestGame {
     this.isGameOver = false;
     this.isImpacting = false;
     this.isPlaying = true;
+    this.isUiPaused = false;
+    this.lastPausedRenderAt = 0;
     this.moveQueue = [];
     this.movement = null;
     this.activeRidePlankId = null;
@@ -416,7 +521,9 @@ export class RoadQuestGame {
     if (this.renderRequested) cancelAnimationFrame(this.renderRequested);
     window.removeEventListener('keydown', this._handleKeyDown);
     this.renderer.domElement.removeEventListener('pointerdown', this._handlePointerDown);
+    this.renderer.domElement.removeEventListener('pointermove', this._handlePointerMove);
     this.renderer.domElement.removeEventListener('pointerup', this._handlePointerUp);
+    this.renderer.domElement.removeEventListener('pointercancel', this._handlePointerCancel);
     this.resizeObserver.disconnect();
 
     if (this.player) this.scene.remove(this.player);
@@ -425,6 +532,7 @@ export class RoadQuestGame {
     Object.values(this.geometries).forEach((geometry) => geometry.dispose?.());
     Object.values(this.materials).forEach((material) => material.dispose?.());
     this.renderer.dispose();
+    this.renderer.forceContextLoss?.();
     this.renderer.domElement.remove();
   }
 
@@ -533,8 +641,13 @@ export class RoadQuestGame {
     this._addRowsAround(row, 24, 24);
     const targetRow = this.rows[row];
     if (!targetRow) return false;
-    if (targetRow.blockers?.has(tile)) return false;
+    if (this._isTileBlocked(targetRow, tile)) return false;
     return true;
+  }
+
+  _isTileBlocked(row, tile) {
+    if (!row || !Number.isInteger(tile)) return true;
+    return row.blockers?.has(tile) === true;
   }
 
   _beginNextMove() {
@@ -554,8 +667,10 @@ export class RoadQuestGame {
       to,
       fromX: tileToX(from.tile, TILE_SIZE),
       fromY: rowToY(from.row, TILE_SIZE),
+      fromZ: this.player?.position.z ?? this._getPlayerStandZ(from.row, from.tile),
       toX: tileToX(to.tile, TILE_SIZE),
-      toY: rowToY(to.row, TILE_SIZE)
+      toY: rowToY(to.row, TILE_SIZE),
+      toZ: this._getPlayerStandZ(to.row, to.tile)
     };
 
     this.callbacks.onMoveStart({ direction, from, to });
@@ -567,6 +682,16 @@ export class RoadQuestGame {
     this.playerPosition = { ...this.movement.to };
     this._setPlayerWorldPosition(this.playerPosition.row, this.playerPosition.tile, completedDirection);
     const landedRow = this.rows[this.playerPosition.row];
+    if (this._isTileBlocked(landedRow, this.playerPosition.tile)) {
+      // Regression guard for late-game decorative trees: if a queued/rapid input
+      // somehow lands on a solid tree footprint, snap back instead of allowing a
+      // visual tree penetration. Normal movement is already blocked in _canMoveTo.
+      this.playerPosition = { ...this.movement.from };
+      this._setPlayerWorldPosition(this.playerPosition.row, this.playerPosition.tile, completedDirection);
+      this.movement = null;
+      this.moveQueue = [];
+      return;
+    }
     // Water must be decided on landing. Without this guard, a fast repeated tap can
     // queue the next hop and let the chicken cross water without touching a plank.
     this.waterGraceUntil = landedRow?.type === 'water' ? 0 : performance.now() + 105;
@@ -656,9 +781,26 @@ export class RoadQuestGame {
     this.prunedRowDataBefore = Math.max(this.prunedRowDataBefore, pruneDataBefore);
   }
 
+  _getPlayerStandZ(rowIndex, tile) {
+    const row = this.rows[rowIndex];
+    if (!row) return 0;
+
+    if (row.type === 'rail') return PLAYER_RAIL_STAND_Z;
+
+    if (row.type === 'water') {
+      const x = tileToX(tile, TILE_SIZE);
+      const y = rowToY(rowIndex, TILE_SIZE);
+      const supportingPlank = this._findSupportingPlankAt(x, y);
+      if (supportingPlank) return supportingPlank.position.z + PLAYER_PLANK_STAND_Z;
+    }
+
+    return 0;
+  }
+
   _setPlayerWorldPosition(row, tile, direction = 'forward') {
     if (!this.player) return;
-    this.player.position.set(tileToX(tile, TILE_SIZE), rowToY(row, TILE_SIZE), 0);
+    const standZ = this._getPlayerStandZ(row, tile);
+    this.player.position.set(tileToX(tile, TILE_SIZE), rowToY(row, TILE_SIZE), standZ);
     const baseScale = this.player.userData.baseScale || 0.72;
     this.player.scale.setScalar(baseScale);
     this._facePlayer(direction, 0);
@@ -678,6 +820,16 @@ export class RoadQuestGame {
   _animate() {
     const delta = Math.min(this.clock.getDelta(), 0.035);
 
+    if (this.isUiPaused && !this.isImpacting) {
+      const nowMs = performance.now();
+      if (nowMs - this.lastPausedRenderAt > 220) {
+        this.lastPausedRenderAt = nowMs;
+        this.renderer.render(this.scene, this.camera);
+      }
+      this.renderRequested = requestAnimationFrame(this._animate);
+      return;
+    }
+
     if (this.isImpacting) {
       this._updateVehicles(delta * 0.12);
       this._updateImpactEffect();
@@ -695,7 +847,7 @@ export class RoadQuestGame {
     this._updateWaterFlow(delta);
     this._updateFx(delta);
     this._updateGhostBlink();
-    this._updateCamera(false);
+    this._updateCamera(false, delta);
     if (this.isImpacting) this._applyCameraShake();
     this.renderer.render(this.scene, this.camera);
     this.renderRequested = requestAnimationFrame(this._animate);
@@ -709,12 +861,13 @@ export class RoadQuestGame {
 
     const elapsed = performance.now() - this.movement.startedAt;
     const t = clamp(elapsed / MOVE_DURATION, 0, 1);
-    const eased = easeOutCubic(t);
+    const eased = easeInOutCubic(t);
     const hop = Math.sin(Math.PI * easeInOutQuad(t)) * 13;
 
     const x = lerp(this.movement.fromX, this.movement.toX, eased);
     const y = lerp(this.movement.fromY, this.movement.toY, eased);
-    this.player.position.set(x, y, hop);
+    const surfaceZ = lerp(this.movement.fromZ || 0, this.movement.toZ || 0, eased);
+    this.player.position.set(x, y, surfaceZ + hop);
 
     const tiltAmount = 0.16 * Math.sin(Math.PI * t);
     const tilt = this.movement.direction === 'backward' ? -tiltAmount : tiltAmount;
@@ -1139,17 +1292,19 @@ export class RoadQuestGame {
   }
 
 
-  _findSupportingPlank() {
-    if (!this.player) return null;
-    const playerX = this.player.position.x;
-    const playerY = this.player.position.y;
+  _findSupportingPlankAt(playerX, playerY) {
     for (const plank of this.planks) {
-      const { rowIndex, width, depth, sinking } = plank.userData;
+      const { width, depth, sinking } = plank.userData;
       if (sinking) continue;
       if (Math.abs(playerY - plank.position.y) > (depth + PLAYER_DEPTH) * 0.62) continue;
       if (Math.abs(playerX - plank.position.x) <= (width + PLAYER_WIDTH) * 0.54) return plank;
     }
     return null;
+  }
+
+  _findSupportingPlank() {
+    if (!this.player) return null;
+    return this._findSupportingPlankAt(this.player.position.x, this.player.position.y);
   }
 
   _updateWaterState(delta) {
@@ -1176,6 +1331,7 @@ export class RoadQuestGame {
 
     const drift = supportingPlank.userData.direction * supportingPlank.userData.currentSpeed * delta;
     this.player.position.x += drift;
+    this.player.position.z = supportingPlank.position.z + PLAYER_PLANK_STAND_Z;
     const tile = clamp(Math.round(this.player.position.x / TILE_SIZE), MIN_TILE, MAX_TILE);
     this.playerPosition.tile = tile;
 
@@ -1427,24 +1583,46 @@ export class RoadQuestGame {
     });
   }
 
-  _updateCamera(force) {
+  _updateCamera(force, delta = 1 / 60) {
     if (!this.player) return;
     const rect = this.container.getBoundingClientRect();
     const isPortrait = rect.height > rect.width;
-    const targetX = clamp(this.player.position.x, MIN_TILE * TILE_SIZE + 45, MAX_TILE * TILE_SIZE - 45);
-    const targetY = this.player.position.y + (isPortrait ? 68 : 42);
-    const targetZ = isPortrait ? 20 : 0;
-    this.cameraTarget.set(targetX, targetY, targetZ);
 
-    const offset = isPortrait
-      ? new THREE.Vector3(250, -345, 352)
-      : new THREE.Vector3(305, -335, 315);
+    // Mode B: softer child-friendly camera. Follow the chicken's visual position
+    // rather than snapping hard to the destination row, with gentle lateral drift
+    // so the map feels smooth instead of locked or floaty.
+    const playerX = this.player.position.x;
+    const playerY = this.player.position.y;
+    const lateralWeight = isPortrait ? 0.46 : 0.54;
+    const targetX = clamp(
+      playerX * lateralWeight,
+      MIN_TILE * TILE_SIZE + 86,
+      MAX_TILE * TILE_SIZE - 86
+    );
+    const targetY = playerY + (isPortrait ? 88 : 58);
+    const targetZ = isPortrait ? 22 : 0;
+    this.cameraRawTarget.set(targetX, targetY, targetZ);
 
-    const desired = this.cameraTarget.clone().add(offset);
+    const targetAlpha = 1 - Math.exp(-CAMERA_TARGET_STIFFNESS * Math.max(0.001, delta));
+    const followAlpha = Math.max(CAMERA_LERP, 1 - Math.exp(-CAMERA_FOLLOW_STIFFNESS * Math.max(0.001, delta)));
+
     if (force) {
-      this.camera.position.copy(desired);
+      this.cameraSmoothedTarget.copy(this.cameraRawTarget);
     } else {
-      this.camera.position.lerp(desired, CAMERA_LERP);
+      this.cameraSmoothedTarget.lerp(this.cameraRawTarget, targetAlpha);
+    }
+    this.cameraTarget.copy(this.cameraSmoothedTarget);
+
+    this.cameraOffset.set(
+      isPortrait ? 250 : 305,
+      isPortrait ? -345 : -335,
+      isPortrait ? 352 : 315
+    );
+    this.cameraDesired.copy(this.cameraTarget).add(this.cameraOffset);
+    if (force) {
+      this.camera.position.copy(this.cameraDesired);
+    } else {
+      this.camera.position.lerp(this.cameraDesired, followAlpha);
     }
     this.camera.lookAt(this.cameraTarget);
     this._updateSunlightForCurrentView();
@@ -1460,7 +1638,6 @@ export class RoadQuestGame {
     );
     this.sunTarget.updateMatrixWorld();
     this.sunlight.updateMatrixWorld();
-    this.sunlight.shadow.camera.updateProjectionMatrix();
   }
 
   _resize() {
@@ -1470,7 +1647,7 @@ export class RoadQuestGame {
     const aspect = width / height;
     const isPortrait = height > width;
 
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.renderProfile.maxPixelRatio));
     this.renderer.setSize(width, height, false);
 
     const viewHeight = isPortrait ? 690 : 390;
@@ -1504,25 +1681,41 @@ export class RoadQuestGame {
     this.queueMove(direction);
   }
 
-  _handlePointerDown(event) {
-    this.touchStart = { x: event.clientX, y: event.clientY, time: performance.now() };
-  }
-
-  _handlePointerUp(event) {
-    if (!this.touchStart) return;
+  _commitPointerMove(event, releaseOnly = false) {
+    if (!this.touchStart || this.touchStart.consumed) return false;
     const dx = event.clientX - this.touchStart.x;
     const dy = event.clientY - this.touchStart.y;
     const dt = performance.now() - this.touchStart.time;
-    this.touchStart = null;
+    const threshold = releaseOnly ? 24 : 34;
 
-    if (dt > 750) return;
-    const threshold = 28;
-    if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
-
-    if (Math.abs(dx) > Math.abs(dy)) {
-      this.queueMove(dx > 0 ? 'right' : 'left');
-    } else {
-      this.queueMove(dy > 0 ? 'backward' : 'forward');
+    if (dt > 750) {
+      this.touchStart = null;
+      return false;
     }
+    if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return false;
+
+    const direction = Math.abs(dx) > Math.abs(dy)
+      ? (dx > 0 ? 'right' : 'left')
+      : (dy > 0 ? 'backward' : 'forward');
+    this.touchStart.consumed = true;
+    this.queueMove(direction);
+    return true;
+  }
+
+  _handlePointerDown(event) {
+    this.touchStart = { x: event.clientX, y: event.clientY, time: performance.now(), consumed: false };
+  }
+
+  _handlePointerMove(event) {
+    if (this._commitPointerMove(event, false)) this.touchStart = null;
+  }
+
+  _handlePointerUp(event) {
+    this._commitPointerMove(event, true);
+    this.touchStart = null;
+  }
+
+  _handlePointerCancel() {
+    this.touchStart = null;
   }
 }

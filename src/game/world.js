@@ -80,16 +80,26 @@ function randomInt(random, min, maxInclusive) {
   return min + Math.floor(random() * (maxInclusive - min + 1));
 }
 
+function createTreeBlockers(trees) {
+  // Collision follows the trunk/core tile only. The crown is decorative and must
+  // not block neighbouring tiles, otherwise the player feels stopped far away
+  // from the visible trunk.
+  return new Set(trees);
+}
+
 function generateGrassRow(rowIndex, random = null, withDecorTrees = false) {
   const shouldDecorate = withDecorTrees || rowIndex >= 80;
   const trees = shouldDecorate && random
     ? uniqueRandomTiles(random, 2 + Math.floor(random() * 3), MIN_TILE, MAX_TILE, [-2, -1, 0, 1, 2])
     : [];
+
+  const blockers = createTreeBlockers(trees);
+
   return {
     index: rowIndex,
     type: 'grass',
     trees,
-    blockers: new Set()
+    blockers
   };
 }
 
@@ -123,7 +133,7 @@ function generateForestRow(rowIndex, random) {
     index: rowIndex,
     type: 'forest',
     trees: softened,
-    blockers: new Set(softened)
+    blockers: createTreeBlockers(softened)
   };
 }
 
@@ -141,12 +151,13 @@ function roadBandContinuation(rows, rowIndex) {
 }
 
 function chooseRoadLaneCount(rowIndex, random) {
-  if (rowIndex < 10) return 1;
   if (rowIndex >= 100) return 4;
   const roll = random();
-  if (rowIndex > 18 && roll < 0.22) return 4;
-  if (rowIndex > 12 && roll < 0.44) return 3;
-  return 1;
+  if (rowIndex < 10) return roll < 0.82 ? 2 : 3;
+  if (rowIndex < 18) return roll < 0.64 ? 2 : 3;
+  if (roll < 0.2) return 4;
+  if (roll < 0.52) return 3;
+  return 2;
 }
 
 function laneDirectionForBand(laneCount, laneIndex, reversed) {
@@ -168,6 +179,29 @@ function railBandContinuation(rows, rowIndex) {
     trackIndex: previous.railTrackIndex + 1,
     reversed: previous.railReversed
   };
+}
+
+
+function recentTypeCount(rows, rowIndex, type, lookback) {
+  let count = 0;
+  for (let i = Math.max(0, rowIndex - lookback); i < rowIndex; i += 1) {
+    if (rows[i]?.type === type) count += 1;
+  }
+  return count;
+}
+
+function shouldSoftenRailPressure(rows, rowIndex) {
+  // Rows around the low 80s are usually where children already feel proud of a
+  // long run. Do not let the generator stack bullet-train rows back-to-back here.
+  if (rowIndex < 80 || rowIndex > 92) return false;
+  return recentTypeCount(rows, rowIndex, 'rail', 4) >= 1;
+}
+
+function chooseCooldownRowAfterRail(rowIndex, random) {
+  const roll = random();
+  if (roll < 0.44) return generateGrassRow(rowIndex, random, true);
+  if (roll < 0.74) return generateTrafficRow(rowIndex, random);
+  return generateWaterRow(rowIndex, random);
 }
 
 function generateLateGameStageRow(rowIndex, random) {
@@ -356,19 +390,30 @@ function generateRailRow(rowIndex, random, railBand = null) {
     ? (trackIndex % 2 === 0 ? 1 : -1) * (reversed ? -1 : 1)
     : (random() > 0.5 ? 1 : -1);
   const laneOffset = trackCount > 1 ? (trackIndex === 0 ? -5 : 5) : (random() - 0.5) * 4;
+  const midGameRailRelief = rowIndex >= 78 && rowIndex <= 92;
   const availableProfiles = TRAIN_PROFILES
     .filter((profile) => !profile.unlockRow || rowIndex >= profile.unlockRow)
-    .map((profile) => ({
-      ...profile,
-      // Later rows should feel more tense: faster modern/bullet trains appear more often.
-      weight: profile.trainClass === 'bullet'
+    .map((profile) => {
+      let weight = profile.trainClass === 'bullet'
         ? profile.weight + trainIntensity * 5.5
         : profile.trainClass === 'electric'
           ? profile.weight + trainIntensity * 1.6
           : profile.trainClass === 'classic'
             ? Math.max(1.2, profile.weight - trainIntensity * 1.8)
-            : profile.weight + trainIntensity * 1.1
-    }));
+            : profile.weight + trainIntensity * 1.1;
+
+      // Score 80–90 was becoming a bullet-train wall. Keep rail exciting, but
+      // give this stage more readable electric/freight trains instead of repeated
+      // high-speed bullets.
+      if (midGameRailRelief) {
+        if (profile.trainClass === 'bullet') weight *= 0.18;
+        if (profile.trainClass === 'electric') weight *= 1.28;
+        if (profile.trainClass === 'freight') weight *= 1.2;
+        if (profile.trainClass === 'classic') weight *= 1.08;
+      }
+
+      return { ...profile, weight };
+    });
   const profile = weightedPick(random, availableProfiles);
   const carriageCount = randomInt(random, profile.carriageCountMin, profile.carriageCountMax);
   const carriageWidth = randomInt(random, profile.carriageWidthMin, profile.carriageWidthMax);
@@ -379,8 +424,12 @@ function generateRailRow(rowIndex, random, railBand = null) {
   const minX = MIN_TILE * TILE_SIZE - TRAIN_SAFE_MARGIN;
   const isClassic = profile.trainClass === 'classic';
   const appliedMultiplier = isClassic ? 0.84 + Math.min(0.2, speedMultiplier - 1) : speedMultiplier;
-  const speed = (profile.speedMin + random() * (profile.speedMax - profile.speedMin)) * appliedMultiplier;
-  const trainCount = rowIndex > 38 && random() < 0.22 + trainIntensity * 0.2 && width < span * 0.58 ? 2 : 1;
+  const rawSpeed = (profile.speedMin + random() * (profile.speedMax - profile.speedMin)) * appliedMultiplier;
+  const speed = midGameRailRelief && profile.trainClass === 'bullet'
+    ? Math.min(rawSpeed, 780)
+    : rawSpeed;
+  const multiTrainChance = midGameRailRelief ? 0.04 : 0.22 + trainIntensity * 0.2;
+  const trainCount = rowIndex > 38 && random() < multiTrainChance && width < span * 0.58 ? 2 : 1;
   const offset = span / trainCount;
   const startX = minX + random() * span;
   const trains = [];
@@ -492,17 +541,25 @@ export function generateRow(rowIndex, rows) {
   if (rowIndex >= 80) {
     const previous = rows[rowIndex - 1]?.type;
     const roll = random();
+    const railCooldown = shouldSoftenRailPressure(rows, rowIndex);
+
+    if (railCooldown && previous !== 'rail') {
+      return chooseCooldownRowAfterRail(rowIndex, random);
+    }
+
     if (previous === 'water') {
+      if (railCooldown) return roll < 0.64 ? generateTrafficRow(rowIndex, random) : generateGrassRow(rowIndex, random, true);
       return roll < 0.58 ? generateTrafficRow(rowIndex, random) : roll < 0.82 ? generateRailRow(rowIndex, random) : generateGrassRow(rowIndex, random);
     }
     if (previous === 'traffic') {
+      if (railCooldown) return roll < 0.46 ? generateWaterRow(rowIndex, random) : roll < 0.74 ? generateGrassRow(rowIndex, random, true) : generateTrafficRow(rowIndex, random);
       return roll < 0.36 ? generateRailRow(rowIndex, random) : roll < 0.62 ? generateWaterRow(rowIndex, random) : generateGrassRow(rowIndex, random);
     }
     if (previous === 'rail') {
       return roll < 0.52 ? generateTrafficRow(rowIndex, random) : roll < 0.76 ? generateWaterRow(rowIndex, random) : generateGrassRow(rowIndex, random);
     }
     if (roll < 0.52) return generateTrafficRow(rowIndex, random);
-    if (roll < 0.76) return generateRailRow(rowIndex, random);
+    if (!railCooldown && roll < 0.76) return generateRailRow(rowIndex, random);
     if (roll < 0.9) return generateWaterRow(rowIndex, random);
     return generateGrassRow(rowIndex, random);
   }

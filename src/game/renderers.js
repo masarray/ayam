@@ -14,6 +14,15 @@ const ENDLESS_FOUNDATION_WIDTH = BOARD_WIDTH + TILE_SIZE * 62;
 const EXTENDED_TILE_MIN = MIN_TILE - 28;
 const EXTENDED_TILE_MAX = MAX_TILE + 28;
 
+const RAIL_HEAD_Y_OFFSET = 19.5;
+const RAIL_HEAD_CENTER_Z = 5.6;
+const RAIL_HEAD_HEIGHT = 3.4;
+const RAIL_HEAD_TOP_Z = RAIL_HEAD_CENTER_Z + RAIL_HEAD_HEIGHT / 2;
+const TRAIN_WHEEL_HALF_Z = 4.5;
+const TRAIN_WHEEL_CENTER_Z = RAIL_HEAD_TOP_Z + TRAIN_WHEEL_HALF_Z;
+const TRAIN_BOGIE_CENTER_Z = TRAIN_WHEEL_CENTER_Z - 1.2;
+const TRAIN_UNDERCARRIAGE_Z = TRAIN_WHEEL_CENTER_Z - 0.9;
+
 export function createMaterials() {
   const make = (color, options = {}) => new THREE.MeshLambertMaterial({ color, ...options });
   return {
@@ -85,8 +94,8 @@ export function createGeometryCache() {
     plankCap: new THREE.BoxGeometry(5, 30, 9),
     plankStripe: new THREE.BoxGeometry(5, 24, 10),
     railBallast: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 34, 4),
-    railLine: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 4, 4),
-    railSleeper: new THREE.BoxGeometry(9, 32, 5),
+    railLine: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 4.8, RAIL_HEAD_HEIGHT),
+    railSleeper: new THREE.BoxGeometry(9, 32, 3.2),
 
     chickenBody: new THREE.BoxGeometry(18, 17, 19),
     chickenBelly: new THREE.BoxGeometry(14, 9, 13),
@@ -666,12 +675,15 @@ export function createVehicle(vehicle, row, geometries, materials) {
   return group;
 }
 
-function addTrainBogie(group, geometries, materials, centerX, bodyLength, yOffset = 20) {
+function addTrainBogie(group, geometries, materials, centerX, bodyLength, yOffset = RAIL_HEAD_Y_OFFSET) {
   const spread = Math.max(18, bodyLength * 0.34);
-  box(group, geometries.roadStripe, materials.railShadow, centerX, 0, 7, { scale: { x: Math.max(1.2, bodyLength / 32), y: 9.5, z: 1.4 }, castShadow: false });
+  box(group, geometries.roadStripe, materials.railShadow, centerX, 0, TRAIN_UNDERCARRIAGE_Z, { scale: { x: Math.max(1.2, bodyLength / 32), y: 10.4, z: 1.15 }, castShadow: false });
   [centerX - spread, centerX + spread].forEach((x) => {
-    box(group, geometries.trainBogie, materials.railShadow, x, 0, 5, { castShadow: false });
-    [-1, 1].forEach((side) => box(group, geometries.trainWheel, materials.wheel, x, side * yOffset, 6));
+    box(group, geometries.trainBogie, materials.railShadow, x, 0, TRAIN_BOGIE_CENTER_Z, { scale: { x: 1, y: 1.18, z: 1 }, castShadow: false });
+    [-1, 1].forEach((side) => {
+      box(group, geometries.trainWheel, materials.wheel, x, side * yOffset, TRAIN_WHEEL_CENTER_Z);
+      box(group, geometries.smallHub, materials.tireHub, x, side * (yOffset + 3.4), TRAIN_WHEEL_CENTER_Z, { castShadow: false });
+    });
   });
 }
 
@@ -1028,21 +1040,21 @@ function createRailTrack(rowIndex, geometries, materials) {
 
   for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 1) {
     const sleeper = new THREE.Mesh(geometries.railSleeper, materials.sleeper);
-    sleeper.position.set(tileToX(tile, TILE_SIZE), y, 3.5);
+    sleeper.position.set(tileToX(tile, TILE_SIZE), y, 2.6);
     sleeper.receiveShadow = true;
     sleeper.castShadow = false;
     group.add(sleeper);
   }
 
-  [-10, 10].forEach((offset) => {
+  [-RAIL_HEAD_Y_OFFSET, RAIL_HEAD_Y_OFFSET].forEach((offset) => {
     const railShadow = new THREE.Mesh(geometries.railLine, materials.railShadow);
-    railShadow.position.set(0, y + offset + 2, 6.4);
+    railShadow.position.set(0, y + offset + 1.6, RAIL_HEAD_CENTER_Z - 1.0);
     railShadow.receiveShadow = false;
     railShadow.castShadow = false;
     group.add(railShadow);
 
     const rail = new THREE.Mesh(geometries.railLine, materials.rail);
-    rail.position.set(0, y + offset, 8.2);
+    rail.position.set(0, y + offset, RAIL_HEAD_CENTER_Z);
     rail.receiveShadow = false;
     rail.castShadow = false;
     group.add(rail);
