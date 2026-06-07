@@ -10,6 +10,9 @@ const requiredFiles = [
   'src/game/RoadQuestGame.js',
   'src/game/audio.js',
   'public/favicon.svg',
+  'public/sw.js',
+  'public/icons/icon-192.png',
+  'public/icons/icon-512.png',
   'public/audio/mushroom-dance.ogg',
   '.github/workflows/deploy-pages.yml'
 ];

@@ -1,6 +1,6 @@
 {
   "name": "voxel-crossing-game",
-  "version": "3.0.0",
+  "version": "3.2.0",
   "type": "module",
   "description": "A lightweight Three.js voxel crossing browser game with smart traffic, trains, rivers, lazy-loaded music, celebratory rewards, and a fullscreen learning quiz that appears after every third game over.",
   "license": "Apache-2.0",

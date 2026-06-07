@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RoadQuestGame } from './RoadQuestGame.js';
 import { GameAudio } from './audio.js';
 import { BADGE_FAMILIES, getBadgeCount, loadPlayerProfile, savePlayerProfile, trackBadgeEvent } from './badges.js';
 import './VoxelCrossing.css';
 
 const SETTINGS_KEY = 'ayam-sd-settings';
+const INSTALL_PROMPT_KEY = 'ayam-sd-install-prompt-v1';
+const SEEN_QUESTIONS_KEY = 'ayam-sd-seen-questions-v1';
 const QUIZ_SIZE = 5;
 const GAME_OVERS_BEFORE_QUIZ = 3;
 const QUIZ_APPEAR_DELAY_MS = 300;
@@ -49,6 +51,55 @@ function saveSettings(settings) {
   }
 }
 
+function loadSeenQuestionIds() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SEEN_QUESTIONS_KEY) || '[]');
+    return new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSeenQuestionIds(seenIds) {
+  try {
+    localStorage.setItem(SEEN_QUESTIONS_KEY, JSON.stringify(Array.from(seenIds)));
+  } catch {
+    // Fresh-question memory is a convenience only; quiz still works without storage.
+  }
+}
+
+function normalizeQuestionSignature(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+
+function isStandaloneDisplay() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true;
+}
+
+function readInstallPromptState() {
+  try {
+    return localStorage.getItem(INSTALL_PROMPT_KEY) || 'fresh';
+  } catch {
+    return 'fresh';
+  }
+}
+
+function writeInstallPromptState(value) {
+  try {
+    localStorage.setItem(INSTALL_PROMPT_KEY, value);
+  } catch {
+    // Optional only. The install prompt still works without persistent storage.
+  }
+}
+
 function shuffle(items) {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -77,7 +128,8 @@ function cleanQuestionText(text) {
 
 function flattenQuestionBanks(data) {
   const banks = Array.isArray(data) ? data : [data];
-  return banks.flatMap((bank) => {
+  const seenSignatures = new Set();
+  const flattened = banks.flatMap((bank) => {
     const bankId = bank?.bankId || 'bank';
     const subject = bank?.subject || 'Latihan';
     const questions = Array.isArray(bank?.questions) ? bank.questions : [];
@@ -110,20 +162,99 @@ function flattenQuestionBanks(data) {
       }))
       .filter((question) => question.options.some((option) => option.key === question.answerKey));
   });
+
+  return flattened.filter((question) => {
+    const signature = normalizeQuestionSignature(`${question.questionText} ${question.options.map((option) => option.text).join(' ')}`);
+    if (!signature || seenSignatures.has(signature)) return false;
+    seenSignatures.add(signature);
+    return true;
+  });
 }
 
+
 function prepareQuizQuestions(pool, seenIds, count = QUIZ_SIZE) {
-  const unasked = pool.filter((question) => !seenIds.has(question.id));
-  const source = unasked.length >= count ? unasked : pool;
-  const selected = shuffle(source).slice(0, count).map((question) => {
+  if (!pool.length) return [];
+
+  // Keep questions fresh for as long as possible. When the child has already seen
+  // almost the whole bank, old questions may reappear so the game never gets stuck.
+  const fresh = pool.filter((question) => !seenIds.has(question.id));
+  const freshSelection = shuffle(fresh).slice(0, count);
+  const selectedIds = new Set(freshSelection.map((question) => question.id));
+  const repeatSelection = freshSelection.length < count
+    ? shuffle(pool.filter((question) => !selectedIds.has(question.id))).slice(0, count - freshSelection.length)
+    : [];
+  const selected = [...freshSelection, ...repeatSelection].map((question) => {
     seenIds.add(question.id);
     return {
       ...question,
       options: shuffle(question.options)
     };
   });
+
+  if (seenIds.size >= Math.floor(pool.length * 0.92)) {
+    const keepRecent = selected.map((question) => question.id);
+    seenIds.clear();
+    keepRecent.forEach((id) => seenIds.add(id));
+  }
+  saveSeenQuestionIds(seenIds);
   return selected;
 }
+
+function FittedQuestionText({ text }) {
+  const textRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const textNode = textRef.current;
+    if (!textNode) return undefined;
+    const board = textNode.closest('.quiz-question');
+    if (!board) return undefined;
+
+    const fit = () => {
+      const countNode = board.querySelector('.quiz-question-count');
+      const boardStyle = window.getComputedStyle(board);
+      const paddingX = parseFloat(boardStyle.paddingLeft) + parseFloat(boardStyle.paddingRight);
+      const paddingY = parseFloat(boardStyle.paddingTop) + parseFloat(boardStyle.paddingBottom);
+      const availableWidth = Math.max(120, board.clientWidth - paddingX);
+      const availableHeight = Math.max(90, board.clientHeight - paddingY - (countNode?.offsetHeight || 0) - 12);
+      const textLength = String(text || '').length;
+      const mobile = window.matchMedia('(max-width: 620px)').matches;
+      const landscapeShort = window.matchMedia('(max-height: 560px)').matches;
+      const minSize = mobile ? 18 : 20;
+      const maxSize = mobile ? (textLength > 185 ? 30 : 39) : (textLength > 220 ? 34 : 48);
+      let low = minSize;
+      let high = landscapeShort ? Math.min(maxSize, 32) : maxSize;
+
+      textNode.style.width = `${availableWidth}px`;
+      textNode.style.maxWidth = `${availableWidth}px`;
+      textNode.style.maxHeight = `${availableHeight}px`;
+      textNode.style.overflow = 'hidden';
+
+      for (let i = 0; i < 12; i += 1) {
+        const mid = (low + high) / 2;
+        textNode.style.setProperty('font-size', `${mid}px`, 'important');
+        textNode.style.setProperty('line-height', textLength > 170 ? '1.08' : '1.1', 'important');
+        const fits = textNode.scrollHeight <= availableHeight + 1 && textNode.scrollWidth <= availableWidth + 1;
+        if (fits) low = mid;
+        else high = mid;
+      }
+
+      textNode.style.setProperty('font-size', `${Math.floor(low)}px`, 'important');
+    };
+
+    const raf = window.requestAnimationFrame(fit);
+    const resizeObserver = new ResizeObserver(() => window.requestAnimationFrame(fit));
+    resizeObserver.observe(board);
+    window.addEventListener('resize', fit);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', fit);
+    };
+  }, [text]);
+
+  return <h2 ref={textRef}>{text}</h2>;
+}
+
 
 function MenuIcon() {
   return (
@@ -173,6 +304,38 @@ function ConfettiBurst({ burst }) {
   );
 }
 
+
+
+function PwaInstallPrompt({ canInstall, status, onInstall, onDismiss }) {
+  const isManual = status === 'manual' || !canInstall;
+  return (
+    <div className="pwa-install-overlay" role="dialog" aria-modal="true" aria-label="Install Ayam SD">
+      <div className="pwa-install-card">
+        <div className="pwa-install-orbit" aria-hidden="true">
+          <span className="pwa-chicken">🐔</span>
+          <i className="spark s1">★</i>
+          <i className="spark s2">✓</i>
+          <i className="spark s3">🏅</i>
+        </div>
+        <div className="mini-badge gold">Bisa Offline</div>
+        <h2>Install Ayam SD</h2>
+        <p>Main lebih cepat, skor dan badge tersimpan, lalu bisa dimainkan lagi walau internet sedang tidak stabil.</p>
+        <div className="pwa-benefits" aria-label="Manfaat install">
+          <span>🏆 Skor tersimpan</span>
+          <span>📴 Offline setelah dibuka</span>
+          <span>🎮 Buka seperti aplikasi</span>
+        </div>
+        {isManual && (
+          <small className="pwa-install-help">Gunakan menu browser lalu pilih <strong>Install app</strong> atau <strong>Add to Home Screen</strong>.</small>
+        )}
+        <div className="pwa-install-actions">
+          <button type="button" className="pwa-install-primary" onClick={onInstall}>{canInstall ? 'Install Sekarang' : 'Oke, Saya Mengerti'}</button>
+          <button type="button" className="pwa-install-later" onClick={onDismiss}>Nanti Saja</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function BadgeUnlockOverlay({ badge, onClose }) {
   if (!badge) return null;
@@ -332,7 +495,7 @@ export default function VoxelCrossing({
   const audioRef = useRef(null);
   const menuPausedRef = useRef(false);
   const questionPoolRef = useRef(null);
-  const seenQuestionIdsRef = useRef(new Set());
+  const seenQuestionIdsRef = useRef(loadSeenQuestionIds());
   const quizStartingRef = useRef(false);
   const gameOverCycleRef = useRef(0);
   const quizActiveMountedRef = useRef(false);
@@ -365,6 +528,82 @@ export default function VoxelCrossing({
   const [activeBadge, setActiveBadge] = useState(null);
   const [badgeBoardOpen, setBadgeBoardOpen] = useState(false);
   const playerProfileRef = useRef(playerProfile);
+  const deferredInstallPromptRef = useRef(null);
+  const pwaPromptTimerRef = useRef(null);
+  const [canInstallPwa, setCanInstallPwa] = useState(false);
+  const [pwaPromptVisible, setPwaPromptVisible] = useState(false);
+  const [pwaPromptStatus, setPwaPromptStatus] = useState('ready');
+  const [standalonePwa, setStandalonePwa] = useState(() => isStandaloneDisplay());
+
+  useEffect(() => {
+    if (isStandaloneDisplay()) {
+      setStandalonePwa(true);
+      return undefined;
+    }
+
+    const installState = readInstallPromptState();
+    const shouldInvite = installState !== 'dismissed' && installState !== 'installed';
+
+    const showPromptSoon = (delay = 950) => {
+      if (!shouldInvite) return;
+      if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
+      pwaPromptTimerRef.current = window.setTimeout(() => {
+        setPwaPromptVisible(true);
+      }, delay);
+    };
+
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      deferredInstallPromptRef.current = event;
+      setCanInstallPwa(true);
+      setPwaPromptStatus('ready');
+      showPromptSoon(560);
+    };
+
+    const handleAppInstalled = () => {
+      deferredInstallPromptRef.current = null;
+      setCanInstallPwa(false);
+      setStandalonePwa(true);
+      setPwaPromptVisible(false);
+      writeInstallPromptState('installed');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    showPromptSoon(1350);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
+    };
+  }, []);
+
+  const installPwa = async () => {
+    if (!canInstallPwa || !deferredInstallPromptRef.current) {
+      setPwaPromptStatus('manual');
+      writeInstallPromptState('dismissed');
+      if (!canInstallPwa) window.setTimeout(() => setPwaPromptVisible(false), 1400);
+      return;
+    }
+
+    const promptEvent = deferredInstallPromptRef.current;
+    deferredInstallPromptRef.current = null;
+    setPwaPromptStatus('installing');
+    promptEvent.prompt();
+    const choice = await promptEvent.userChoice.catch(() => ({ outcome: 'dismissed' }));
+    if (choice?.outcome === 'accepted') {
+      writeInstallPromptState('installed');
+      setStandalonePwa(true);
+    }
+    setCanInstallPwa(false);
+    setPwaPromptVisible(false);
+  };
+
+  const dismissPwaPrompt = () => {
+    writeInstallPromptState('dismissed');
+    setPwaPromptVisible(false);
+  };
 
   useEffect(() => {
     audioRef.current = new GameAudio({
@@ -391,6 +630,7 @@ export default function VoxelCrossing({
     if (nearMissTimerRef.current) window.clearTimeout(nearMissTimerRef.current);
     if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
     if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
+    if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
   }, []);
 
   const triggerConfetti = (level = 'rainbow') => {
@@ -782,6 +1022,14 @@ export default function VoxelCrossing({
       <div ref={hostRef} className="vc-host" />
       <ConfettiBurst burst={confettiBurst} />
       <BadgeUnlockOverlay badge={activeBadge} onClose={closeBadge} />
+      {pwaPromptVisible && !standalonePwa && (
+        <PwaInstallPrompt
+          canInstall={canInstallPwa}
+          status={pwaPromptStatus}
+          onInstall={installPwa}
+          onDismiss={dismissPwaPrompt}
+        />
+      )}
       {nearMissBurst && (
         <div key={nearMissBurst.id} className="near-miss-stinger" aria-hidden="true">
           <span>NYARIS!</span>
@@ -843,6 +1091,7 @@ export default function VoxelCrossing({
             )}
             <button type="button" className="menu-action" onClick={startGame} disabled={!ready}>Restart</button>
             <button type="button" className={`menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}>Papan Badge</button>
+            {!standalonePwa && <button type="button" className="menu-action install" onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(false); setPwaPromptVisible(true); }}>Install App</button>}
             <button type="button" className={`menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}>Settings</button>
           </div>
 
@@ -945,7 +1194,7 @@ export default function VoxelCrossing({
               <>
                 <div className={`quiz-question ${questionLengthClass(currentQuizQuestion.questionText)}`} style={questionFitStyle(currentQuizQuestion.questionText)}>
                   <div className="quiz-question-count">Soal {quiz.index + 1} dari {quizTotal}</div>
-                  <h2>{currentQuizQuestion.questionText}</h2>
+                  <FittedQuestionText text={currentQuizQuestion.questionText} />
                 </div>
 
                 <div className="quiz-options">

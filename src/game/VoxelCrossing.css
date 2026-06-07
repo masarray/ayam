@@ -3240,3 +3240,298 @@
     font-size: clamp(13px, var(--question-fit-size, 18px), 25px) !important;
   }
 }
+
+/* v3.1 PWA install prompt ownership */
+.pwa-install-overlay {
+  position: absolute;
+  z-index: 70;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 244, 155, 0.22), transparent 34%),
+    linear-gradient(180deg, rgba(12, 24, 18, 0.32), rgba(8, 14, 18, 0.58));
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  animation: pwa-overlay-in 260ms ease both;
+}
+
+.pwa-install-card {
+  position: relative;
+  width: min(430px, calc(100vw - 34px));
+  overflow: hidden;
+  padding: 26px 22px 20px;
+  border-radius: 34px;
+  color: #27331b;
+  text-align: center;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.88), transparent 40%),
+    linear-gradient(180deg, #fff8d7, #f2eab7 54%, #dceca3);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  box-shadow:
+    0 26px 80px rgba(15, 24, 10, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: pwa-card-pop 560ms cubic-bezier(0.12, 1.48, 0.22, 1) both;
+}
+
+.pwa-install-card::before {
+  content: '';
+  position: absolute;
+  inset: auto -16% -26% -16%;
+  height: 45%;
+  border-radius: 50% 50% 0 0;
+  background: rgba(148, 204, 71, 0.2);
+  pointer-events: none;
+}
+
+.pwa-install-orbit {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, #fffef1 0 42%, rgba(255, 215, 76, 0.45) 43% 64%, rgba(105, 182, 65, 0.22) 65% 100%);
+  box-shadow:
+    0 16px 34px rgba(119, 92, 7, 0.18),
+    inset 0 0 0 7px rgba(255, 255, 255, 0.44);
+}
+
+.pwa-chicken {
+  font-size: 50px;
+  filter: drop-shadow(0 8px 12px rgba(58, 52, 4, 0.16));
+  animation: pwa-chicken-bob 1200ms ease-in-out infinite;
+}
+
+.pwa-install-orbit .spark {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  color: #5f4712;
+  background: #fff3a1;
+  box-shadow: 0 8px 16px rgba(74, 54, 12, 0.14);
+  font-style: normal;
+  font-size: 14px;
+}
+
+.pwa-install-orbit .s1 { top: 4px; right: 8px; }
+.pwa-install-orbit .s2 { bottom: 6px; right: 0; }
+.pwa-install-orbit .s3 { bottom: 2px; left: 4px; }
+
+.pwa-install-card h2 {
+  position: relative;
+  z-index: 1;
+  margin: 8px 0 8px;
+  font-size: clamp(30px, 6vw, 44px);
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+  font-weight: 560;
+}
+
+.pwa-install-card p {
+  position: relative;
+  z-index: 1;
+  max-width: 34ch;
+  margin: 0 auto 14px;
+  color: rgba(42, 52, 29, 0.78);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.pwa-benefits {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 14px;
+}
+
+.pwa-benefits span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: #293c16;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  font-size: 15px;
+}
+
+.pwa-install-help {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin: 3px auto 12px;
+  max-width: 34ch;
+  color: rgba(46, 47, 26, 0.7);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.pwa-install-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pwa-install-primary,
+.pwa-install-later {
+  min-height: 55px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  transition: transform 95ms cubic-bezier(0.1, 1.6, 0.22, 1), filter 95ms ease, box-shadow 95ms ease;
+  transform-origin: center center;
+}
+
+.pwa-install-primary {
+  color: #fffdf3;
+  background: linear-gradient(180deg, #ffca45, #f2971f 64%, #d77918);
+  box-shadow:
+    0 8px 0 rgba(143, 83, 12, 0.34),
+    0 18px 34px rgba(225, 143, 20, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.pwa-install-later {
+  color: #3b4b27;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow:
+    0 6px 0 rgba(93, 111, 55, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.pwa-install-primary:active,
+.pwa-install-later:active {
+  transform: translateY(5px) scale(0.97);
+  filter: brightness(0.98) saturate(1.05);
+  box-shadow:
+    0 2px 0 rgba(91, 55, 12, 0.26),
+    0 8px 18px rgba(91, 55, 12, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.menu-action.install {
+  background: linear-gradient(180deg, rgba(255, 214, 78, 0.3), rgba(255, 168, 45, 0.19));
+  border-color: rgba(255, 227, 124, 0.3);
+}
+
+@keyframes pwa-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pwa-card-pop {
+  from { opacity: 0; transform: translateY(18px) scale(0.92); }
+  64% { opacity: 1; transform: translateY(-3px) scale(1.018); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pwa-chicken-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-5px) rotate(3deg); }
+}
+
+@media (min-width: 680px) {
+  .pwa-install-card {
+    padding: 30px 28px 24px;
+  }
+  .pwa-install-actions {
+    grid-template-columns: 1.15fr 0.85fr;
+  }
+}
+
+/* v3.2 final ownership: mobile-readable quiz board, emoji chicken PWA icon, and smoother edge perception. */
+.vc-overlay.quiz .quiz-card {
+  --quiz-board-height: 40dvh;
+}
+
+.vc-overlay.quiz .quiz-question {
+  height: var(--quiz-board-height) !important;
+  min-height: var(--quiz-board-height) !important;
+  max-height: var(--quiz-board-height) !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: clamp(8px, 1.6dvh, 16px) !important;
+  padding: clamp(18px, 4.2vw, 34px) clamp(20px, 4.8vw, 38px) !important;
+  overflow: hidden !important;
+}
+
+.vc-overlay.quiz .quiz-question-count {
+  align-self: start !important;
+  justify-self: start !important;
+  margin: 0 !important;
+  font-weight: 620 !important;
+}
+
+.vc-overlay.quiz .quiz-question h2 {
+  align-self: center !important;
+  justify-self: stretch !important;
+  width: 100% !important;
+  margin: 0 !important;
+  color: #f8fff4 !important;
+  font-weight: 560 !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1.08 !important;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  text-shadow: 0 3px 0 rgba(2, 43, 36, 0.24), 0 13px 28px rgba(2, 39, 35, 0.28) !important;
+}
+
+.quiz-complete h2,
+.quiz-complete-stars + .mini-badge + h2,
+.result-card h2,
+.quiz-feedback-title,
+.quiz-score-pill strong {
+  font-weight: 650 !important;
+}
+
+@media (max-width: 620px) {
+  .vc-overlay.quiz .quiz-card {
+    --quiz-board-height: 40dvh;
+    gap: clamp(10px, 1.5dvh, 16px) !important;
+  }
+
+  .vc-overlay.quiz .quiz-question {
+    padding: clamp(16px, 4.1vw, 24px) clamp(18px, 4.5vw, 26px) !important;
+  }
+
+  .vc-overlay.quiz .quiz-question-count {
+    font-size: clamp(11px, 2.7vw, 13px) !important;
+  }
+
+  .vc-overlay.quiz .quiz-options {
+    gap: clamp(10px, 1.45dvh, 14px) !important;
+  }
+
+  .vc-overlay.quiz .quiz-option {
+    min-height: clamp(58px, 7.8dvh, 72px) !important;
+  }
+}
+
+@media (max-height: 620px) {
+  .vc-overlay.quiz .quiz-card {
+    --quiz-board-height: 38dvh;
+  }
+
+  .vc-overlay.quiz .quiz-question {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+}

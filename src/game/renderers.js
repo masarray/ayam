@@ -9,6 +9,11 @@ import {
 } from './constants.js';
 import { rowToY, tileToX } from './math.js';
 
+const ENDLESS_VISUAL_WIDTH = BOARD_WIDTH + TILE_SIZE * 54;
+const ENDLESS_FOUNDATION_WIDTH = BOARD_WIDTH + TILE_SIZE * 62;
+const EXTENDED_TILE_MIN = MIN_TILE - 28;
+const EXTENDED_TILE_MAX = MAX_TILE + 28;
+
 export function createMaterials() {
   const make = (color, options = {}) => new THREE.MeshLambertMaterial({ color, ...options });
   return {
@@ -68,18 +73,18 @@ export function createGeometryCache() {
   classicBoiler.rotateZ(Math.PI / 2);
 
   return {
-    row: new THREE.BoxGeometry(BOARD_WIDTH + TILE_SIZE * 2, ROW_DEPTH, 5),
-    rowWide: new THREE.BoxGeometry(BOARD_WIDTH + TILE_SIZE * 8, ROW_DEPTH, 5),
+    row: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, ROW_DEPTH, 5),
+    rowWide: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, ROW_DEPTH, 5),
     roadStripe: new THREE.BoxGeometry(22, 2, 1),
     waterRipple: new THREE.BoxGeometry(26, 2, 1),
     waterWave: new THREE.BoxGeometry(54, 2.4, 1),
     waterSparkle: new THREE.BoxGeometry(9, 2, 1),
-    waterEdge: new THREE.BoxGeometry(BOARD_WIDTH + TILE_SIZE * 8, 4, 3),
+    waterEdge: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 4, 3),
     plankBody: new THREE.BoxGeometry(72, 28, 8),
     plankCap: new THREE.BoxGeometry(5, 30, 9),
     plankStripe: new THREE.BoxGeometry(5, 24, 10),
-    railBallast: new THREE.BoxGeometry(BOARD_WIDTH + TILE_SIZE * 5, 34, 4),
-    railLine: new THREE.BoxGeometry(BOARD_WIDTH + TILE_SIZE * 7, 4, 4),
+    railBallast: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 34, 4),
+    railLine: new THREE.BoxGeometry(ENDLESS_VISUAL_WIDTH, 4, 4),
     railSleeper: new THREE.BoxGeometry(9, 32, 5),
 
     chickenBody: new THREE.BoxGeometry(18, 17, 19),
@@ -165,7 +170,7 @@ export function createGeometryCache() {
     freightWagon: new THREE.BoxGeometry(84, 36, 24),
     freightContainer: new THREE.BoxGeometry(76, 32, 28),
 
-    foundation: new THREE.BoxGeometry(BOARD_WIDTH + TILE_SIZE * 11, TILE_SIZE * 126, 4),
+    foundation: new THREE.BoxGeometry(ENDLESS_FOUNDATION_WIDTH, TILE_SIZE * 156, 4),
     checkpoint: new THREE.BoxGeometry(32, 8, 4)
   };
 }
@@ -719,7 +724,7 @@ function createWaterSurface(row, geometries, materials) {
   bottomEdge.position.y = y - ROW_DEPTH / 2 + 2;
   group.add(bottomEdge);
 
-  for (let tile = MIN_TILE - 5; tile <= MAX_TILE + 5; tile += 2) {
+  for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 2) {
     const phase = (rowIndex * 17 + tile * 11) % 7;
     const wave = new THREE.Mesh(phase % 3 === 0 ? geometries.waterWave : geometries.waterRipple, phase % 2 ? materials.waterBright : materials.waterFoam);
     wave.position.set(tileToX(tile, TILE_SIZE) + (phase - 3) * 3, y + ((phase % 5) - 2) * 4, 2.8 + (phase % 2) * 0.4);
@@ -740,7 +745,7 @@ function createWaterSurface(row, geometries, materials) {
     group.add(wave);
   }
 
-  for (let tile = MIN_TILE - 4; tile <= MAX_TILE + 4; tile += 4) {
+  for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 4) {
     const sparkle = new THREE.Mesh(geometries.waterSparkle, materials.waterFoam);
     sparkle.position.set(tileToX(tile, TILE_SIZE) + ((rowIndex + tile) % 3) * 8, y + (((rowIndex + tile) % 5) - 2) * 5, 3.2);
     sparkle.userData.waterFlow = {
@@ -770,7 +775,7 @@ function createRailTrack(rowIndex, geometries, materials) {
   ballast.receiveShadow = true;
   group.add(ballast);
 
-  for (let tile = MIN_TILE - 4; tile <= MAX_TILE + 4; tile += 1) {
+  for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 1) {
     const sleeper = new THREE.Mesh(geometries.railSleeper, materials.sleeper);
     sleeper.position.set(tileToX(tile, TILE_SIZE), y, 3.5);
     sleeper.receiveShadow = true;
@@ -834,7 +839,7 @@ export function createRowGroup(row, geometries, materials) {
     if (isFirstLane) makeEdge(y - ROW_DEPTH / 2 + 2);
 
     // Dashed lane markers along the driving direction. Consecutive traffic rows read as 3-lane/4-lane roads.
-    for (let tile = MIN_TILE - 1; tile <= MAX_TILE + 1; tile += 3) {
+    for (let tile = EXTENDED_TILE_MIN; tile <= EXTENDED_TILE_MAX; tile += 3) {
       group.add(createRoadStripe(tile, row.index, geometries, materials.asphaltMark));
     }
   }

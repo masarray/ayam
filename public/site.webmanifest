@@ -1,16 +1,33 @@
 {
+  "id": "/voxel-crossing-game/",
   "name": "Ayam SD",
   "short_name": "Ayam SD",
-  "description": "A lightweight Three.js voxel road-crossing game with cars, trains, rivers, and mobile controls.",
+  "description": "Game edukasi ringan: ayam menyeberang jalan, kereta, sungai, quiz OSN-style, high score, dan badge yang bisa dimainkan offline setelah dibuka pertama kali.",
   "start_url": ".",
+  "scope": ".",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "orientation": "any",
   "background_color": "#eef6e7",
   "theme_color": "#9fd044",
+  "categories": ["games", "education", "kids"],
   "icons": [
     {
       "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
