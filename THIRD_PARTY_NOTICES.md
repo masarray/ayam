@@ -15,7 +15,10 @@ Design and technical inspiration:
 
 Audio:
 
-- `public/audio/mushroom-dance.ogg` is a user-supplied background music file for this project. Verify and keep the correct license/credit for this track before publishing the app publicly.
+- `public/audio/mushroom-dance.ogg` — **Mushroom Dance** by **bart**, sourced from **OpenGameArt.org**, used under **CC BY 3.0**.
+  - Source: https://opengameart.org/content/mushroom-dance
+  - OpenGameArt: https://opengameart.org
+  - Attribution note from the asset page: credit must include a link to OpenGameArt.
 - `public/audio/kids-yay.mp3` is a user-supplied celebratory sound effect. Verify and keep the correct license/credit for this file before publishing the app publicly.
 - Most sound effects are generated at runtime using original Web Audio synthesis code in `src/game/audio.js`.
 - Future optional sound generators or asset packs should be added only when their license is documented here.

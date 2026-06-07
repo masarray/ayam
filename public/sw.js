@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3.2.0';
+const CACHE_VERSION = 'v3.3.0';
 const CACHE_NAME = `ayam-sd-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `ayam-sd-runtime-${CACHE_VERSION}`;
 

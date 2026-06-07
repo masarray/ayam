@@ -35,14 +35,20 @@ The project handles this automatically in `vite.config.js`:
 
 ```js
 const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? '';
-const githubPagesBase = process.env.GITHUB_ACTIONS && repoName ? `/${repoName}/` : '/';
+const isUserOrOrgSite = repoName.endsWith('.github.io');
+const githubPagesBase = process.env.GITHUB_ACTIONS && repoName && !isUserOrOrgSite ? `/${repoName}/` : '/';
+const base = process.env.VITE_BASE_PATH || githubPagesBase;
 ```
 
-For a user/organization root site such as `masarray.github.io`, the base remains `/`.
+For the `masarray/ayam` repository, the production base path becomes:
 
-## Manual override
+```txt
+/ayam/
+```
 
-Set `VITE_BASE_PATH` when you need a custom path:
+## Manual base-path override
+
+Set `VITE_BASE_PATH` only when deploying to a custom path:
 
 ```bash
 VITE_BASE_PATH=/custom-path/ npm run build
@@ -53,4 +59,12 @@ On Windows PowerShell:
 ```powershell
 $env:VITE_BASE_PATH="/custom-path/"
 npm run build
+```
+
+## GitHub Pages setting
+
+Use this setting once after the repository is pushed:
+
+```txt
+Settings → Pages → Build and deployment → Source → GitHub Actions
 ```

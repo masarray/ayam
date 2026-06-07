@@ -1,19 +1,20 @@
 {
-  "name": "voxel-crossing-game",
-  "version": "3.2.0",
+  "name": "ayam-sd",
+  "version": "3.3.0",
   "type": "module",
-  "description": "A lightweight Three.js voxel crossing browser game with smart traffic, trains, rivers, lazy-loaded music, celebratory rewards, and a fullscreen learning quiz that appears after every third game over.",
+  "description": "Free and open-source Three.js Ayam SD browser game with a voxel chicken, traffic, trains, rivers, rewards, audio, mobile controls, and a learning quiz loop.",
   "license": "Apache-2.0",
   "author": "Ari Sulistiono",
-  "homepage": "https://masarray.github.io/voxel-crossing-game/",
+  "homepage": "https://masarray.github.io/ayam/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/masarray/voxel-crossing-game.git"
+    "url": "https://github.com/masarray/ayam.git"
   },
   "bugs": {
-    "url": "https://github.com/masarray/voxel-crossing-game/issues"
+    "url": "https://github.com/masarray/ayam/issues"
   },
   "keywords": [
+    "ayam-sd",
     "threejs",
     "react",
     "vite",
@@ -22,7 +23,9 @@
     "browser-game",
     "github-pages",
     "educational-game",
-    "mobile-game"
+    "kids-game",
+    "mobile-game",
+    "pwa"
   ],
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -35,10 +38,12 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^6.0.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "three": "^0.184.0",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
     "vite": "^8.0.16"
   }
 }

@@ -19,7 +19,7 @@ export default function GamePage() {
   enableMilestoneCallback
   milestoneEvery={5}
   onQuestionGate={({ score }) => {
-    openQuestionModal({ source: 'voxel-crossing', score });
+    openQuestionModal({ source: 'ayam-sd', score });
   }}
   onGameOver={({ score, highScore, reason }) => {
     saveMiniGameResult({ score, highScore, reason });
@@ -31,7 +31,7 @@ export default function GamePage() {
 
 | Prop | Type | Default | Purpose |
 |---|---:|---:|---|
-| `title` | string | `Voxel Crossing` | Intro overlay title |
+| `title` | string | `Ayam SD` | Intro overlay title |
 | `subtitle` | string | built-in Indonesian text | Intro description |
 | `enableMilestoneCallback` | boolean | `false` | Enables periodic callback for quiz/checkpoint integration |
 | `milestoneEvery` | number | `5` | Number of score steps per milestone callback |

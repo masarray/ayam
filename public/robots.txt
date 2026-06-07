@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://masarray.github.io/voxel-crossing-game/sitemap.xml
+Sitemap: https://masarray.github.io/ayam/sitemap.xml
