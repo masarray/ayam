@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.4.9 - 2026-06-08
+
+### Fixed
+- Fixed dashed white road marking thickness: `ROAD_WHITE_LINE_WIDTH` now directly controls the dashed center/divider stripe geometry.
+- Removed the hidden `ROAD_DASH_SCALE_Y` multiplier that made the dashed white road line stay visually thin even when `ROAD_WHITE_LINE_WIDTH` was increased.
+
 ## 3.4.8 - 2026-06-08
 
 ### Fixed

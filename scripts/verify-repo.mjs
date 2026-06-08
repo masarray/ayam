@@ -54,7 +54,7 @@ if (!/railLine: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, 3\.6, RAIL_HEAD_HE
   console.error('Rail geometry should use a slim raised rail-head profile and aligned wheel contact constants.');
   process.exit(1);
 }
-if (!/ROAD_EDGE_WHITE_LINE_WIDTH = 2\.2/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 2\.5/.test(rendererSource) || !/ROAD_WHITE_LINE_WIDTH = 1\.24/.test(rendererSource)) {
+if (!/ROAD_EDGE_WHITE_LINE_WIDTH = 2\.2/.test(rendererSource) || !/ROAD_YELLOW_LINE_WIDTH = 2\.5/.test(rendererSource) || !/ROAD_WHITE_LINE_WIDTH = 2\.0/.test(rendererSource)) {
   console.error('Road edge and yellow center markings should stay visually narrow but stable enough to avoid mobile shimmer.');
   process.exit(1);
 }
@@ -70,8 +70,12 @@ if (!/row\.roadLaneCount === 2 && !isLastLane/.test(rendererSource) || /row\.roa
   console.error('Two-lane roads must use a white dashed divider only, never yellow center markings.');
   process.exit(1);
 }
-if (!/roadLineLong: new THREE\.PlaneGeometry\(ENDLESS_VISUAL_WIDTH, 1\)/.test(rendererSource) || !/roadDashMark: new THREE\.PlaneGeometry\(22, 2\)/.test(rendererSource) || !/roadEdgeLineLong: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, ROAD_EDGE_WHITE_LINE_WIDTH, 0\.08\)/.test(rendererSource) || !/roadShoulderLong: new THREE\.PlaneGeometry\(ENDLESS_VISUAL_WIDTH, 1\)/.test(rendererSource)) {
-  console.error('Road markings must use stable flat/low-profile geometry so edge lines do not shimmer or disappear during camera movement.');
+if (!/roadLineLong: new THREE\.PlaneGeometry\(ENDLESS_VISUAL_WIDTH, 1\)/.test(rendererSource) || !/roadDashMark: new THREE\.PlaneGeometry\(22, ROAD_WHITE_LINE_WIDTH\)/.test(rendererSource) || !/stripe\.scale\.set\(0\.86, 1, 1\)/.test(rendererSource) || !/roadEdgeLineLong: new THREE\.BoxGeometry\(ENDLESS_VISUAL_WIDTH, ROAD_EDGE_WHITE_LINE_WIDTH, 0\.08\)/.test(rendererSource) || !/roadShoulderLong: new THREE\.PlaneGeometry\(ENDLESS_VISUAL_WIDTH, 1\)/.test(rendererSource)) {
+  console.error('Road markings must use stable geometry, and dashed white road marks must directly follow ROAD_WHITE_LINE_WIDTH.');
+  process.exit(1);
+}
+if (/ROAD_DASH_SCALE_Y/.test(rendererSource)) {
+  console.error('ROAD_WHITE_LINE_WIDTH must drive dashed white marking thickness directly; do not hide it behind ROAD_DASH_SCALE_Y.');
   process.exit(1);
 }
 if (!/makeRoadMark/.test(rendererSource) || !/polygonOffsetFactor: -8/.test(rendererSource) || !/renderOrder = 11/.test(rendererSource) || !/makeRoadEdgeLine/.test(rendererSource)) {
