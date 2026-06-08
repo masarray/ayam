@@ -635,6 +635,11 @@ export default function VoxelCrossing({
   const resumeFramesRef = useRef([]);
   const startFramesRef = useRef([]);
   const startedRef = useRef(false);
+  const gameOverRef = useRef(false);
+  const impactingRef = useRef(false);
+  const menuOpenRef = useRef(false);
+  const quizDueRef = useRef(false);
+  const quizStatusRef = useRef(QUIZ_INITIAL.status);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -680,6 +685,14 @@ export default function VoxelCrossing({
   useEffect(() => {
     startedRef.current = started;
   }, [started]);
+
+  useEffect(() => {
+    gameOverRef.current = gameOver;
+    impactingRef.current = impacting;
+    menuOpenRef.current = menuOpen;
+    quizDueRef.current = quizDue;
+    quizStatusRef.current = quiz.status;
+  }, [gameOver, impacting, menuOpen, quizDue, quiz.status]);
 
   useEffect(() => {
     if (isStandaloneDisplay()) {
@@ -774,6 +787,7 @@ export default function VoxelCrossing({
     audioRef.current?.setMusicEnabled(settings.musicEnabled);
     audioRef.current?.setSfxEnabled(settings.sfxEnabled);
     gameRef.current?.setCheatMode?.(settings.cheatMode);
+    syncBackgroundMusicContext('settings');
   }, [settings]);
 
   useEffect(() => {
@@ -830,6 +844,34 @@ export default function VoxelCrossing({
     }
   };
 
+
+  const cancelDeferredMusicResume = () => {
+    if (startMusicTimerRef.current) {
+      window.clearTimeout(startMusicTimerRef.current);
+      startMusicTimerRef.current = null;
+    }
+  };
+
+  const isQuizMusicLocked = () => quizDueRef.current || ACTIVE_QUIZ_STATES.has(quizStatusRef.current);
+  const shouldAllowBackgroundMusic = () => (
+    settingsRef.current.musicEnabled &&
+    startedRef.current &&
+    !gameOverRef.current &&
+    !impactingRef.current &&
+    !menuOpenRef.current &&
+    !isQuizMusicLocked()
+  );
+
+  const syncBackgroundMusicContext = (reason = 'sync') => {
+    const allowed = shouldAllowBackgroundMusic();
+    audioRef.current?.setMusicContext?.(allowed ? 'playing' : reason);
+    if (!allowed) {
+      cancelDeferredMusicResume();
+      audioRef.current?.forceStopMusic?.();
+    }
+    return allowed;
+  };
+
   const startEngineAfterIntroPaint = () => {
     cancelDeferredStart();
     const firstFrame = window.requestAnimationFrame(() => {
@@ -851,7 +893,7 @@ export default function VoxelCrossing({
     if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
     if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
     if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
-    if (startMusicTimerRef.current) window.clearTimeout(startMusicTimerRef.current);
+    cancelDeferredMusicResume();
     if (restartPrepareTaskRef.current) cancelIdleTask(restartPrepareTaskRef.current);
     cancelDeferredAudioUnlock();
     cancelDeferredResume();
@@ -930,9 +972,8 @@ export default function VoxelCrossing({
   };
 
   const unlockAudio = ({ allowMusic = true } = {}) => {
-    const quizMusicLocked = quizDue || ACTIVE_QUIZ_STATES.has(quiz.status);
-    audioRef.current?.setMusicSuppressed?.(!allowMusic || quizMusicLocked);
-    audioRef.current?.unlock({ allowMusic: allowMusic && !quizMusicLocked });
+    const musicAllowedNow = allowMusic && syncBackgroundMusicContext('unlock-audio');
+    audioRef.current?.unlock({ allowMusic: musicAllowedNow });
   };
 
   const primeSfxAudio = () => {
@@ -964,17 +1005,12 @@ export default function VoxelCrossing({
   };
 
   const deferMusicResume = (delayMs = 1800) => {
-    if (startMusicTimerRef.current) {
-      window.clearTimeout(startMusicTimerRef.current);
-      startMusicTimerRef.current = null;
-    }
+    cancelDeferredMusicResume();
     startMusicTimerRef.current = window.setTimeout(() => {
       startMusicTimerRef.current = null;
       window.requestAnimationFrame(() => {
         runWhenIdle(() => {
-          if (!gameRef.current || gameOver || impacting) return;
-          if (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status)) return;
-          audioRef.current?.setMusicSuppressed?.(false);
+          if (!syncBackgroundMusicContext('deferred-blocked')) return;
           audioRef.current?.resumeMusic?.();
         }, 1800);
       });
@@ -1029,11 +1065,16 @@ export default function VoxelCrossing({
   async function beginQuizSession() {
     if (quizStartingRef.current) return;
     quizStartingRef.current = true;
+    quizDueRef.current = true;
+    quizStatusRef.current = 'loading';
+    syncBackgroundMusicContext('quiz-loading');
     setQuiz({ ...QUIZ_INITIAL, status: 'loading', loading: true });
 
     try {
       const pool = await loadQuestionPool();
       const questions = prepareQuizQuestions(pool, seenQuestionIdsRef.current, QUIZ_SIZE);
+      quizStatusRef.current = 'running';
+      syncBackgroundMusicContext('quiz-running');
       setQuiz({
         ...QUIZ_INITIAL,
         status: 'running',
@@ -1042,6 +1083,8 @@ export default function VoxelCrossing({
         index: 0
       });
     } catch (error) {
+      quizStatusRef.current = 'error';
+      syncBackgroundMusicContext('quiz-error');
       setQuiz({
         ...QUIZ_INITIAL,
         status: 'error',
@@ -1079,12 +1122,14 @@ export default function VoxelCrossing({
         primeSfxAudio();
         runHaptic('jump', settingsRef.current.hapticsEnabled);
         audioRef.current?.jump();
-        deferMusicResume(12000);
+        if (syncBackgroundMusicContext('move')) audioRef.current?.resumeMusicFromTrustedGesture?.();
+        deferMusicResume(5200);
       },
       onBlocked: () => {
         primeSfxAudio();
         runHaptic('blocked', settingsRef.current.hapticsEnabled);
         audioRef.current?.blockedBounce?.();
+        if (syncBackgroundMusicContext('blocked')) audioRef.current?.resumeMusicFromTrustedGesture?.();
       },
       onHazardSound: ({ kind }) => {
         if (kind === 'carHorn') audioRef.current?.carHorn();
@@ -1127,6 +1172,11 @@ export default function VoxelCrossing({
 
         setImpacting(false);
         setGameOver(true);
+        gameOverRef.current = true;
+        startedRef.current = false;
+        quizDueRef.current = shouldStartQuiz;
+        quizStatusRef.current = QUIZ_INITIAL.status;
+        syncBackgroundMusicContext(shouldStartQuiz ? 'quiz-due' : 'game-over');
         setStarted(false);
         setMenuOpen(false);
         setSettingsOpen(false);
@@ -1178,9 +1228,9 @@ export default function VoxelCrossing({
   }, [gameOver, result, menuOpen, quizDue, quiz.status]);
 
   useEffect(() => {
-    const quizMusicLocked = quizDue || ACTIVE_QUIZ_STATES.has(quiz.status);
-    audioRef.current?.setMusicSuppressed?.(quizMusicLocked);
-    if (quizMusicLocked) audioRef.current?.forceStopMusic?.();
+    quizDueRef.current = quizDue;
+    quizStatusRef.current = quiz.status;
+    syncBackgroundMusicContext('quiz');
   }, [quiz.status, quizDue]);
 
   useEffect(() => {
@@ -1208,10 +1258,7 @@ export default function VoxelCrossing({
       cancelIdleTask(restartPrepareTaskRef.current);
       restartPrepareTaskRef.current = null;
     }
-    if (startMusicTimerRef.current) {
-      window.clearTimeout(startMusicTimerRef.current);
-      startMusicTimerRef.current = null;
-    }
+    cancelDeferredMusicResume();
 
     // Start must stay frame-safe. Do not unlock audio, fetch media, start music,
     // or even resume the WebGL engine in this click handler. First paint the
@@ -1231,6 +1278,11 @@ export default function VoxelCrossing({
     setQuizDue(false);
     setQuizReveal(false);
     setQuiz(QUIZ_INITIAL);
+    gameOverRef.current = false;
+    impactingRef.current = false;
+    quizDueRef.current = false;
+    quizStatusRef.current = QUIZ_INITIAL.status;
+    menuOpenRef.current = false;
     setScore(0);
     setLastRunScore(0);
     startEngineAfterIntroPaint();
@@ -1238,6 +1290,7 @@ export default function VoxelCrossing({
     // Keep the Start tap visually light. Mark the page as user-interacted
     // without creating/resuming AudioContext; that work caused recurring Start freezes.
     audioRef.current?.markUserInteracted?.();
+    audioRef.current?.setMusicContext?.('starting');
 
     // Background music is warmed and resumed only on idle work after gameplay has
     // already painted, so it should not steal the first rendered frames.
@@ -1283,6 +1336,12 @@ export default function VoxelCrossing({
     setLifeBlinkIndex(null);
     setScore(saveState.score || saveState.row || 0);
     setLastRunScore(saveState.score || saveState.row || 0);
+    startedRef.current = true;
+    gameOverRef.current = false;
+    quizDueRef.current = false;
+    quizStatusRef.current = QUIZ_INITIAL.status;
+    syncBackgroundMusicContext('continue');
+    deferMusicResume(3800);
   };
 
   const resumeGame = ({ deferEngine = false } = {}) => {
@@ -1292,6 +1351,9 @@ export default function VoxelCrossing({
     setSettingsOpen(false);
     setBadgeBoardOpen(false);
     setStarted(true);
+    startedRef.current = true;
+    syncBackgroundMusicContext('resume');
+    deferMusicResume(3600);
 
     // Closing the menu must paint first, then resume WebGL. Running the engine
     // in the same input handler as the React menu unmount can make mobile
@@ -1348,15 +1410,19 @@ export default function VoxelCrossing({
   };
 
   const move = (direction) => {
-    if (impacting || menuOpen || gameOver || activeBadge) return;
+    if (impacting || menuOpen || gameOver || activeBadge) return false;
     if (!started && !gameOver) resumeGame();
     const accepted = gameRef.current?.queueMove(direction) === true;
     if (!accepted) runHaptic('blocked', settingsRef.current.hapticsEnabled);
+    return accepted;
   };
 
   const handleControlPointer = (event, direction) => {
     event.preventDefault();
-    move(direction);
+    const accepted = move(direction);
+    if (accepted && syncBackgroundMusicContext('trusted-control')) {
+      audioRef.current?.resumeMusicFromTrustedGesture?.();
+    }
   };
 
   const answerCurrentQuestion = (answerKey) => {
@@ -1395,6 +1461,8 @@ export default function VoxelCrossing({
         triggerConfetti(stars >= 3 ? 'gold' : 'rainbow');
       }
       trackProfileEvent('quiz_finished', { stars });
+      quizStatusRef.current = 'complete';
+      syncBackgroundMusicContext('quiz-complete');
       setQuiz((current) => ({ ...current, status: 'complete', selectedKey: null, lastCorrect: null }));
       return;
     }

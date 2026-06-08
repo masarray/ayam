@@ -28,7 +28,8 @@ export class GameAudio {
     this.sfxEnabled = sfxEnabled;
     this.musicEnabled = musicEnabled;
     this.volume = volume;
-    this.musicVolume = 0.46;
+    this.musicVolume = 0.22;
+    this.sfxVolume = 1.45;
     this.last = new Map();
     this.musicTimer = null;
     this.musicStep = 0;
@@ -42,6 +43,8 @@ export class GameAudio {
     this.bgmReady = false;
     this.bgmError = false;
     this.musicSuppressed = false;
+    this.musicContext = 'boot';
+    this.lastMusicResumeAttemptAt = 0;
     this.userInteracted = false;
   }
 
@@ -60,7 +63,7 @@ export class GameAudio {
       this.musicGain = this.ctx.createGain();
 
       this.master.gain.value = this.volume;
-      this.sfxGain.gain.value = this.sfxEnabled ? 1 : 0;
+      this.sfxGain.gain.value = this.sfxEnabled ? this.sfxVolume : 0;
       this.musicGain.gain.value = 0;
       this.limiter.threshold.value = -8;
       this.limiter.knee.value = 18;
@@ -94,7 +97,7 @@ export class GameAudio {
     if (!this.sfxGain || !this.ctx) return;
     const t = now(this.ctx);
     safeCancel(this.sfxGain.gain, t);
-    this.sfxGain.gain.setTargetAtTime(this.sfxEnabled ? 1 : 0, t, 0.025);
+    this.sfxGain.gain.setTargetAtTime(this.sfxEnabled ? this.sfxVolume : 0, t, 0.025);
   }
 
   setMusicEnabled(enabled) {
@@ -111,7 +114,13 @@ export class GameAudio {
     }
 
     if (this.bgm) this.bgm.volume = this.musicVolume;
-    if (this.userInteracted) this.startMusic();
+    if (this.userInteracted && this.musicContext === 'playing') this.startMusic();
+  }
+
+  setMusicContext(context = 'idle') {
+    this.musicContext = context;
+    const allowed = context === 'playing';
+    this.setMusicSuppressed(!allowed);
   }
 
   setMusicSuppressed(suppressed) {
@@ -120,7 +129,6 @@ export class GameAudio {
       this.pauseMusic(0);
       return;
     }
-    this.resumeMusic();
   }
 
   forceStopMusic() {
@@ -161,7 +169,17 @@ export class GameAudio {
   }
 
   resumeMusic() {
-    if (!this.musicEnabled || this.musicSuppressed) return;
+    if (!this.musicEnabled || this.musicSuppressed || this.musicContext !== 'playing') return;
+    this.startMusic();
+  }
+
+  resumeMusicFromTrustedGesture() {
+    if (!this.musicEnabled || this.musicSuppressed || this.musicContext !== 'playing') return;
+    // Rate limit retry attempts. On mobile, the first actual movement tap is the
+    // safest time to satisfy autoplay policy, but it must never spam play().
+    const t = performance.now();
+    if (t - this.lastMusicResumeAttemptAt < 900) return;
+    this.lastMusicResumeAttemptAt = t;
     this.startMusic();
   }
 
@@ -218,7 +236,7 @@ export class GameAudio {
     audio.volume = this.musicEnabled ? this.musicVolume : 0;
     audio.addEventListener('canplaythrough', () => { this.bgmReady = true; }, { once: true });
     audio.addEventListener('play', () => {
-      if (this.musicSuppressed || !this.musicEnabled) {
+      if (this.musicSuppressed || !this.musicEnabled || this.musicContext !== 'playing') {
         audio.muted = true;
         audio.pause();
         audio.volume = 0;
@@ -305,7 +323,7 @@ export class GameAudio {
   }
 
   startMusic() {
-    if (!this.userInteracted || !this.musicEnabled || this.musicSuppressed || this.bgmError) return;
+    if (!this.userInteracted || !this.musicEnabled || this.musicSuppressed || this.musicContext !== 'playing' || this.bgmError) return;
     const bgm = this._ensureBgm();
     if (!bgm) return;
 
@@ -324,7 +342,7 @@ export class GameAudio {
     const playPromise = bgm.play();
     if (playPromise?.then) {
       playPromise.then(() => {
-        if (this.musicSuppressed || !this.musicEnabled) this.forceStopMusic();
+        if (this.musicSuppressed || !this.musicEnabled || this.musicContext !== 'playing') this.forceStopMusic();
       }).catch(() => {
         // Browser autoplay can still block playback until the next trusted tap/key press.
       });

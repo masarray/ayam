@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.4.8 - 2026-06-08
+
+### Fixed
+- Hardened background-music state handling so delayed/lazy BGM cannot resume during quiz, game over, impact, or menu states.
+- Fixed deferred BGM resume cancellation to clear timers instead of recursively calling itself.
+- Kept water foam and floating white water marks constrained to active water rows so they no longer drift into grass.
+- Reworked rows 96-99 into one complete 4-lane road block so score 99 cannot appear as an orphan/1-lane road.
+
+### Improved
+- Thickened road markings: white divider 1.24, road edge white line 2.2, and yellow line 2.5.
+- Rebalanced audio mix so SFX is much more prominent than BGM: music volume reduced and SFX bus boosted.
+
+## 3.4.7 - 2026-06-08
+
+### Fixed
+- Made the background music engine context-aware so BGM cannot resume during quiz states, game-over, impact, menu pause, or other blocked states.
+- Fixed BGM restart behavior after game-over by separating music warm-up, trusted gameplay resume, and current game-context gating.
+- Prevented water foam / white floating line particles from drifting outside the river row into grass rows.
+- Fixed the row-99 orphan road-band issue that could visually appear as a 1-lane road before the late-game section.
+
+### Improved
+- Thickened white and yellow road markings again for better visibility and reduced shimmer.
+- Prioritized SFX unlock/playback over BGM: movement and impact effects are still first priority; BGM is treated as lazy, context-aware background media.
+
 ## 3.4.6 - 2026-06-08
 
 ### Fixed

@@ -260,6 +260,25 @@ function generateLateGameStageRow(rowIndex, random) {
 }
 
 
+
+function generatePreLateGameBridgeRow(rowIndex, random) {
+  // Keep the transition into the deterministic late-game section clean.
+  // Rows 96-99 are a complete 4-lane road block so score 99 can never look
+  // like an isolated/orphan 1-lane road before the fixed late-game section.
+  switch (rowIndex) {
+    case 96:
+      return generateTrafficRow(rowIndex, random, { bandId: 96, laneCount: 4, laneIndex: 0, reversed: false });
+    case 97:
+      return generateTrafficRow(rowIndex, random, { bandId: 96, laneCount: 4, laneIndex: 1, reversed: false });
+    case 98:
+      return generateTrafficRow(rowIndex, random, { bandId: 96, laneCount: 4, laneIndex: 2, reversed: false });
+    case 99:
+      return generateTrafficRow(rowIndex, random, { bandId: 96, laneCount: 4, laneIndex: 3, reversed: false });
+    default:
+      return null;
+  }
+}
+
 function generateEarlyGameStageRow(rowIndex, rows) {
   const random = mulberry32(hashSeed(rowIndex, 41));
 
@@ -328,8 +347,8 @@ function chooseTrafficVariant(rowIndex, random, vehiclePool, chosenVariants = []
 function generateTrafficRow(rowIndex, random, roadBand = null) {
   const { speedMultiplier } = difficultyForRow(rowIndex);
   const vehiclePool = vehiclePoolForRow(rowIndex);
-  const laneCount = Math.max(2, roadBand?.laneCount || chooseRoadLaneCount(rowIndex, random));
-  const laneIndex = roadBand?.laneIndex || 0;
+  const laneCount = Math.max(2, Math.min(4, roadBand?.laneCount || chooseRoadLaneCount(rowIndex, random)));
+  const laneIndex = Math.max(0, Math.min(laneCount - 1, roadBand?.laneIndex || 0));
   const roadBandId = roadBand?.bandId ?? rowIndex;
   const reversed = roadBand?.reversed ?? random() > 0.5;
   const direction = laneCount > 1 ? laneDirectionForBand(laneCount, laneIndex, reversed) : (random() > 0.5 ? 1 : -1);
@@ -561,6 +580,9 @@ export function generateRow(rowIndex, rows) {
   if (curatedEarlyRow) return curatedEarlyRow;
 
   const random = mulberry32(hashSeed(rowIndex, 41));
+
+  const preLateBridgeRow = rowIndex >= 96 && rowIndex < 100 ? generatePreLateGameBridgeRow(rowIndex, random) : null;
+  if (preLateBridgeRow) return preLateBridgeRow;
 
   if (rowIndex >= 100) return generateLateGameStageRow(rowIndex, random);
 

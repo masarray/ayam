@@ -992,13 +992,21 @@ export class RoadQuestGame {
     this.waterFlowItems.forEach((item) => {
       const data = item.userData.waterFlow;
       if (!data) return;
+      const row = Number.isInteger(data.rowIndex) ? this.rows[data.rowIndex] : null;
+      const isStillWater = row?.type === 'water';
+      item.visible = isStillWater;
+      if (!isStillWater) return;
+
       data.age = (data.age || 0) + delta;
       item.position.x += data.speed * delta;
-      item.position.y = data.baseY + Math.sin(data.age * data.rate + data.phase) * data.amp;
+      const safeMinY = Math.max(data.minY ?? (data.baseY - 5), data.baseY - 5.5);
+      const safeMaxY = Math.min(data.maxY ?? (data.baseY + 5), data.baseY + 5.5);
+      const flowY = data.baseY + Math.sin(data.age * data.rate + data.phase) * Math.min(data.amp || 0, 1.4);
+      item.position.y = clamp(flowY, safeMinY, safeMaxY);
       const wrap = data.wrap || boardWrap;
       if (item.position.x > wrap) item.position.x -= wrap * 2;
       if (item.position.x < -wrap) item.position.x += wrap * 2;
-      const pulse = 0.84 + Math.sin(data.age * 4.5 + data.phase) * 0.12;
+      const pulse = 0.84 + Math.sin(data.age * 4.5 + data.phase) * 0.08;
       item.scale.y = Math.max(0.72, pulse);
     });
   }
