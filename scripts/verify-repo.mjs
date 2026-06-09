@@ -16,6 +16,7 @@ const requiredFiles = [
   'public/icons/icon-512.png',
   'public/audio/mushroom-dance.mp3',
   'docs/START_AUDIO_ROAD_TREE_AUDIT.md',
+  'docs/REVIVE_LEARNING_LOOP_AUDIT.md',
   '.github/workflows/deploy-pages.yml'
 ];
 
@@ -128,6 +129,44 @@ if (!/wheel: new THREE\.BoxGeometry\(9\.5, 6, 9\.5\)/.test(rendererSource) || !/
   process.exit(1);
 }
 const cssSource = readFileSync('src/game/VoxelCrossing.css', 'utf8');
+if (!/const QUIZ_SIZE = 1;/.test(crossingSource) || !/const MAX_LIVES = 2;/.test(crossingSource) || !/REVIVE_COIN_REWARD = 5/.test(crossingSource) || /GAME_OVERS_BEFORE_QUIZ/.test(crossingSource)) {
+  console.error('Learning loop must use one-question revive, two-life reserve-heart flow, and no periodic 5-question quiz cycle.');
+  process.exit(1);
+}
+
+if (!/reviveOfferOpen/.test(crossingSource) || !/reviveOfferPending/.test(crossingSource) || !/openReviveQuiz/.test(crossingSource) || !/reserve_heart_used/.test(crossingSource) || !/revive-offer-card/.test(cssSource) || !/revive-pending/.test(cssSource)) {
+  console.error('Revive quiz must be opt-in: first hit spends reserve heart, second hit shows only revive pending/offer before any question appears.');
+  process.exit(1);
+}
+
+if (!/modalOverlayActive \? 'quiz-active' : ''/.test(crossingSource) || !/quiz-stale-repair/.test(crossingSource) || !/Watchdog: if a stale async flag blocks the loader/.test(crossingSource)) {
+  console.error('Revive quiz state must have a stale-state repair guard and quiz-active must only apply while an actual modal overlay is active.');
+  process.exit(1);
+}
+if (!/!reviveOfferPending && !reviveOfferOpen && !quizDue && quiz\.status === 'idle'/.test(crossingSource)) {
+  console.error('Game-over result overlay must not render while revive pending/offer is active.');
+  process.exit(1);
+}
+if (!/COINS_KEY/.test(crossingSource) || !/awardCoins\(REVIVE_COIN_REWARD(?:,\s*\{[^}]*animate:\s*true[^}]*\})?\)/.test(crossingSource) || !/coin-hud/.test(cssSource)) {
+  console.error('Revive learning loop must include persistent coins and visible coin HUD reward feedback.');
+  process.exit(1);
+}
+if (!/reviveCorrect/.test(audioSource) || !/reviveWrong/.test(audioSource) || !/Benar! \+/.test(crossingSource) || !/Belum tepat/.test(crossingSource)) {
+  console.error('Revive quiz needs friendly correct/wrong feedback without noisy copy.');
+  process.exit(1);
+}
+if (!/ChalkboardExplanationText/.test(crossingSource) || !/explanation-page/.test(crossingSource) || !/Pembahasan/.test(crossingSource) || !/explain-board/.test(cssSource)) {
+  console.error('Wrong revive answer must offer a full-page chalkboard text explanation, not a tiny feedback card only.');
+  process.exit(1);
+}
+if (!/white-space: normal !important/.test(cssSource) || !/text-overflow: unset !important/.test(cssSource) || !/-webkit-line-clamp: unset !important/.test(cssSource)) {
+  console.error('Answer choices must show full long text; ellipsis/clamp truncation is not allowed in revive quiz.');
+  process.exit(1);
+}
+if (!/nearest non-water open row/.test(gameSource) || !/candidate.type === 'water'/.test(gameSource)) {
+  console.error('Revive should not put the player back on a water tile that can instantly drown again.');
+  process.exit(1);
+}
 if (!/font-size: 40px;/.test(cssSource) || !/background: transparent;/.test(cssSource)) {
   console.error('Life HUD should use large bare hearts without background or border.');
   process.exit(1);
@@ -295,3 +334,28 @@ if (passabilityErrors.length > 0) {
 }
 
 console.log('Repository verification passed.');
+
+if (!/v3\.5\.4 final HUD ownership reset/.test(cssSource) || !/\.vc-shell\.move-pad-right \.menu-button \{[\s\S]*left: max\(20px/.test(cssSource) || !/\.vc-shell\.move-pad-left \.menu-button \{[\s\S]*right: max\(20px/.test(cssSource) || !/\.vc-shell \.best-hud/.test(cssSource)) {
+  console.error('HUD layout reset must keep menu opposite the move pad and keep coin/best in a compact top-right stack.');
+  process.exit(1);
+}
+
+
+if (!/ChalkboardExplanationText/.test(crossingSource) || !/quiz-active/.test(crossingSource) || /<span className="quiz-mark">✓<\/span>/.test(crossingSource) || /<span className="quiz-mark">×<\/span>/.test(crossingSource)) {
+  console.error('Revive quiz must have a safe chalkboard explanation page, disabled underlay controls, and Material-icon answer marks.');
+  process.exit(1);
+}
+
+if (!/ChalkboardExplanationText/.test(crossingSource) || /ExplanationVisual/.test(crossingSource)) {
+  console.error('Revive explanation must use chalkboard text only, not the old visual renderer.');
+  process.exit(1);
+}
+if (!/quiz-active/.test(crossingSource) || !/grid-template-columns: 1fr !important/.test(cssSource) || !/explain-board/.test(cssSource)) {
+  console.error('Revive quiz layout must disable background controls, stack action buttons, and use chalkboard explanation.');
+  process.exit(1);
+}
+
+if (!/function usesHeavyVehicleHorn/.test(gameSource) || !/kind: heavyVehicle \? 'truckHorn' : 'carHorn'/.test(gameSource) || !/truckHorn\(\)/.test(audioSource)) {
+  console.error('Heavy vehicle horn routing must keep truck/bus horn separate from small car horn.');
+  process.exit(1);
+}

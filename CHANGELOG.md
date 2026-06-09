@@ -1,5 +1,171 @@
 # Changelog
 
+## 3.5.17 - 2026-06-10
+
+### Tuned
+- Unified road-vehicle horn distance for small cars, trucks, buses, tankers, containers, and articulated trucks. Heavy-vehicle horns no longer trigger too far away, while small-car horns no longer trigger too late.
+
+## 3.5.16 - 2026-06-09
+
+### Fixed
+- Reworked heavy vehicle horn routing so buses, box trucks, articulated trucks, dump trucks, tanker trucks, container trucks, tractor/heavy-width vehicles use the truck/bus horn path instead of the small car horn path.
+- Vehicle horn detection now uses the front/nose edge of the vehicle and a width/kind fallback, preventing large vehicles from accidentally falling back to car horn.
+
+### Improved
+- Truck/bus horn timbre is now a much lower, rougher `THOTTT` sound, clearly separated from the small car `Diiiin` horn.
+
+## 3.5.15 - 2026-06-10
+
+### Improved
+- Added a dedicated heavy-vehicle horn for bus, box truck, articulated truck, dump truck, tanker truck, and container truck.
+- Passenger cars keep the longer `Diiiin` horn, while heavy vehicles now use a lower `Thottt` horn character.
+- Traffic warning logic now routes horn SFX based on vehicle kind instead of using one generic car horn for every road vehicle.
+
+## 3.5.14 - 2026-06-09
+
+### Fixed
+- Removed the `Ulang` button from the explanation screen so users who answered correctly cannot accidentally reset to score 0 from the learning page.
+
+### Improved
+- Made the car horn longer and more like a sustained "Diiiin" car horn instead of a short double-beep.
+- Made the coin number heavier/bolder for better game-HUD readability.
+
+## 3.5.13 - 2026-06-09
+
+### Fixed
+- Rebuilt train warning audio as a per-train nose/front-edge state machine: every train class now uses one long train horn per approach, including bullet trains, and the center/tail can no longer retrigger horn or wind SFX after the train has passed.
+- Removed bullet-train wind/pass warning spam from the hazard warning path. Fast trains now warn with the same train horn earlier so the player has time to avoid.
+- Made the kids-yay MP3 play directly from the correct-answer user gesture and increased its playback volume.
+
+### Improved
+- Increased feather, blood, debris velocity, and camera shake for fast/bullet train impacts.
+- Added the Pembahasan button to correct-answer feedback so lucky guesses can still lead to learning before the player continues.
+
+## 3.5.12 - 2026-06-09
+
+### Fixed
+- Train horn now triggers only once when the locomotive front is near the chicken. The middle and rear body no longer re-arm the horn.
+- Added a per-train pass reset so the horn can trigger again only after the train wraps back for a new approach.
+
+### Improved
+- Removed the extra Revive Quiz title block to give more space to the question and answers.
+- Changed the correct-answer feedback copy to `Yey Benar! +5` with the uploaded coin SVG inline.
+- Kept the previous train-horn tone character while making the trigger logic smarter.
+
+## 3.5.11 - 2026-06-09
+
+### Improved
+- Added a cheerful kids-style correct-answer SFX for revive quiz success.
+- Moved the coin reward moment to the `Lanjut` action after a correct revive answer, with coin-count bump animation and a crisp coin `cring` SFX.
+- Replaced the previous coin HUD shape with the provided SVG coin asset and a cleaner mobile-game style number treatment.
+- Made train horns smarter: horns now trigger only when the train head is close to the chicken, with per-approach guard to avoid repeated horn spam.
+- Scaled chicken impact debris and camera shake with vehicle/train speed, so faster collisions throw more feathers/blood and shake harder.
+
+## 3.5.10 - 2026-06-09
+
+### Fixed
+- Fixed the revive answer layout ownership conflict where old quiz CSS still forced answer options into fixed 58-66px rows and clamped text to two lines. Revive answer pills now use true auto-height rows for multi-line answers.
+
+## 3.5.9 - 2026-06-09
+
+### Improved
+- Made revive quiz answer pills auto-resize for multi-line answers. Short answers stay compact, while longer answers expand vertically without breaking the A/B/C/D badge alignment or answer feedback icons.
+
+## 3.5.8 - 2026-06-09
+
+### Fixed
+- Fixed a second-cycle revive bug where the game could remain blurred/disabled after choosing `Jawab soal` while no revive quiz dialog appeared.
+- `quiz-active` now applies only when a real modal overlay is active, preventing leaked quiz flags from disabling gameplay.
+- `openReviveQuiz()` now explicitly locks the game-over revive context before loading questions and includes a loader watchdog.
+- Added stale-state repair that restores the revive modal context or clears leaked quiz flags.
+
+## 3.5.7 - 2026-06-09
+
+### Fixed
+- Fixed revive flow where tapping `Jawab soal` could hide the offer card without showing the quiz, leaving the game stuck in a paused blurred state. The quiz overlay now becomes visible first and starts question loading on the next frame.
+- Added a `Close` action to the menu action list for a clearer exit path besides the top-right close icon.
+- Reworked revive/ explanation action groups so desktop buttons stack reliably and no longer overlap.
+
+### Improved
+- Made the explanation chalkboard taller and more readable, with a larger but lighter-weight text style that fits the board more naturally.
+
+## 3.5.6 - 2026-06-09
+
+### Fixed
+- Fixed the revive quiz path that could close the offer card and leave the game blurred without mounting the quiz.
+- Forced revive offer, quiz feedback, and explanation action buttons into a single-column layout to stop desktop button overlap.
+- Replaced the weak visual explanation renderer with a chalkboard-style adaptive text explanation.
+- Disabled/de-emphasized menu, HUD, and move controls while revive/quiz overlays are active.
+
+### Improved
+- Reduced unnecessary revive quiz copy and centered Material icon + button text alignment.
+
+## 3.5.5 - 2026-06-09
+
+### Fixed
+- Fixed the blank page when opening the explanation screen by adding a safe `ExplanationVisual` renderer.
+- Fixed desktop revive-offer button stacking by enforcing a single-column action layout.
+- Disabled and pushed the menu button behind quiz/revive overlays so it behaves like the move pad during modal states.
+- Replaced raw check/cross/heart markers with Google Material icon paths.
+
+### Improved
+- Reduced revive and quiz microcopy to a cleaner, lower-noise game UI.
+- Centered action icons and text inside quiz/revive buttons.
+
+## 3.5.4 - 2026-06-09
+
+### Fixed
+- Reset HUD ownership so score, heart, coin, best, menu, and move pad no longer overlap.
+- Forced the menu button to the bottom corner opposite the move pad, overriding older center-menu CSS.
+- Reduced coin and best HUD footprint so the top-right stack is cleaner and less bulky.
+- Anchored the menu panel above the bottom menu button instead of near the top-center.
+
+## 3.5.3 - 2026-06-09
+
+### Improved
+- Upgraded the coin HUD to a more familiar gold-coin game look using a Google Material coin glyph inside a layered gold coin chip.
+- Moved the floating menu button to the bottom corner opposite the move pad, so controls follow a more familiar mobile game layout.
+- Repositioned HUD elements into a more standard layout: score + heart on the left, coin at the top-right, best score just beneath it.
+- Anchored the menu panel above the relocated menu button for a more natural thumb-friendly interaction pattern.
+
+## 3.5.2 - 2026-06-08
+
+### Fixed
+- Fixed revive-offer flow so the normal Game Over result card cannot render underneath or on top of the revive offer.
+- Added a short revive-pending overlay state before the native-style revive card appears, keeping the game context visible without showing Game Over.
+
+### Design
+- Documented the next product direction: math should become a power-up/reward loop, not an interruption or punishment.
+
+## 3.5.1 - 2026-06-08
+
+### Changed
+- Reworked the revive loop into a native-style two-life flow: first impact consumes the reserve heart and respawns; second impact shows a centered revive offer card.
+- Revive quiz is now opt-in. The question only appears after the player chooses to answer one question.
+- Reserve heart HUD now shows one red/gray heart instead of presenting the quiz as an immediate punishment.
+- Revive quiz and explanation remain modal overlays above the game context rather than replacing the game screen.
+
+### Stability
+- Preserved the no-start-freeze and context-aware BGM behavior.
+
+## 3.5.0 - 2026-06-09
+
+### Changed
+- Reworked the learning loop from a 5-question interruption into a 1-question revive system.
+- Set base heart count to 1 so failure becomes a clear revive decision rather than an invisible extra-life flow.
+- Correct revive answer now gives coins and lets the child continue from the current score.
+- Wrong revive answer now offers a full-page visual explanation and a friendly restart path.
+- Long answer choices now expand naturally instead of being truncated with ellipsis.
+
+### Added
+- Coin HUD and persistent coin storage.
+- Tring-style correct revive SFX and soft whoosh wrong-answer SFX.
+- Visual explanation page using simple dot/bar shapes.
+- Safe revive placement so falling into water does not immediately drown again after revival.
+
+### Stability
+- Preserved the no-start-freeze audio and BGM strategy.
+
 ## 3.4.9 - 2026-06-08
 
 ### Fixed

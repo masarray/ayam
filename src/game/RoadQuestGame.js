@@ -89,6 +89,24 @@ function laneProgress(vehicle, direction, wrapMin, wrapMax) {
 }
 
 const HIGH_SCORE_KEY = 'ayam-sd-high-score';
+const ROAD_VEHICLE_HORN_WINDOW = 110;
+const ROAD_VEHICLE_HORN_COOLDOWN_MS = 1420;
+
+const HEAVY_VEHICLE_HORN_KINDS = new Set([
+  'bus',
+  'boxTruck',
+  'articulatedTruck',
+  'dumpTruck',
+  'tankerTruck',
+  'containerTruck',
+  'tractor'
+]);
+
+function usesHeavyVehicleHorn(vehicleKind = '', width = 0) {
+  if (HEAVY_VEHICLE_HORN_KINDS.has(vehicleKind)) return true;
+  if (/truck|bus|tanker|container|dump|articulated|tractor/i.test(String(vehicleKind))) return true;
+  return Number(width || 0) >= 112;
+}
 
 function detectRenderProfile() {
   const nav = typeof navigator !== 'undefined' ? navigator : {};
@@ -237,6 +255,7 @@ export class RoadQuestGame {
     this.impactStartedAt = 0;
     this.impactDuration = 920;
     this.impactReason = 'traffic';
+    this.impactSpeedFactor = 0;
     this.impactVector = new THREE.Vector2(0, 0);
     this.cheatMode = Boolean(options.cheatMode);
     this.cheatRespawnPending = false;
@@ -488,6 +507,23 @@ export class RoadQuestGame {
     this.pendingWaterMissUntil = 0;
     this.cheatRespawnPending = false;
     this.cheatRespawnPosition = null;
+
+    // Revive must feel fair. If the child fell into water, do not respawn on a
+    // tile that will instantly drown again after the grace window. Step back to
+    // the nearest non-water open row while preserving score/highestRow.
+    let reviveRow = this.playerPosition.row;
+    let reviveTile = this.playerPosition.tile;
+    const currentRow = this.rows[reviveRow];
+    if (!currentRow || currentRow.type === 'water' || this._isTileBlocked(currentRow, reviveTile)) {
+      for (let rowIndex = reviveRow; rowIndex >= 0; rowIndex -= 1) {
+        const candidate = this.rows[rowIndex];
+        if (!candidate || candidate.type === 'water') continue;
+        if (this._isTileBlocked(candidate, reviveTile)) continue;
+        reviveRow = rowIndex;
+        break;
+      }
+    }
+    this.playerPosition = { row: reviveRow, tile: reviveTile };
 
     this.invulnerableUntil = performance.now() + invulnerableMs;
     this.waterGraceUntil = this.invulnerableUntil;
@@ -1017,10 +1053,19 @@ export class RoadQuestGame {
     const { minX, maxX } = laneBounds(margin);
     vehicle.position.x += direction * speed * delta;
 
+    const resetTrainApproachState = () => {
+      if (vehicle.userData.type !== 'train') return;
+      vehicle.userData.hornedNearChicken = false;
+      vehicle.userData.hornApproachId = null;
+      vehicle.userData.lastPassSoundAt = 0;
+    };
+
     if (direction > 0 && vehicle.position.x > maxX + width) {
       vehicle.position.x = minX - width;
+      resetTrainApproachState();
     } else if (direction < 0 && vehicle.position.x < minX - width) {
       vehicle.position.x = maxX + width;
+      resetTrainApproachState();
     }
   }
 
@@ -1255,10 +1300,12 @@ export class RoadQuestGame {
     }
   }
 
-  _spawnChickenImpactDebris(x, y, z, direction = 1, reason = 'traffic') {
+  _spawnChickenImpactDebris(x, y, z, direction = 1, reason = 'traffic', speedFactor = 0, trainClass = '') {
     const trainHit = reason === 'train';
-    const featherCount = trainHit ? 30 : 22;
-    const bloodCount = trainHit ? 20 : 13;
+    const bulletHit = trainHit && (trainClass === 'bullet' || speedFactor > 0.82);
+    const force = clamp(1 + speedFactor * (bulletHit ? 1.45 : 1), 1, bulletHit ? 4.4 : trainHit ? 3.2 : 2.35);
+    const featherCount = Math.round((bulletHit ? 52 : trainHit ? 34 : 22) * force);
+    const bloodCount = Math.round((bulletHit ? 36 : trainHit ? 23 : 13) * (0.9 + force * (bulletHit ? 0.62 : 0.45)));
     const forwardPush = direction >= 0 ? 1 : -1;
 
     for (let i = 0; i < featherCount; i += 1) {
@@ -1282,14 +1329,14 @@ export class RoadQuestGame {
       feather.castShadow = false;
       feather.receiveShadow = false;
       feather.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      const side = (Math.random() - 0.5) * (trainHit ? 96 : 70);
+      const side = (Math.random() - 0.5) * (trainHit ? 96 : 70) * Math.min(1.65, force);
       feather.userData = {
         kind: 'feather',
         age: 0,
         life: 0.95 + Math.random() * 0.58,
-        vx: forwardPush * (trainHit ? 92 : 62) + (Math.random() - 0.5) * 70,
+        vx: forwardPush * (trainHit ? 92 : 62) * force + (Math.random() - 0.5) * 70 * Math.min(1.5, force),
         vy: side,
-        vz: trainHit ? 112 + Math.random() * 54 : 82 + Math.random() * 42,
+        vz: (trainHit ? 112 + Math.random() * 54 : 82 + Math.random() * 42) * Math.min(1.55, force),
         gravity: trainHit ? 96 : 86,
         flutter: 22 + Math.random() * 28,
         flutterRate: 11 + Math.random() * 9,
@@ -1319,9 +1366,9 @@ export class RoadQuestGame {
         kind: 'blood',
         age: 0,
         life: 0.72 + Math.random() * 0.32,
-        vx: forwardPush * (62 + Math.random() * 64),
-        vy: (Math.random() - 0.5) * 72,
-        vz: 58 + Math.random() * 58,
+        vx: forwardPush * (62 + Math.random() * 64) * force,
+        vy: (Math.random() - 0.5) * 72 * Math.min(1.55, force),
+        vz: (58 + Math.random() * 58) * Math.min(1.55, force),
         gravity: 185,
         rx: (Math.random() - 0.5) * 10,
         ry: (Math.random() - 0.5) * 10,
@@ -1332,7 +1379,7 @@ export class RoadQuestGame {
       this.fxItems.push(drop);
     }
 
-    for (let i = 0; i < (trainHit ? 9 : 6); i += 1) {
+    for (let i = 0; i < Math.round((trainHit ? 9 : 6) * Math.min(2.05, force)); i += 1) {
       const sizeX = 5 + Math.random() * 10;
       const sizeY = 3 + Math.random() * 7;
       const geometry = new THREE.BoxGeometry(sizeX, sizeY, 1.2);
@@ -1500,21 +1547,49 @@ export class RoadQuestGame {
     for (const obstacle of this.vehicles) {
       const { rowIndex, width, type, trainClass, direction, currentSpeed, baseSpeed } = obstacle.userData;
       if (Math.abs(rowIndex - playerRow) > 1) continue;
-      const distance = Math.abs(playerX - obstacle.position.x);
       const speed = currentSpeed || baseSpeed || 0;
-      if (type === 'train' && distance < width * 0.55 + 190 && (!obstacle.userData.lastSoundAt || now - obstacle.userData.lastSoundAt > 1900)) {
-        obstacle.userData.lastSoundAt = now;
-        this.callbacks.onHazardSound({ kind: trainClass === 'bullet' ? 'bulletTrain' : 'train', speed, direction });
-        if (trainClass !== 'bullet') this.callbacks.onHazardSound({ kind: 'trainHorn', speed, direction });
+      if (type === 'train') {
+        // Train audio is a single smart warning horn per train approach. The
+        // trigger is the locomotive nose/front edge, not the center/body/tail,
+        // so the same train cannot honk again after it has already passed.
+        const frontX = obstacle.position.x + direction * width * 0.5;
+        const noseLeadDistance = direction * (playerX - frontX);
+        const chickenNearRail = Math.abs(rowIndex - playerRow) <= 1;
+        const fastTrain = trainClass === 'bullet' || Math.abs(speed) >= 250;
+        const earlyHornWindow = fastTrain
+          ? Math.min(520, Math.max(260, Math.abs(speed) * 0.72))
+          : Math.min(230, Math.max(118, Math.abs(speed) * 0.34));
+        const noseApproachingChicken = noseLeadDistance > PLAYER_WIDTH * 0.1 && noseLeadDistance < earlyHornWindow;
+        const globalHornReady = !this.lastTrainHornAt || now - this.lastTrainHornAt > 1450;
+
+        if (chickenNearRail && noseApproachingChicken && !obstacle.userData.hornedNearChicken && globalHornReady) {
+          obstacle.userData.hornedNearChicken = true;
+          obstacle.userData.lastHornAt = now;
+          this.lastTrainHornAt = now;
+          this.callbacks.onHazardSound({ kind: 'trainHorn', speed, direction, trainClass });
+        }
       }
       if (type === 'vehicle' && rowIndex === playerRow) {
-        const leadDistance = direction * (playerX - obstacle.position.x);
-        const frontClearance = width * 0.5 + PLAYER_WIDTH * 0.5;
-        const hornRange = frontClearance + 54;
-        const chickenIsDirectlyAhead = leadDistance > frontClearance && leadDistance < hornRange;
-        if (chickenIsDirectlyAhead && (!obstacle.userData.lastSoundAt || now - obstacle.userData.lastSoundAt > 1750)) {
+        const vehicleKind = obstacle.userData.kind || '';
+        const heavyVehicle = usesHeavyVehicleHorn(vehicleKind, width);
+        const frontX = obstacle.position.x + direction * width * 0.5;
+        const noseLeadDistance = direction * (playerX - frontX);
+        // Road vehicle warning distance is deliberately shared across
+        // small cars and heavy vehicles. Previous tuning made truck/bus horns
+        // too early and small-car horns too late. Keep one midpoint so the
+        // player learns a consistent road-warning timing.
+        const hornWindow = ROAD_VEHICLE_HORN_WINDOW;
+        const noseApproachingChicken = noseLeadDistance > PLAYER_WIDTH * 0.05 && noseLeadDistance < hornWindow;
+        if (noseApproachingChicken && (!obstacle.userData.lastSoundAt || now - obstacle.userData.lastSoundAt > ROAD_VEHICLE_HORN_COOLDOWN_MS)) {
           obstacle.userData.lastSoundAt = now;
-          this.callbacks.onHazardSound({ kind: 'carHorn', speed, direction });
+          obstacle.userData.lastHornKind = heavyVehicle ? 'truckHorn' : 'carHorn';
+          this.callbacks.onHazardSound({
+            kind: heavyVehicle ? 'truckHorn' : 'carHorn',
+            speed,
+            direction,
+            vehicleKind,
+            width
+          });
         }
       }
     }
@@ -1577,6 +1652,8 @@ export class RoadQuestGame {
     this.impactStartedAt = performance.now();
     this.impactReason = reason;
     this.impactDuration = cheatRespawn ? 640 : reason === 'train' ? 2120 : reason === 'water' ? 1980 : 1880;
+    const impactSpeed = Math.abs(obstacle?.userData?.currentSpeed || obstacle?.userData?.baseSpeed || 0);
+    this.impactSpeedFactor = reason === 'water' ? 0 : clamp((impactSpeed - 90) / (reason === 'train' ? 560 : 230), 0, 1.85);
     this.cheatRespawnPending = cheatRespawn;
     this.cheatRespawnPosition = cheatRespawn && this.player
       ? {
@@ -1607,7 +1684,9 @@ export class RoadQuestGame {
         this.player.position.y,
         this.player.position.z + 14,
         this.impactVector.x || 1,
-        reason
+        reason,
+        this.impactSpeedFactor,
+        obstacle?.userData?.trainClass || ''
       );
     }
 
@@ -1702,7 +1781,8 @@ export class RoadQuestGame {
   _applyCameraShake() {
     const elapsed = performance.now() - this.impactStartedAt;
     const t = clamp(elapsed / this.impactDuration, 0, 1);
-    const strength = (1 - t) * (this.impactReason === 'train' ? 14 : this.impactReason === 'water' ? 9 : 10);
+    const speedBoost = 1 + (this.impactSpeedFactor || 0) * (this.impactReason === 'train' ? 1.08 : 0.58);
+    const strength = (1 - t) * (this.impactReason === 'train' ? 17 : this.impactReason === 'water' ? 9 : 10) * speedBoost;
     const shakeX = (Math.random() - 0.5) * strength;
     const shakeY = (Math.random() - 0.5) * strength;
     const shakeZ = (Math.random() - 0.5) * strength * 0.45;

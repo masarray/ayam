@@ -252,7 +252,7 @@ export class GameAudio {
     const audio = new Audio();
     audio.src = this.kidsYayUrl;
     audio.loop = false;
-    audio.preload = 'none';
+    audio.preload = 'auto';
     audio.volume = 0;
     this.kidsYay = audio;
     return this.kidsYay;
@@ -416,14 +416,25 @@ export class GameAudio {
   }
 
   carHorn() {
-    if (!this._cooldown('horn', 620)) return;
-    // Short dual-tone car horn: two close square-wave notes, slight tremolo bite, fast attack.
-    this._tone({ type: 'square', frequency: 372, endFrequency: 368, duration: 0.18, gain: 0.15, attack: 0.0015, decay: 0.035 });
-    this._tone({ type: 'square', frequency: 468, endFrequency: 462, duration: 0.18, gain: 0.13, attack: 0.0015, decay: 0.035, delay: 0.002 });
-    this._tone({ type: 'sawtooth', frequency: 186, endFrequency: 180, duration: 0.16, gain: 0.035, attack: 0.003, decay: 0.04 });
-    this._noise({ duration: 0.038, gain: 0.018, frequency: 1800, type: 'bandpass', delay: 0.006 });
-    this._tone({ type: 'square', frequency: 372, endFrequency: 366, duration: 0.09, gain: 0.09, attack: 0.0015, decay: 0.03, delay: 0.22 });
-    this._tone({ type: 'square', frequency: 468, endFrequency: 460, duration: 0.09, gain: 0.075, attack: 0.0015, decay: 0.03, delay: 0.222 });
+    if (!this._cooldown('horn', 980)) return;
+    // Longer "Diiiin" style car horn: sustained dual-tone with a small harmonic layer.
+    // Keep this distinct from the train horn: shorter than train, but no double-beep.
+    this._tone({ type: 'square', frequency: 392, endFrequency: 382, duration: 0.58, gain: 0.155, attack: 0.006, decay: 0.16 });
+    this._tone({ type: 'square', frequency: 494, endFrequency: 482, duration: 0.58, gain: 0.135, attack: 0.006, decay: 0.16, delay: 0.002 });
+    this._tone({ type: 'sawtooth', frequency: 196, endFrequency: 188, duration: 0.54, gain: 0.038, attack: 0.008, decay: 0.18 });
+    this._tone({ type: 'triangle', frequency: 784, endFrequency: 760, duration: 0.44, gain: 0.026, attack: 0.008, decay: 0.2, delay: 0.018 });
+    this._noise({ duration: 0.055, gain: 0.011, frequency: 1500, type: 'bandpass', delay: 0.012 });
+  }
+
+  truckHorn() {
+    if (!this._cooldown('truck-horn', 1120)) return;
+    // Heavy vehicle "THOTTT" horn. Keep it clearly different from car "Diiiin":
+    // low fundamental, rough square/saw body, short breath/noise attack, and no high bright chord.
+    this._noise({ duration: 0.08, gain: 0.028, frequency: 300, type: 'lowpass', delay: 0 });
+    this._tone({ type: 'square', frequency: 185, endFrequency: 158, duration: 0.82, gain: 0.24, attack: 0.018, decay: 0.30, delay: 0.008 });
+    this._tone({ type: 'sawtooth', frequency: 138, endFrequency: 116, duration: 0.86, gain: 0.16, attack: 0.02, decay: 0.34, delay: 0.014 });
+    this._tone({ type: 'triangle', frequency: 92, endFrequency: 82, duration: 0.9, gain: 0.11, attack: 0.026, decay: 0.36, delay: 0.026 });
+    this._tone({ type: 'square', frequency: 247, endFrequency: 222, duration: 0.36, gain: 0.055, attack: 0.012, decay: 0.22, delay: 0.035 });
   }
 
   trainHorn() {
@@ -437,7 +448,6 @@ export class GameAudio {
     if (!this._cooldown(isBullet ? 'bullet' : 'train', isBullet ? 1150 : 1600)) return;
     this._noise({ duration: isBullet ? 0.68 : 0.84, gain: isBullet ? 0.15 : 0.11, frequency: isBullet ? 1900 : 760, type: isBullet ? 'highpass' : 'lowpass' });
     this._tone({ type: 'sawtooth', frequency: isBullet ? 190 : 92, endFrequency: isBullet ? 70 : 62, duration: isBullet ? 0.48 : 0.72, gain: isBullet ? 0.05 : 0.052, decay: 0.14 });
-    if (!isBullet) this.trainHorn();
   }
 
   hit(reason = 'traffic') {
@@ -462,10 +472,33 @@ export class GameAudio {
 
   quizCorrect() {
     if (!this._cooldown('quiz-correct', 160)) return;
-    this._tone({ type: 'sine', frequency: 523.25, endFrequency: 783.99, duration: 0.11, gain: 0.072, attack: 0.004, decay: 0.07 });
-    this._tone({ type: 'triangle', frequency: 659.25, endFrequency: 1046.5, duration: 0.14, gain: 0.056, attack: 0.004, decay: 0.08, delay: 0.08 });
-    this._tone({ type: 'sine', frequency: 1046.5, endFrequency: 1567.98, duration: 0.12, gain: 0.05, attack: 0.004, decay: 0.09, delay: 0.18 });
-    this._noise({ duration: 0.11, gain: 0.034, frequency: 5200, type: 'highpass', delay: 0.035 });
+    this._tone({ type: 'sine', frequency: 523.25, endFrequency: 783.99, duration: 0.11, gain: 0.08, attack: 0.004, decay: 0.07 });
+    this._tone({ type: 'triangle', frequency: 659.25, endFrequency: 1046.5, duration: 0.14, gain: 0.064, attack: 0.004, decay: 0.08, delay: 0.08 });
+    this._tone({ type: 'sine', frequency: 1046.5, endFrequency: 1567.98, duration: 0.12, gain: 0.058, attack: 0.004, decay: 0.09, delay: 0.18 });
+    this._noise({ duration: 0.11, gain: 0.04, frequency: 5200, type: 'highpass', delay: 0.035 });
+  }
+
+  yayKids() {
+    if (!this._cooldown('yay-kids', 260)) return;
+    this._tone({ type: 'sine', frequency: 659.25, endFrequency: 987.77, duration: 0.16, gain: 0.095, attack: 0.002, decay: 0.09 });
+    this._tone({ type: 'triangle', frequency: 783.99, endFrequency: 1318.51, duration: 0.18, gain: 0.082, attack: 0.003, decay: 0.1, delay: 0.08 });
+    this._tone({ type: 'sine', frequency: 1046.5, endFrequency: 1567.98, duration: 0.16, gain: 0.072, attack: 0.003, decay: 0.1, delay: 0.18 });
+    this._noise({ duration: 0.16, gain: 0.045, frequency: 6200, type: 'highpass', delay: 0.05 });
+  }
+
+  coinCring() {
+    if (!this._cooldown('coin-cring', 120)) return;
+    this._tone({ type: 'sine', frequency: 1318.51, endFrequency: 2093, duration: 0.08, gain: 0.105, attack: 0.0015, decay: 0.055 });
+    this._tone({ type: 'triangle', frequency: 1760, endFrequency: 2637, duration: 0.09, gain: 0.085, delay: 0.055, attack: 0.0015, decay: 0.06 });
+    this._tone({ type: 'sine', frequency: 2349.32, endFrequency: 3135.96, duration: 0.07, gain: 0.062, delay: 0.12, attack: 0.0015, decay: 0.055 });
+  }
+
+  reviveCorrect() {
+    if (!this._cooldown('revive-correct-tring', 180)) return;
+    this._tone({ type: 'sine', frequency: 987.77, endFrequency: 1567.98, duration: 0.09, gain: 0.09, attack: 0.002, decay: 0.06 });
+    this._tone({ type: 'triangle', frequency: 1318.51, endFrequency: 1975.53, duration: 0.12, gain: 0.07, delay: 0.055, attack: 0.002, decay: 0.08 });
+    this._tone({ type: 'sine', frequency: 2093, endFrequency: 2637, duration: 0.1, gain: 0.045, delay: 0.13, attack: 0.002, decay: 0.08 });
+    this._noise({ duration: 0.08, gain: 0.038, frequency: 6200, type: 'highpass', delay: 0.035 });
   }
 
   quizWrong() {
@@ -473,6 +506,12 @@ export class GameAudio {
     this._tone({ type: 'sawtooth', frequency: 220, endFrequency: 150, duration: 0.12, gain: 0.062, attack: 0.006, decay: 0.08 });
     this._tone({ type: 'triangle', frequency: 164, endFrequency: 116, duration: 0.16, gain: 0.052, attack: 0.006, decay: 0.1, delay: 0.08 });
     this._noise({ duration: 0.08, gain: 0.032, frequency: 900, type: 'bandpass', delay: 0.02 });
+  }
+
+  reviveWrong() {
+    if (!this._cooldown('revive-wrong-whoosh', 220)) return;
+    this._noise({ duration: 0.18, gain: 0.048, frequency: 1100, type: 'bandpass' });
+    this._tone({ type: 'sine', frequency: 420, endFrequency: 260, duration: 0.16, gain: 0.042, delay: 0.015, attack: 0.008, decay: 0.11 });
   }
 
   quizComplete(correctCount = 0) {
@@ -488,7 +527,7 @@ export class GameAudio {
     if (!this.sfxEnabled || !this._cooldown(`kids-yay-${stars}`, 1200)) return;
     const audio = this._ensureKidsYay();
     if (!audio) return;
-    const volume = stars >= 3 ? 0.34 : stars >= 2 ? 0.2 : 0.16;
+    const volume = stars >= 3 ? 0.78 : stars >= 2 ? 0.46 : 0.34;
     try {
       audio.pause();
       audio.currentTime = 0;
