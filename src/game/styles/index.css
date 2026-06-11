@@ -5,5 +5,7 @@
 */
 @import './legacy.css';
 @import './tokens.css';
+@import './hud.css';
 @import './controls.css';
 @import './menu.css';
+@import "./quiz.css";

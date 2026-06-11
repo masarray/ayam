@@ -1,5 +1,44 @@
 # Changelog
 
+## 3.5.24 - 2026-06-11
+
+- Added CSS Ownership Phase 3 for the revive quiz and revive offer overlays.
+- Moved active revive quiz class contracts to `src/game/styles/quiz.css` with `vc-*` owner selectors.
+- Removed legacy quiz/revive class usage from `VoxelCrossing.jsx` so new fixes no longer stack on `.quiz-card`, `.quiz-option`, or `.revive-offer-card`.
+- Added quiz ownership tokens and verification guards for the new class contract.
+
+## 3.5.22 - 2026-06-11
+
+### Improved
+- Added CSS Ownership Phase 2 for the gameplay HUD. Score, coin, best score, reserve-heart, and cheat chip now live in `src/game/styles/hud.css`.
+- Replaced legacy HUD class names in `VoxelCrossing.jsx` with `vc-*` ownership classes so future HUD work does not fight historical `!important` rules.
+- Added HUD geometry tokens in `tokens.css` and guard checks in `npm run verify`.
+- Documented the HUD ownership contract in `docs/CSS_OWNERSHIP_PHASE_2.md`.
+
+## 3.5.21 - 2026-06-11
+
+### Improved
+- Added CSS Ownership Phase 1 for menu and bottom controls.
+- Moved active menu/control styling into `tokens.css`, `controls.css`, and `menu.css`, with legacy CSS quarantined.
+- Rebuilt hamburger and movement arrows on one shared dock primitive so alignment is layout-owned instead of patched.
+- Documented the control/menu ownership contract in `docs/CSS_OWNERSHIP_PHASE_1.md`.
+
+## 3.5.20 - 2026-06-11
+
+### Fixed
+- Added a hard final CSS ownership layer so the hamburger menu button now truly overrides the older HUD rules that used `!important`.
+- Matched the hamburger button diameter to the visible move-arrow circle, not the hidden touch grid.
+- Aligned the hamburger button baseline with the lower move-arrow row so it sits straight with the left/down/right controls.
+- Kept landscape sizing separate so the controls remain compact on short screens.
+
+## 3.5.19 - 2026-06-11
+
+- Centered the in-game menu as a modal and added a blurred/dimmed gameplay backdrop.
+- Optimized menu readability across phone heights with max-height scrolling and tighter responsive spacing.
+- Left-aligned every menu action with a fixed 10px visual indent, consistent icon column, and softer font weight under 500.
+- Matched the hamburger menu circle size and bottom alignment to the move-pad arrow circle.
+- Fixed a duplicate `onChange` prop in the sound-effect setting and corrected the hamburger button active-state transform so it no longer jumps sideways.
+
 ## 3.5.18 - 2026-06-11
 
 ### Improved

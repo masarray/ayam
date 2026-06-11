@@ -2,6 +2,8 @@
 
 Version: 3.5.21
 
+Next phase completed: see `docs/CSS_OWNERSHIP_PHASE_2.md` for HUD ownership.
+
 ## What changed
 
 The menu and bottom movement controls now have dedicated CSS ownership instead of receiving more patch rules at the bottom of the old stylesheet.
@@ -17,6 +19,7 @@ Current import order:
 ```txt
 legacy.css       # old skin, quarantined; do not add new rules here
 tokens.css       # shared sizing/z-index/radius/spacing tokens
+hud.css          # score, coin, best, life, cheat HUD
 controls.css     # bottom dock, hamburger trigger, movement pad
 menu.css         # centered menu modal, menu actions, settings rows
 ```

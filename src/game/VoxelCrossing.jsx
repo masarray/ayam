@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RoadQuestGame } from './RoadQuestGame.js';
 import { GameAudio } from './audio.js';
 import { BADGE_FAMILIES, getBadgeCount, loadPlayerProfile, savePlayerProfile, trackBadgeEvent } from './badges.js';
-import './VoxelCrossing.css';
+import './styles/index.css';
 
 const SETTINGS_KEY = 'ayam-sd-settings';
 const SAVE_GAME_KEY = 'ayam-sd-save-game-v1';
@@ -11,6 +11,7 @@ const INSTALL_PROMPT_KEY = 'ayam-sd-install-prompt-v1';
 const SEEN_QUESTIONS_KEY = 'ayam-sd-seen-questions-v1';
 const QUIZ_SIZE = 1;
 const REVIVE_COIN_REWARD = 5;
+const QUIZ_FEEDBACK_DELAY_MS = 2000;
 const QUIZ_APPEAR_DELAY_MS = 220;
 const REVIVE_OFFER_DELAY_MS = 460;
 const MAX_LIVES = 2;
@@ -27,6 +28,7 @@ const QUIZ_INITIAL = {
   correctCount: 0,
   lastCorrect: null,
   explanationOpen: false,
+  feedbackVisible: false,
   reviveAwarded: false
 };
 
@@ -256,11 +258,11 @@ function FittedQuestionText({ text }) {
   useLayoutEffect(() => {
     const textNode = textRef.current;
     if (!textNode) return undefined;
-    const board = textNode.closest('.quiz-question');
+    const board = textNode.closest('.vc-quiz-question');
     if (!board) return undefined;
 
     const fit = () => {
-      const countNode = board.querySelector('.quiz-question-count');
+      const countNode = board.querySelector('.vc-quiz-question-count');
       const boardStyle = window.getComputedStyle(board);
       const paddingX = parseFloat(boardStyle.paddingLeft) + parseFloat(boardStyle.paddingRight);
       const paddingY = parseFloat(boardStyle.paddingTop) + parseFloat(boardStyle.paddingBottom);
@@ -346,7 +348,7 @@ function CoinIcon() {
 }
 
 function ActionIcon({ name }) {
-  return <MaterialIcon name={name} size={18} className="action-icon" />;
+  return <MaterialIcon name={name} size={18} className="vc-action-icon" />;
 }
 
 function MenuIcon() {
@@ -379,15 +381,15 @@ function MenuActionIcon({ name }) {
     close: 'close'
   }[name] || 'settings';
   return (
-    <span className={`menu-action-icon-wrap ${name}`} aria-hidden="true">
-      <MaterialIcon name={iconName} size={18} className="menu-action-icon" />
+    <span className={`vc-menu-action-icon-wrap ${name}`} aria-hidden="true">
+      <MaterialIcon name={iconName} size={18} className="vc-menu-action-icon" />
     </span>
   );
 }
 
 function ProgressDots({ total, current }) {
   return (
-    <div className="quiz-dots" aria-label={`Soal ${current + 1} dari ${total}`}>
+    <div className="vc-quiz-dots" aria-label={`Soal ${current + 1} dari ${total}`}>
       {Array.from({ length: total }, (_, index) => (
         <span key={index} className={index <= current ? 'active' : ''} />
       ))}
@@ -612,8 +614,8 @@ function ChalkboardExplanationText({ question }) {
   const explanation = question?.explanationText || 'Gunakan cara singkat, lalu cocokkan dengan jawaban yang benar.';
   const text = `Jawaban benar: ${correctText}\n\n${explanation}`;
   return (
-    <div className="explain-board" style={explanationTextFitStyle(text)} aria-label="Papan pembahasan jawaban">
-      <div className="explain-board-label"><MaterialIcon name="menu_book" size={17} /> Pembahasan</div>
+    <div className="vc-explain-board" style={explanationTextFitStyle(text)} aria-label="Papan pembahasan jawaban">
+      <div className="vc-explain-board-label"><MaterialIcon name="menu_book" size={17} /> Pembahasan</div>
       <p>{text}</p>
     </div>
   );
@@ -676,6 +678,7 @@ export default function VoxelCrossing({
   const gameOverCycleRef = useRef(0);
   const quizActiveMountedRef = useRef(false);
   const reviveOfferTimerRef = useRef(null);
+  const quizFeedbackTimerRef = useRef(null);
   const confettiTimerRef = useRef(null);
   const nearMissTimerRef = useRef(null);
   const badgeQueueRef = useRef([]);
@@ -737,6 +740,12 @@ export default function VoxelCrossing({
 
   const livesRef = useRef(MAX_LIVES);
   const lifeBlinkTimerRef = useRef(null);
+
+  const clearQuizFeedbackTimer = () => {
+    if (!quizFeedbackTimerRef.current) return;
+    window.clearTimeout(quizFeedbackTimerRef.current);
+    quizFeedbackTimerRef.current = null;
+  };
 
   useEffect(() => {
     livesRef.current = lives;
@@ -954,6 +963,7 @@ export default function VoxelCrossing({
     if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
     if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
     if (reviveOfferTimerRef.current) window.clearTimeout(reviveOfferTimerRef.current);
+    clearQuizFeedbackTimer();
     cancelDeferredMusicResume();
     if (restartPrepareTaskRef.current) cancelIdleTask(restartPrepareTaskRef.current);
     cancelDeferredAudioUnlock();
@@ -1095,10 +1105,10 @@ export default function VoxelCrossing({
   useEffect(() => {
     const isGameplayPointerTarget = (target) => {
       if (!target?.closest) return false;
-      if (target.closest('.start-button, .menu-action, .icon-close, .settings-section, .pwa-install-overlay, .badge-board-overlay, .badge-unlock-overlay, input, textarea, select')) {
+      if (target.closest('.start-button, .vc-menu-action, .icon-close, .vc-menu-settings, .pwa-install-overlay, .badge-board-overlay, .badge-unlock-overlay, input, textarea, select')) {
         return false;
       }
-      return Boolean(target.closest('.vc-controls, .vc-canvas'));
+      return Boolean(target.closest('.vc-move-pad, .vc-canvas'));
     };
 
     const primeGameplayAudioFromTrustedGesture = (event) => {
@@ -1619,6 +1629,7 @@ export default function VoxelCrossing({
     unlockAudio({ allowMusic: false });
     audioRef.current?.setMusicSuppressed?.(true);
     audioRef.current?.forceStopMusic?.();
+    clearQuizFeedbackTimer();
     const question = quiz.questions[quiz.index];
     const isCorrect = answerKey === question.answerKey;
     if (isCorrect) {
@@ -1639,8 +1650,17 @@ export default function VoxelCrossing({
       selectedKey: answerKey,
       correctCount: isCorrect ? 1 : 0,
       lastCorrect: isCorrect,
+      feedbackVisible: false,
       reviveAwarded: isCorrect
     }));
+
+    quizFeedbackTimerRef.current = window.setTimeout(() => {
+      quizFeedbackTimerRef.current = null;
+      setQuiz((current) => {
+        if (current.status !== 'running' || current.selectedKey !== answerKey || current.explanationOpen) return current;
+        return { ...current, feedbackVisible: true };
+      });
+    }, QUIZ_FEEDBACK_DELAY_MS);
   };
 
   const reviveFromQuiz = () => {
@@ -1738,11 +1758,12 @@ export default function VoxelCrossing({
 
   const currentQuizQuestion = quiz.questions[quiz.index];
   const quizAnswered = Boolean(quiz.selectedKey);
+  const quizFeedbackVisible = quizAnswered && quiz.feedbackVisible;
   const quizTotal = 1;
   const modalOverlayActive = gameOver && !menuOpen && (reviveOfferPending || reviveOfferOpen || quizDue || ACTIVE_QUIZ_STATES.has(quiz.status) || quiz.status === 'error');
 
   return (
-    <section className={`vc-shell ${orientationHint} move-pad-${settings.movePadSide === 'left' ? 'left' : 'right'} ${menuOpen ? 'menu-open' : ''} ${modalOverlayActive ? 'quiz-active' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
+    <section className={`vc-shell ${orientationHint} move-pad-${settings.movePadSide === 'left' ? 'left' : 'right'} ${menuOpen ? 'vc-menu-open' : ''} ${modalOverlayActive ? 'quiz-active' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
       <div ref={hostRef} className="vc-host" />
       <ConfettiBurst burst={confettiBurst} />
       <BadgeUnlockOverlay badge={activeBadge} onClose={closeBadge} />
@@ -1767,81 +1788,90 @@ export default function VoxelCrossing({
         </div>
       )}
 
-      <div className="vc-hud top-left" aria-live="polite">
-        <div className="score-value">{visibleScore}</div>
-        <div className="score-label">score</div>
+      <div className="vc-game-hud vc-score-hud" aria-live="polite">
+        <div className="vc-score-value">{visibleScore}</div>
+        <div className="vc-score-label">score</div>
       </div>
 
-      <div className={`coin-hud ${coinBurst ? 'coin-bursting' : ''}`} aria-label={`Koin ${coins}`}>
-        <img className="coin-svg-icon" src={`${import.meta.env.BASE_URL}icons/coin.svg`} alt="" aria-hidden="true" />
-        <strong>{coins}</strong>
-        {coinBurst && <span key={coinBurst.id} className="coin-plus" aria-hidden="true">+{coinBurst.amount}</span>}
+      <div className={`vc-coin-hud ${coinBurst ? 'is-bursting' : ''}`} aria-label={`Koin ${coins}`}>
+        <img className="vc-coin-icon" src={`${import.meta.env.BASE_URL}icons/coin.svg`} alt="" aria-hidden="true" />
+        <strong className="vc-coin-value">{coins}</strong>
+        {coinBurst && <span key={coinBurst.id} className="vc-coin-plus" aria-hidden="true">+{coinBurst.amount}</span>}
       </div>
 
-      <div className="vc-hud top-right best-hud">
-        <div className="high-label">best</div>
-        <div className="high-value">{highScore}</div>
+      <div className="vc-game-hud vc-best-hud">
+        <div className="vc-best-label">best</div>
+        <div className="vc-best-value">{highScore}</div>
       </div>
 
       {settings.cheatMode ? (
-        <div className="cheat-chip" role="status" aria-label="Cheat mode aktif">CHEAT MODE</div>
+        <div className="vc-cheat-chip" role="status" aria-label="Cheat mode aktif">CHEAT MODE</div>
       ) : (
-        <div className="life-hud" aria-label={lives > 1 ? 'Hati cadangan tersedia' : 'Hati cadangan habis'}>
+        <div className="vc-life-hud" aria-label={lives > 1 ? 'Hati cadangan tersedia' : 'Hati cadangan habis'}>
           <span className={lifeBlinkIndex === 0 ? 'lost' : lives > 1 ? 'active' : 'spent'} aria-hidden="true">♥</span>
         </div>
       )}
 
-      <button
-        type="button"
-        className={`menu-button ${menuOpen ? 'active' : ''} ${modalOverlayActive ? 'disabled-underlay' : ''}`}
-        aria-label="Buka menu"
-        aria-expanded={menuOpen}
-        disabled={modalOverlayActive}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          if (menuOpen) closeMenu({ resume: menuPausedRef.current });
-          else openMenu();
-        }}
-      >
-        <MenuIcon />
-      </button>
+      <div className="vc-control-dock" aria-label="Kontrol game">
+        <button
+          type="button"
+          className={`vc-dock-button vc-menu-trigger ${menuOpen ? 'active' : ''} ${modalOverlayActive ? 'disabled-underlay' : ''}`}
+          aria-label="Buka menu"
+          aria-expanded={menuOpen}
+          disabled={modalOverlayActive}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            if (menuOpen) closeMenu({ resume: menuPausedRef.current });
+            else openMenu();
+          }}
+        >
+          <span className="vc-dock-visual vc-menu-trigger-visual" aria-hidden="true"><MenuIcon /></span>
+        </button>
+
+        <div className="vc-move-pad" aria-label="Kontrol gerak">
+          <button type="button" className="vc-dock-button vc-move-control up" aria-label="Maju" onPointerDown={(event) => handleControlPointer(event, 'forward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="vc-dock-visual vc-move-visual" aria-hidden="true"><ControlArrowIcon direction="up" /></span></button>
+          <button type="button" className="vc-dock-button vc-move-control left" aria-label="Kiri" onPointerDown={(event) => handleControlPointer(event, 'left')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="vc-dock-visual vc-move-visual" aria-hidden="true"><ControlArrowIcon direction="left" /></span></button>
+          <button type="button" className="vc-dock-button vc-move-control down" aria-label="Mundur" onPointerDown={(event) => handleControlPointer(event, 'backward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="vc-dock-visual vc-move-visual" aria-hidden="true"><ControlArrowIcon direction="down" /></span></button>
+          <button type="button" className="vc-dock-button vc-move-control right" aria-label="Kanan" onPointerDown={(event) => handleControlPointer(event, 'right')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="vc-dock-visual vc-move-visual" aria-hidden="true"><ControlArrowIcon direction="right" /></span></button>
+        </div>
+      </div>
 
       {menuOpen && (
-        <div className="menu-panel" role="dialog" aria-label="Menu game">
-          <div className="menu-head">
+        <div className="vc-menu-panel" role="dialog" aria-label="Menu game">
+          <div className="vc-menu-head">
             <div>
               <strong>Menu</strong>
               <span>{menuPausedRef.current ? 'Game dijeda' : 'Atur game'}</span>
             </div>
-            <button type="button" className="icon-close" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); closeMenu({ resume: menuPausedRef.current }); }} aria-label="Tutup menu"><CloseIcon /></button>
+            <button type="button" className="icon-close vc-menu-close" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); closeMenu({ resume: menuPausedRef.current }); }} aria-label="Tutup menu"><CloseIcon /></button>
           </div>
 
-          <div className="badge-progress-pill" aria-label={`Badge terbuka ${playerProfile.unlockedBadges.length} dari ${getBadgeCount()}`}>
+          <div className="vc-badge-progress-pill" aria-label={`Badge terbuka ${playerProfile.unlockedBadges.length} dari ${getBadgeCount()}`}>
             <span>🏅</span>
             <strong>{playerProfile.unlockedBadges.length}/{getBadgeCount()}</strong>
             <small>Badge terbuka</small>
           </div>
 
-          <div className="menu-actions">
+          <div className="vc-menu-actions">
             {menuPausedRef.current ? (
-              <button type="button" className="menu-action primary" onClick={() => resumeGame({ deferEngine: true })}><MenuActionIcon name="play" />Lanjutkan</button>
+              <button type="button" className="vc-menu-action primary" onClick={() => resumeGame({ deferEngine: true })}><MenuActionIcon name="play" />Lanjutkan</button>
             ) : (
-              <button type="button" className="menu-action primary" onClick={startGame} disabled={!ready}><MenuActionIcon name="play" />Mulai Main</button>
+              <button type="button" className="vc-menu-action primary" onClick={startGame} disabled={!ready}><MenuActionIcon name="play" />Mulai Main</button>
             )}
-            <button type="button" className="menu-action" onClick={startGame} disabled={!ready}><MenuActionIcon name="restart" />Restart</button>
-            <button type="button" className="menu-action" onClick={saveGame} disabled={!ready || gameOver}><MenuActionIcon name="save" />Save</button>
-            <button type="button" className="menu-action" onClick={continueSavedGame} disabled={!ready || !savedGame}><MenuActionIcon name="continue" />Continue</button>
-            <button type="button" className={`menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}><MenuActionIcon name="badge" />Papan Badge</button>
-            {!standalonePwa && <button type="button" className="menu-action install" onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(false); setPwaPromptVisible(true); }}><MenuActionIcon name="install" />Install App</button>}
-            <button type="button" className={`menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}><MenuActionIcon name="settings" />Settings</button>
-            <button type="button" className="menu-action" onClick={() => closeMenu({ resume: menuPausedRef.current })}><MenuActionIcon name="close" />Close</button>
+            <button type="button" className="vc-menu-action" onClick={startGame} disabled={!ready}><MenuActionIcon name="restart" />Restart</button>
+            <button type="button" className="vc-menu-action" onClick={saveGame} disabled={!ready || gameOver}><MenuActionIcon name="save" />Save</button>
+            <button type="button" className="vc-menu-action" onClick={continueSavedGame} disabled={!ready || !savedGame}><MenuActionIcon name="continue" />Continue</button>
+            <button type="button" className={`vc-menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}><MenuActionIcon name="badge" />Papan Badge</button>
+            {!standalonePwa && <button type="button" className="vc-menu-action install" onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(false); setPwaPromptVisible(true); }}><MenuActionIcon name="install" />Install App</button>}
+            <button type="button" className={`vc-menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}><MenuActionIcon name="settings" />Settings</button>
+            <button type="button" className="vc-menu-action" onClick={() => closeMenu({ resume: menuPausedRef.current })}><MenuActionIcon name="close" />Close</button>
           </div>
 
-          {saveNotice && <div className="menu-save-note" role="status">{saveNotice}</div>}
+          {saveNotice && <div className="vc-menu-save-note" role="status">{saveNotice}</div>}
 
           {settingsOpen && (
-            <div className="settings-section">
-              <label className="setting-row">
+            <div className="vc-menu-settings">
+              <label className="vc-menu-setting-row">
                 <span>
                   <strong>Background music</strong>
                   <small>Musik ringan saat bermain</small>
@@ -1851,10 +1881,10 @@ export default function VoxelCrossing({
                   checked={settings.musicEnabled}
                   onChange={(event) => updateSetting('musicEnabled', event.target.checked)}
                 />
-                <i aria-hidden="true" />
+                <i className="vc-menu-switch" aria-hidden="true" />
               </label>
 
-              <label className="setting-row">
+              <label className="vc-menu-setting-row">
                 <span>
                   <strong>Sound effect</strong>
                   <small>Lompat, klakson, kereta, splash, dan hit</small>
@@ -1864,10 +1894,10 @@ export default function VoxelCrossing({
                   checked={settings.sfxEnabled}
                   onChange={(event) => updateSetting('sfxEnabled', event.target.checked)}
                 />
-                <i aria-hidden="true" />
+                <i className="vc-menu-switch" aria-hidden="true" />
               </label>
 
-              <label className="setting-row">
+              <label className="vc-menu-setting-row">
                 <span>
                   <strong>Haptic vibration</strong>
                   <small>Getar halus untuk lompat, hampir tertabrak, hit, dan reward di HP Android</small>
@@ -1877,21 +1907,21 @@ export default function VoxelCrossing({
                   checked={settings.hapticsEnabled}
                   onChange={(event) => updateSetting('hapticsEnabled', event.target.checked)}
                 />
-                <i aria-hidden="true" />
+                <i className="vc-menu-switch" aria-hidden="true" />
               </label>
 
-              <div className="setting-row move-pad-setting">
+              <div className="vc-menu-setting-row vc-menu-move-pad-setting">
                 <span>
                   <strong>Move pad</strong>
                   <small>Pilih posisi tombol gerak sesuai tangan yang nyaman</small>
                 </span>
-                <div className="move-pad-toggle" role="group" aria-label="Pilih posisi move pad">
+                <div className="vc-menu-move-pad-toggle" role="group" aria-label="Pilih posisi move pad">
                   <button type="button" className={settings.movePadSide === 'left' ? 'active' : ''} onClick={() => updateSetting('movePadSide', 'left')}>Left</button>
                   <button type="button" className={settings.movePadSide === 'right' ? 'active' : ''} onClick={() => updateSetting('movePadSide', 'right')}>Right</button>
                 </div>
               </div>
 
-              <button type="button" className="reset-score-button" onClick={resetHighScore}>Reset high score</button>
+              <button type="button" className="vc-menu-reset-score" onClick={resetHighScore}>Reset high score</button>
             </div>
           )}
         </div>
@@ -1900,13 +1930,6 @@ export default function VoxelCrossing({
       {badgeBoardOpen && (
         <BadgeBoardOverlay profile={playerProfile} onClose={() => setBadgeBoardOpen(false)} />
       )}
-
-      <div className="vc-controls" aria-label="Kontrol game">
-        <button type="button" className="control up" aria-label="Maju" onPointerDown={(event) => handleControlPointer(event, 'forward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="control-visual" aria-hidden="true"><ControlArrowIcon direction="up" /></span></button>
-        <button type="button" className="control left" aria-label="Kiri" onPointerDown={(event) => handleControlPointer(event, 'left')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="control-visual" aria-hidden="true"><ControlArrowIcon direction="left" /></span></button>
-        <button type="button" className="control down" aria-label="Mundur" onPointerDown={(event) => handleControlPointer(event, 'backward')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="control-visual" aria-hidden="true"><ControlArrowIcon direction="down" /></span></button>
-        <button type="button" className="control right" aria-label="Kanan" onPointerDown={(event) => handleControlPointer(event, 'right')} disabled={impacting || menuOpen || gameOver || Boolean(activeBadge)}><span className="control-visual" aria-hidden="true"><ControlArrowIcon direction="right" /></span></button>
-      </div>
 
       {impacting && (
         <div className={`impact-stinger ${impactReason}`} aria-hidden="true">
@@ -1933,39 +1956,39 @@ export default function VoxelCrossing({
       )}
 
       {gameOver && !menuOpen && reviveOfferPending && quiz.status === 'idle' && (
-        <div className="vc-overlay revive-pending" aria-hidden="true" />
+        <div className="vc-overlay vc-revive-pending" aria-hidden="true" />
       )}
 
       {gameOver && !menuOpen && reviveOfferOpen && quiz.status === 'idle' && (
-        <div className="vc-overlay revive-offer" role="presentation">
-          <div className="revive-offer-card" role="dialog" aria-label="Tawaran hidup lagi">
-            <div className="revive-offer-icon" aria-hidden="true"><MaterialIcon name="favorite" size={30} /></div>
+        <div className="vc-overlay vc-revive-offer-overlay" role="presentation">
+          <div className="vc-revive-offer-card" role="dialog" aria-label="Tawaran hidup lagi">
+            <div className="vc-revive-offer-icon" aria-hidden="true"><MaterialIcon name="favorite" size={30} /></div>
             <div className="mini-badge gold">Kesempatan Kedua</div>
             <h2>Lanjut?</h2>
-            <p className="revive-offer-copy">Score <strong>{resultScore}</strong></p>
-            <div className="revive-offer-actions">
-              <button type="button" className="quiz-next-button primary" onClick={openReviveQuiz}><ActionIcon name="school" />Jawab soal</button>
-              <button type="button" className="quiz-next-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
+            <p className="vc-revive-offer-copy">Score <strong>{resultScore}</strong></p>
+            <div className="vc-revive-offer-actions">
+              <button type="button" className="vc-quiz-button primary" onClick={openReviveQuiz}><ActionIcon name="school" />Jawab soal</button>
+              <button type="button" className="vc-quiz-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
             </div>
           </div>
         </div>
       )}
 
       {gameOver && !menuOpen && (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status) || quiz.status === 'error') && (
-        <div className={`vc-overlay quiz revive ${(quizDue && quiz.status === 'idle') ? 'loading' : quiz.status} ${quizReveal ? 'reveal' : ''} ${quiz.explanationOpen ? 'explain-open' : ''}`}>
-          <div className={`quiz-card revive-card ${quizAnswered && !quiz.explanationOpen ? 'feedback-open' : ''} ${quizAnswered && quiz.lastCorrect ? 'feedback-good' : ''} ${quizAnswered && quiz.lastCorrect === false ? 'feedback-try' : ''}`} role="dialog" aria-label="Kesempatan hidup lagi">
-            <div className="quiz-glow" aria-hidden="true" />
+        <div className={`vc-overlay vc-quiz-overlay vc-revive-quiz-overlay ${(quizDue && quiz.status === 'idle') ? 'loading' : quiz.status} ${quizReveal ? 'reveal' : ''} ${quiz.explanationOpen ? 'explain-open' : ''}`}>
+          <div className={`vc-quiz-card vc-revive-card ${quizFeedbackVisible && !quiz.explanationOpen ? 'feedback-open' : ''} ${quizFeedbackVisible && quiz.lastCorrect ? 'feedback-good' : ''} ${quizFeedbackVisible && quiz.lastCorrect === false ? 'feedback-try' : ''}`} role="dialog" aria-label="Kesempatan hidup lagi">
+            <div className="vc-quiz-glow" aria-hidden="true" />
             {(quiz.status === 'loading' || (quizDue && quiz.status === 'idle')) && (
-              <div className="quiz-loading" aria-live="polite">
-                <div className="quiz-loader-ring" aria-hidden="true" />
+              <div className="vc-quiz-loading" aria-live="polite">
+                <div className="vc-quiz-loader-ring" aria-hidden="true" />
                 <h2>Kesempatan Hidup Lagi</h2>
                 <p>Jawab satu soal. Benar = lanjut dari skor ini dan dapat koin.</p>
               </div>
             )}
 
             {quiz.status === 'running' && !currentQuizQuestion && !quiz.explanationOpen && (
-              <div className="quiz-loading" aria-live="polite">
-                <div className="quiz-loader-ring" aria-hidden="true" />
+              <div className="vc-quiz-loading" aria-live="polite">
+                <div className="vc-quiz-loader-ring" aria-hidden="true" />
                 <h2>Menyiapkan soal…</h2>
                 <p>Sebentar ya.</p>
               </div>
@@ -1973,12 +1996,12 @@ export default function VoxelCrossing({
 
             {quiz.status === 'running' && currentQuizQuestion && !quiz.explanationOpen && (
               <>
-                <div className={`quiz-question ${questionLengthClass(currentQuizQuestion.questionText)}`} style={questionFitStyle(currentQuizQuestion.questionText)}>
-                  <div className="quiz-question-count">Satu soal untuk revive</div>
+                <div className={`vc-quiz-question ${questionLengthClass(currentQuizQuestion.questionText)}`} style={questionFitStyle(currentQuizQuestion.questionText)}>
+                  <div className="vc-quiz-question-count">Satu soal untuk revive</div>
                   <FittedQuestionText text={currentQuizQuestion.questionText} />
                 </div>
 
-                <div className="quiz-options revive-options">
+                <div className="vc-quiz-options vc-revive-options">
                   {currentQuizQuestion.options.map((option, optionIndex) => {
                     const isCorrect = option.key === currentQuizQuestion.answerKey;
                     const isSelected = option.key === quiz.selectedKey;
@@ -1993,46 +2016,46 @@ export default function VoxelCrossing({
                       <button
                         key={option.key}
                         type="button"
-                        className={`quiz-option option-${optionIndex + 1} ${stateClass} ${isSelected ? 'selected' : ''}`}
+                        className={`vc-quiz-option option-${optionIndex + 1} ${stateClass} ${isSelected ? 'selected' : ''}`}
                         onClick={() => answerCurrentQuestion(option.key)}
                         disabled={quizAnswered}
                       >
-                        <span className="quiz-option-key">{String.fromCharCode(65 + optionIndex)}</span>
-                        <span className="quiz-option-text">{option.text}</span>
-                        {quizAnswered && isCorrect && <span className="quiz-mark"><MaterialIcon name="check_circle" size={20} /></span>}
-                        {quizAnswered && isSelected && !isCorrect && <span className="quiz-mark"><MaterialIcon name="cancel" size={20} /></span>}
+                        <span className="vc-quiz-option-key">{String.fromCharCode(65 + optionIndex)}</span>
+                        <span className="vc-quiz-option-text">{option.text}</span>
+                        {quizAnswered && isCorrect && <span className="vc-quiz-mark"><MaterialIcon name="check_circle" size={20} /></span>}
+                        {quizAnswered && isSelected && !isCorrect && <span className="vc-quiz-mark"><MaterialIcon name="cancel" size={20} /></span>}
                       </button>
                     );
                   })}
                 </div>
 
                 {!quizAnswered && (
-                  <div className="revive-actions pre-answer">
-                    <button type="button" className="quiz-next-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
+                  <div className="vc-revive-actions pre-answer">
+                    <button type="button" className="vc-quiz-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
                   </div>
                 )}
 
-                {quizAnswered && (
-                  <div className={`quiz-feedback revive-feedback ${quiz.lastCorrect ? 'good' : 'try'}`} aria-live="polite">
-                    <div className="quiz-feedback-title">
+                {quizFeedbackVisible && (
+                  <div className={`vc-quiz-feedback vc-revive-feedback ${quiz.lastCorrect ? 'good' : 'try'}`} aria-live="polite">
+                    <div className="vc-quiz-feedback-title">
                       {quiz.lastCorrect ? (
-                        <span className="correct-coin-reward">
+                        <span className="vc-correct-coin-reward">
                           <span>Yey Benar! +{REVIVE_COIN_REWARD}</span>
-                          <img className="inline-coin-icon" src={`${import.meta.env.BASE_URL}icons/coin.svg`} alt="" aria-hidden="true" />
+                          <img className="vc-inline-coin-icon" src={`${import.meta.env.BASE_URL}icons/coin.svg`} alt="" aria-hidden="true" />
                         </span>
                       ) : 'Belum tepat'}
                     </div>
                     
-                    <div className="revive-actions">
+                    <div className="vc-revive-actions">
                       {quiz.lastCorrect ? (
                         <>
-                          <button type="button" className="quiz-next-button" onClick={showQuizExplanation}><ActionIcon name="menu_book" />Pembahasan</button>
-                          <button type="button" className="quiz-next-button primary" onClick={reviveFromQuiz}><ActionIcon name="favorite" />Lanjut</button>
+                          <button type="button" className="vc-quiz-button" onClick={showQuizExplanation}><ActionIcon name="menu_book" />Pembahasan</button>
+                          <button type="button" className="vc-quiz-button primary" onClick={reviveFromQuiz}><ActionIcon name="favorite" />Lanjut</button>
                         </>
                       ) : (
                         <>
-                          <button type="button" className="quiz-next-button" onClick={showQuizExplanation}><ActionIcon name="menu_book" />Pembahasan</button>
-                          <button type="button" className="quiz-next-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
+                          <button type="button" className="vc-quiz-button" onClick={showQuizExplanation}><ActionIcon name="menu_book" />Pembahasan</button>
+                          <button type="button" className="vc-quiz-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
                         </>
                       )}
                     </div>
@@ -2042,24 +2065,24 @@ export default function VoxelCrossing({
             )}
 
             {quiz.status === 'running' && currentQuizQuestion && quiz.explanationOpen && (
-              <div className="explanation-page" aria-live="polite">
+              <div className="vc-explanation-page" aria-live="polite">
                 <div className="mini-badge">Pembahasan</div>
                 <h2>Pembahasan</h2>
-                <div className="explain-question">{currentQuizQuestion.questionText}</div>
+                <div className="vc-explain-question">{currentQuizQuestion.questionText}</div>
                 <ChalkboardExplanationText question={currentQuizQuestion} />
-                <div className="revive-actions explanation-actions">
-                  <button type="button" className="quiz-next-button secondary" onClick={hideQuizExplanation}><ActionIcon name="arrow_back" />Kembali</button>
+                <div className="vc-revive-actions vc-explanation-actions">
+                  <button type="button" className="vc-quiz-button secondary" onClick={hideQuizExplanation}><ActionIcon name="arrow_back" />Kembali</button>
                 </div>
               </div>
             )}
 
             {quiz.status === 'complete' && (
-              <div className="quiz-complete" aria-live="polite">
+              <div className="vc-quiz-complete" aria-live="polite">
                 <div className="mini-badge gold">Revive Berhasil</div>
                 <h2>Ayam hidup lagi!</h2>
                 <p>+{REVIVE_COIN_REWARD} koin. Lanjutkan dari skor terakhir.</p>
-                <div className="quiz-complete-actions">
-                  <button type="button" className="quiz-next-button primary" onClick={reviveFromQuiz}>Lanjut</button>
+                <div className="vc-quiz-complete-actions">
+                  <button type="button" className="vc-quiz-button primary" onClick={reviveFromQuiz}>Lanjut</button>
                 </div>
               </div>
             )}

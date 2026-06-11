@@ -128,13 +128,22 @@ if (!/wheel: new THREE\.BoxGeometry\(9\.5, 6, 9\.5\)/.test(rendererSource) || !/
   console.error('Vehicle/train wheels should stay slightly enlarged and aligned to road/rail surfaces.');
   process.exit(1);
 }
-const cssSource = readFileSync('src/game/VoxelCrossing.css', 'utf8');
+const cssSource = [
+  'src/game/VoxelCrossing.css',
+  'src/game/styles/index.css',
+  'src/game/styles/legacy.css',
+  'src/game/styles/tokens.css',
+  'src/game/styles/hud.css',
+  'src/game/styles/controls.css',
+  'src/game/styles/menu.css',
+  'src/game/styles/quiz.css'
+].map((file) => readFileSync(file, 'utf8')).join('\n');
 if (!/const QUIZ_SIZE = 1;/.test(crossingSource) || !/const MAX_LIVES = 2;/.test(crossingSource) || !/REVIVE_COIN_REWARD = 5/.test(crossingSource) || /GAME_OVERS_BEFORE_QUIZ/.test(crossingSource)) {
   console.error('Learning loop must use one-question revive, two-life reserve-heart flow, and no periodic 5-question quiz cycle.');
   process.exit(1);
 }
 
-if (!/reviveOfferOpen/.test(crossingSource) || !/reviveOfferPending/.test(crossingSource) || !/openReviveQuiz/.test(crossingSource) || !/reserve_heart_used/.test(crossingSource) || !/revive-offer-card/.test(cssSource) || !/revive-pending/.test(cssSource)) {
+if (!/reviveOfferOpen/.test(crossingSource) || !/reviveOfferPending/.test(crossingSource) || !/openReviveQuiz/.test(crossingSource) || !/reserve_heart_used/.test(crossingSource) || !/vc-revive-offer-card/.test(cssSource) || !/vc-revive-pending/.test(cssSource)) {
   console.error('Revive quiz must be opt-in: first hit spends reserve heart, second hit shows only revive pending/offer before any question appears.');
   process.exit(1);
 }
@@ -147,7 +156,7 @@ if (!/!reviveOfferPending && !reviveOfferOpen && !quizDue && quiz\.status === 'i
   console.error('Game-over result overlay must not render while revive pending/offer is active.');
   process.exit(1);
 }
-if (!/COINS_KEY/.test(crossingSource) || !/awardCoins\(REVIVE_COIN_REWARD(?:,\s*\{[^}]*animate:\s*true[^}]*\})?\)/.test(crossingSource) || !/coin-hud/.test(cssSource)) {
+if (!/COINS_KEY/.test(crossingSource) || !/awardCoins\(REVIVE_COIN_REWARD(?:,\s*\{[^}]*animate:\s*true[^}]*\})?\)/.test(crossingSource) || !/vc-coin-hud/.test(cssSource)) {
   console.error('Revive learning loop must include persistent coins and visible coin HUD reward feedback.');
   process.exit(1);
 }
@@ -155,7 +164,12 @@ if (!/reviveCorrect/.test(audioSource) || !/reviveWrong/.test(audioSource) || !/
   console.error('Revive quiz needs friendly correct/wrong feedback without noisy copy.');
   process.exit(1);
 }
-if (!/ChalkboardExplanationText/.test(crossingSource) || !/explanation-page/.test(crossingSource) || !/Pembahasan/.test(crossingSource) || !/explain-board/.test(cssSource)) {
+if (!/const QUIZ_FEEDBACK_DELAY_MS = 2000;/.test(crossingSource) || !/feedbackVisible: false/.test(crossingSource) || !/setTimeout\(\(\) => \{[\s\S]*feedbackVisible: true[\s\S]*QUIZ_FEEDBACK_DELAY_MS/.test(crossingSource) || !/quizFeedbackVisible && !quiz\.explanationOpen \? 'feedback-open'/.test(crossingSource)) {
+  console.error('Revive quiz feedback modal must wait 2 seconds after answer selection so the child can read the green/red answer state before the modal appears.');
+  process.exit(1);
+}
+
+if (!/ChalkboardExplanationText/.test(crossingSource) || !/vc-explanation-page/.test(crossingSource) || !/Pembahasan/.test(crossingSource) || !/vc-explain-board/.test(cssSource)) {
   console.error('Wrong revive answer must offer a full-page chalkboard text explanation, not a tiny feedback card only.');
   process.exit(1);
 }
@@ -167,11 +181,11 @@ if (!/nearest non-water open row/.test(gameSource) || !/candidate.type === 'wate
   console.error('Revive should not put the player back on a water tile that can instantly drown again.');
   process.exit(1);
 }
-if (!/font-size: 40px;/.test(cssSource) || !/background: transparent;/.test(cssSource)) {
+if (!/font-size: 40px;/.test(cssSource) || !/\.vc-life-hud[\s\S]*background: transparent;/.test(cssSource)) {
   console.error('Life HUD should use large bare hearts without background or border.');
   process.exit(1);
 }
-if (!/CHEAT MODE/.test(crossingSource) || /QA cheat mode/.test(crossingSource) || !/ctrlKey && event\.altKey && event\.shiftKey/.test(crossingSource) || !/control-visual/.test(crossingSource) || !/ControlArrowIcon/.test(crossingSource) || !/MenuActionIcon/.test(crossingSource) || !/movePadSide/.test(crossingSource) || !/move-pad-left/.test(cssSource) || !/border-radius: 999px;/.test(cssSource)) {
+if (!/CHEAT MODE/.test(crossingSource) || /QA cheat mode/.test(crossingSource) || !/ctrlKey && event\.altKey && event\.shiftKey/.test(crossingSource) || !/vc-dock-visual/.test(crossingSource) || !/ControlArrowIcon/.test(crossingSource) || !/MenuActionIcon/.test(crossingSource) || !/movePadSide/.test(crossingSource) || !/move-pad-left/.test(cssSource) || !/border-radius: 999px;/.test(cssSource)) {
   console.error('Cheat mode must be secret-hotkey only, controls should support left/right move pad, and menu/move buttons need consistent icon styling.');
   process.exit(1);
 }
@@ -335,8 +349,8 @@ if (passabilityErrors.length > 0) {
 
 console.log('Repository verification passed.');
 
-if (!/v3\.5\.4 final HUD ownership reset/.test(cssSource) || !/\.vc-shell\.move-pad-right \.menu-button \{[\s\S]*left: max\(20px/.test(cssSource) || !/\.vc-shell\.move-pad-left \.menu-button \{[\s\S]*right: max\(20px/.test(cssSource) || !/\.vc-shell \.best-hud/.test(cssSource)) {
-  console.error('HUD layout reset must keep menu opposite the move pad and keep coin/best in a compact top-right stack.');
+if (!/v3\.5\.21 owner: bottom control dock/.test(cssSource) || !/v3\.5\.22 owner: gameplay HUD/.test(cssSource) || !/\.vc-shell\.move-pad-left \.vc-control-dock[\s\S]*flex-direction: row-reverse/.test(cssSource) || !/\.vc-move-pad[\s\S]*grid-template-columns: repeat\(3, var\(--vc-control-hit-size\)\)/.test(cssSource) || !/\.vc-best-hud[\s\S]*top: calc\(var\(--vc-hud-top\) \+ var\(--vc-coin-height\) \+ 5px\)/.test(cssSource)) {
+  console.error('HUD/control ownership must keep menu opposite the move pad and keep coin/best in a compact top-right stack.');
   process.exit(1);
 }
 
@@ -350,8 +364,32 @@ if (!/ChalkboardExplanationText/.test(crossingSource) || /ExplanationVisual/.tes
   console.error('Revive explanation must use chalkboard text only, not the old visual renderer.');
   process.exit(1);
 }
-if (!/quiz-active/.test(crossingSource) || !/grid-template-columns: 1fr !important/.test(cssSource) || !/explain-board/.test(cssSource)) {
+if (!/quiz-active/.test(crossingSource) || !/vc-quiz-options[\s\S]*grid-template-columns: 1fr/.test(cssSource) || !/vc-explain-board/.test(cssSource)) {
   console.error('Revive quiz layout must disable background controls, stack action buttons, and use chalkboard explanation.');
+  process.exit(1);
+}
+
+
+if (/className="vc-hud|className="score-value|className="score-label|className="high-value|className="high-label|className="coin-hud|className="life-hud|className="best-hud|className="cheat-chip/.test(crossingSource)) {
+  console.error('HUD ownership phase 2 must not use legacy HUD class names in VoxelCrossing.jsx.');
+  process.exit(1);
+}
+if (!/vc-game-hud vc-score-hud/.test(crossingSource) || !/vc-coin-hud/.test(crossingSource) || !/vc-game-hud vc-best-hud/.test(crossingSource) || !/vc-life-hud/.test(crossingSource) || !/vc-cheat-chip/.test(crossingSource)) {
+  console.error('HUD ownership phase 2 class contract is incomplete.');
+  process.exit(1);
+}
+
+
+if (/className="(?:quiz-card|revive-card|quiz-question|quiz-question-count|quiz-options|revive-options|quiz-option|quiz-option-key|quiz-option-text|quiz-mark|quiz-next-button|quiz-feedback|quiz-feedback-title|revive-actions|explanation-page|explain-question|explain-board|revive-offer-card|revive-offer-actions)|className=\{`(?:quiz-card|quiz-option|quiz-feedback|vc-overlay quiz)/.test(crossingSource)) {
+  console.error('Quiz ownership phase 3 must not use legacy revive quiz class names in VoxelCrossing.jsx.');
+  process.exit(1);
+}
+if (!/v3\.5\.23 owner: revive quiz/.test(cssSource) || !/vc-revive-offer-card/.test(crossingSource) || !/vc-quiz-overlay vc-revive-quiz-overlay/.test(crossingSource) || !/vc-quiz-card vc-revive-card/.test(crossingSource) || !/vc-quiz-question/.test(crossingSource) || !/vc-quiz-option/.test(crossingSource) || !/vc-quiz-button/.test(crossingSource) || !/vc-explain-board/.test(crossingSource)) {
+  console.error('Quiz ownership phase 3 class contract is incomplete.');
+  process.exit(1);
+}
+if (!/\.vc-quiz-option[\s\S]*white-space: normal/.test(cssSource) || !/\.vc-quiz-option-text[\s\S]*text-overflow: unset/.test(cssSource) || !/\.vc-revive-card\.feedback-open \.vc-revive-feedback/.test(cssSource)) {
+  console.error('Quiz ownership phase 3 must keep full answer text and centered feedback modal ownership in quiz.css.');
   process.exit(1);
 }
 

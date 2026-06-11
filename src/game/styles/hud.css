@@ -1,0 +1,259 @@
+/*
+  v3.5.22 owner: gameplay HUD.
+  Owns: .vc-game-hud, .vc-score-hud, .vc-best-hud,
+  .vc-coin-hud, .vc-life-hud, .vc-cheat-chip and descendants.
+  Do not use the old HUD selectors in JSX: .vc-hud, .score-value,
+  .score-label, .high-value, .high-label, .coin-hud, .life-hud,
+  .best-hud, .cheat-chip.
+*/
+.vc-game-hud {
+  position: absolute;
+  z-index: var(--vc-hud-z);
+  display: grid;
+  place-items: center;
+  color: #f8fbff;
+  background: rgba(25, 32, 40, 0.44);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 14px 28px rgba(10, 18, 24, 0.18);
+  backdrop-filter: blur(16px) saturate(0.96);
+  -webkit-backdrop-filter: blur(16px) saturate(0.96);
+  pointer-events: none;
+}
+
+.vc-score-hud {
+  top: var(--vc-hud-top);
+  left: var(--vc-hud-left);
+  min-width: var(--vc-score-min-width);
+  min-height: var(--vc-score-min-height);
+  padding: 9px 10px 8px;
+  border-radius: 20px;
+}
+
+.vc-score-value,
+.vc-best-value {
+  line-height: 0.98;
+  font-weight: 400;
+  letter-spacing: 0.002em;
+  text-shadow: 0 2px 0 rgba(19, 27, 33, 0.22), 0 7px 14px rgba(0, 0, 0, 0.16);
+}
+
+.vc-score-value {
+  font-size: clamp(18px, 5vw, 24px);
+}
+
+.vc-score-label,
+.vc-best-label {
+  margin-top: 4px;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.vc-coin-hud {
+  position: absolute;
+  z-index: var(--vc-coin-z);
+  top: var(--vc-hud-top);
+  right: var(--vc-hud-right);
+  height: var(--vc-coin-height);
+  min-width: 0;
+  width: auto;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff7ce;
+  background: transparent;
+  box-shadow: none;
+  text-shadow: 0 2px 0 rgba(65, 34, 4, 0.38), 0 7px 14px rgba(43, 25, 6, 0.25);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.vc-coin-icon {
+  width: var(--vc-coin-icon-size);
+  height: var(--vc-coin-icon-size);
+  display: block;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 4px 0 rgba(118, 72, 8, 0.25)) drop-shadow(0 8px 12px rgba(38, 24, 5, 0.24));
+}
+
+.vc-coin-value {
+  font-size: 23px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.015em;
+  color: #fff9cc;
+}
+
+.vc-coin-hud.is-bursting .vc-coin-icon {
+  animation: vc-coin-pop-bump 620ms cubic-bezier(0.16, 1.4, 0.24, 1) both;
+}
+
+.vc-coin-hud.is-bursting .vc-coin-value {
+  animation: vc-coin-count-pop 620ms cubic-bezier(0.16, 1.4, 0.24, 1) both;
+}
+
+.vc-coin-plus {
+  position: absolute;
+  right: 6px;
+  top: -18px;
+  color: #fff2a4;
+  font-size: 17px;
+  font-weight: 900;
+  text-shadow: 0 2px 0 rgba(105, 61, 3, 0.35), 0 9px 16px rgba(39, 23, 4, 0.24);
+  animation: vc-coin-plus-float 980ms cubic-bezier(0.16, 1.1, 0.25, 1) both;
+}
+
+.vc-best-hud {
+  top: calc(var(--vc-hud-top) + var(--vc-coin-height) + 5px);
+  right: var(--vc-hud-right);
+  min-width: var(--vc-best-min-width);
+  min-height: var(--vc-best-min-height);
+  padding: 8px 10px 7px;
+  border-radius: 18px;
+  background: rgba(25, 32, 40, 0.40);
+  z-index: var(--vc-hud-z);
+}
+
+.vc-best-value {
+  font-size: 17px;
+}
+
+.vc-life-hud {
+  position: absolute;
+  z-index: var(--vc-hud-z);
+  top: calc(var(--vc-hud-top) + 3px);
+  left: calc(var(--vc-hud-left) + var(--vc-score-min-width) + 8px);
+  width: var(--vc-life-size);
+  height: var(--vc-life-size);
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+
+.vc-life-hud span {
+  font-family: "Segoe UI Symbol", "Apple Color Emoji", system-ui, sans-serif;
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 400;
+  color: #ff5368;
+  filter: drop-shadow(0 5px 10px rgba(52, 18, 23, 0.22));
+  text-shadow: 0 4px 0 rgba(96, 18, 28, 0.16), 0 9px 18px rgba(17, 26, 25, 0.2);
+}
+
+.vc-life-hud span.spent {
+  color: rgba(255, 255, 255, 0.36);
+  filter: none;
+  text-shadow: none;
+}
+
+.vc-life-hud span.lost {
+  color: #ff5368;
+  animation: vc-life-lost-blink 920ms ease-out both;
+}
+
+.vc-cheat-chip {
+  position: absolute;
+  z-index: var(--vc-hud-z);
+  top: calc(var(--vc-hud-top) + 4px);
+  left: calc(var(--vc-hud-left) + var(--vc-score-min-width) + 12px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  color: #fff4bd;
+  background: rgba(30, 25, 10, 0.46);
+  border: 1px solid rgba(255, 222, 114, 0.32);
+  box-shadow: 0 13px 26px rgba(52, 31, 6, 0.17);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.vc-shell.vc-menu-open .vc-game-hud,
+.vc-shell.vc-menu-open .vc-coin-hud,
+.vc-shell.vc-menu-open .vc-life-hud,
+.vc-shell.vc-menu-open .vc-cheat-chip {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.vc-shell.quiz-active .vc-game-hud,
+.vc-shell.quiz-active .vc-coin-hud,
+.vc-shell.quiz-active .vc-life-hud,
+.vc-shell.quiz-active .vc-cheat-chip {
+  pointer-events: none;
+  opacity: 0.34;
+  filter: blur(1.2px) saturate(0.72);
+}
+
+@keyframes vc-life-lost-blink {
+  0% { transform: scale(1); opacity: 1; }
+  14% { transform: scale(1.32); opacity: 1; }
+  30% { transform: scale(0.86); opacity: 0.38; }
+  46% { transform: scale(1.18); opacity: 1; }
+  62% { transform: scale(0.9); opacity: 0.32; }
+  78% { transform: scale(1.06); opacity: 0.86; }
+  100% { transform: scale(1); opacity: 0.36; color: rgba(255, 255, 255, 0.36); }
+}
+
+@keyframes vc-coin-pop-bump {
+  0% { transform: scale(1) rotate(0deg); }
+  32% { transform: scale(1.32) rotate(-9deg); }
+  62% { transform: scale(0.94) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes vc-coin-count-pop {
+  0% { transform: translateY(0) scale(1); }
+  36% { transform: translateY(-3px) scale(1.28); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes vc-coin-plus-float {
+  0% { opacity: 0; transform: translateY(10px) scale(0.82); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-24px) scale(1.18); }
+}
+
+@media (max-width: 560px) {
+  .vc-score-value { font-size: 22px; }
+  .vc-best-value { font-size: 17px; }
+  .vc-score-label,
+  .vc-best-label { font-size: 8.5px; }
+  .vc-life-hud span { font-size: 36px; }
+  .vc-coin-value { font-size: 22px; }
+}
+
+@media (min-width: 1200px) {
+  .vc-score-value { font-size: 28px; }
+  .vc-best-value { font-size: 19px; }
+  .vc-score-label,
+  .vc-best-label { font-size: 10px; }
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  .vc-game-hud {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

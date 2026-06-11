@@ -35,3 +35,53 @@
     --vc-menu-panel-width: min(390px, calc(100% - 28px));
   }
 }
+
+/* v3.5.22 HUD ownership tokens: shared HUD geometry only. */
+.vc-shell {
+  --vc-hud-top: max(12px, env(safe-area-inset-top));
+  --vc-hud-left: max(12px, env(safe-area-inset-left));
+  --vc-hud-right: max(12px, env(safe-area-inset-right));
+  --vc-hud-z: 6;
+  --vc-coin-z: 7;
+  --vc-score-min-width: 58px;
+  --vc-score-min-height: 50px;
+  --vc-best-min-width: 76px;
+  --vc-best-min-height: 38px;
+  --vc-coin-height: 38px;
+  --vc-coin-icon-size: 34px;
+  --vc-life-size: 42px;
+}
+
+@media (min-width: 561px) {
+  .vc-shell {
+    --vc-hud-top: max(14px, env(safe-area-inset-top));
+    --vc-hud-left: max(14px, env(safe-area-inset-left));
+    --vc-hud-right: max(14px, env(safe-area-inset-right));
+    --vc-score-min-width: 64px;
+    --vc-score-min-height: 54px;
+    --vc-best-min-width: 82px;
+    --vc-best-min-height: 42px;
+    --vc-coin-height: 42px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .vc-shell {
+    --vc-score-min-width: 72px;
+    --vc-score-min-height: 58px;
+    --vc-best-min-width: 88px;
+    --vc-best-min-height: 46px;
+    --vc-coin-height: 44px;
+    --vc-coin-icon-size: 36px;
+  }
+}
+
+/* v3.5.23 quiz ownership tokens: revive quiz and offer geometry only. */
+.vc-shell {
+  --vc-quiz-z: 32;
+  --vc-quiz-outer-pad: clamp(14px, 2.5vw, 28px);
+  --vc-quiz-card-width: 680px;
+  --vc-quiz-explain-width: 700px;
+  --vc-quiz-card-pad: clamp(14px, 2.6vw, 24px);
+  --vc-quiz-card-radius: clamp(26px, 4.5vw, 38px);
+}

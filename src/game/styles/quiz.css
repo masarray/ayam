@@ -1,0 +1,899 @@
+/*
+  v3.5.23 owner: revive quiz and revive offer overlays.
+  Owns: .vc-quiz-overlay, .vc-revive-quiz-overlay, .vc-quiz-card,
+  .vc-revive-card, .vc-quiz-question, .vc-quiz-options, .vc-quiz-option,
+  .vc-quiz-button, .vc-revive-offer-*, .vc-explain-*.
+  Do not use the old quiz selectors in JSX: .quiz-card, .revive-card,
+  .quiz-question, .quiz-options, .quiz-option, .quiz-next-button,
+  .revive-offer-card, .revive-actions, .explanation-page, .explain-board.
+*/
+.vc-revive-pending,
+.vc-revive-offer-overlay,
+.vc-quiz-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--vc-quiz-z);
+  width: 100vw;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-family: "Sniglet", ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+}
+
+.vc-revive-pending {
+  z-index: calc(var(--vc-quiz-z) - 1);
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 224, 117, 0.12), rgba(8, 13, 17, 0.22) 42%, rgba(8, 13, 17, 0.36));
+  backdrop-filter: blur(1.5px) saturate(1.03);
+  -webkit-backdrop-filter: blur(1.5px) saturate(1.03);
+  animation: vc-revive-pending-fade 240ms ease both;
+}
+
+.vc-revive-offer-overlay {
+  padding: var(--vc-quiz-outer-pad);
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 222, 118, 0.13), rgba(15, 22, 25, 0.22) 38%, rgba(9, 14, 18, 0.42));
+  backdrop-filter: blur(3px) saturate(1.04);
+  -webkit-backdrop-filter: blur(3px) saturate(1.04);
+}
+
+.vc-revive-offer-card {
+  width: min(380px, calc(100vw - 36px));
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px 22px 20px;
+  border-radius: 30px;
+  text-align: center;
+  color: #f9fbff;
+  background:
+    linear-gradient(145deg, rgba(22, 31, 42, 0.88), rgba(38, 48, 60, 0.74)),
+    radial-gradient(circle at 50% 0%, rgba(255, 218, 90, 0.22), transparent 48%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 34px 90px rgba(5, 10, 18, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  animation: vc-revive-offer-pop 360ms cubic-bezier(0.16, 1.28, 0.3, 1) both;
+}
+
+.vc-revive-offer-icon {
+  width: 62px;
+  height: 62px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 23px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff5368, #ff9554);
+  box-shadow: 0 18px 34px rgba(212, 56, 86, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.44);
+}
+
+.vc-revive-offer-card h2,
+.vc-quiz-loading h2,
+.vc-quiz-complete h2,
+.vc-explanation-page h2 {
+  margin: 0;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+
+.vc-revive-offer-card h2 {
+  font-size: clamp(34px, 8vw, 48px);
+}
+
+.vc-revive-offer-copy {
+  max-width: 310px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.22;
+  color: rgba(248, 251, 255, 0.9);
+}
+
+.vc-revive-offer-actions,
+.vc-revive-actions,
+.vc-explanation-actions,
+.vc-quiz-complete-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.vc-quiz-overlay {
+  padding: var(--vc-quiz-outer-pad);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(107, 139, 255, 0.26), transparent 35%),
+    radial-gradient(circle at 50% 76%, rgba(255, 215, 87, 0.12), transparent 38%),
+    rgba(12, 18, 28, 0.62);
+  backdrop-filter: blur(10px) saturate(1.12);
+  -webkit-backdrop-filter: blur(10px) saturate(1.12);
+  opacity: 0;
+  transform: scale(0.985);
+  filter: saturate(0.96) brightness(0.98);
+  transition:
+    opacity 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform, filter;
+}
+
+.vc-quiz-overlay.reveal {
+  opacity: 1;
+  transform: scale(1);
+  filter: saturate(1) brightness(1);
+}
+
+.vc-quiz-card {
+  position: relative;
+  width: min(var(--vc-quiz-card-width), calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  min-height: auto;
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  overflow: hidden auto;
+  margin: 0 auto;
+  padding: var(--vc-quiz-card-pad);
+  border-radius: var(--vc-quiz-card-radius);
+  color: #fff;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.18), transparent 32%),
+    linear-gradient(155deg, rgba(73, 61, 164, 0.96), rgba(44, 72, 162, 0.93) 48%, rgba(31, 43, 106, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 26px 72px rgba(9, 13, 30, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  transform: translateY(14px) scale(0.982);
+  transition:
+    opacity 300ms cubic-bezier(0.18, 0.9, 0.2, 1),
+    transform 300ms cubic-bezier(0.18, 0.9, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+.vc-quiz-overlay.reveal .vc-quiz-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.vc-quiz-overlay.explain-open .vc-quiz-card {
+  width: min(var(--vc-quiz-explain-width), calc(100vw - 28px));
+}
+
+.vc-quiz-glow {
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(255, 231, 105, 0.28), transparent 34%),
+    radial-gradient(circle at 88% 16%, rgba(100, 221, 255, 0.18), transparent 32%);
+  filter: blur(4px);
+}
+
+.vc-quiz-loading,
+.vc-quiz-complete {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+  color: #f8fbff;
+}
+
+.vc-quiz-loading h2,
+.vc-quiz-complete h2 {
+  font-size: clamp(28px, 6vw, 42px);
+}
+
+.vc-quiz-loading p,
+.vc-quiz-complete p {
+  max-width: 390px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.38;
+  color: rgba(248, 251, 255, 0.78);
+}
+
+.vc-quiz-loader-ring {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff5a8;
+  animation: vc-quiz-loader-spin 760ms linear infinite;
+}
+
+.vc-quiz-question {
+  position: relative;
+  min-height: clamp(210px, 32dvh, 270px);
+  margin: 0;
+  padding: 18px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  border-radius: clamp(24px, 5vw, 30px);
+  color: #f9fff5;
+  background:
+    linear-gradient(90deg, rgba(141, 93, 45, 0.95), rgba(183, 124, 58, 0.98)) top/100% 10px no-repeat,
+    linear-gradient(90deg, rgba(141, 93, 45, 0.95), rgba(183, 124, 58, 0.98)) bottom/100% 10px no-repeat,
+    linear-gradient(180deg, #1f6f62 0%, #175c54 58%, #124b48 100%);
+  border: 1px solid rgba(255, 237, 178, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -4px 0 rgba(7, 37, 38, 0.26),
+    0 16px 36px rgba(10, 14, 52, 0.2);
+  overflow: hidden;
+}
+
+.vc-quiz-question::before {
+  content: "";
+  position: absolute;
+  inset: 12px 16px;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 25%, rgba(255, 255, 255, 0.08), transparent 16%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent 22%, rgba(255, 255, 255, 0.035) 56%, transparent 84%);
+  mix-blend-mode: screen;
+}
+
+.vc-quiz-question-count {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: #125044;
+  background: rgba(248, 255, 229, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  box-shadow: 0 7px 18px rgba(5, 37, 37, 0.16);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.vc-quiz-question h2 {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: #f9fff5;
+  text-align: center;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  font-size: clamp(20px, var(--question-fit-size, 32px), 44px);
+  line-height: 1.1;
+  font-weight: 400;
+  letter-spacing: 0.002em;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.14), 0 12px 26px rgba(0, 0, 0, 0.18);
+}
+
+.vc-quiz-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-auto-rows: minmax(64px, auto);
+  align-content: start;
+  align-items: stretch;
+  gap: 11px;
+  margin: 0;
+  overflow: visible;
+}
+
+.vc-quiz-option {
+  appearance: none;
+  width: 100%;
+  min-height: 64px;
+  height: auto;
+  max-height: none;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 11px 14px;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  color: #172033;
+  background: linear-gradient(180deg, #fff, #eef4ff);
+  box-shadow:
+    0 8px 0 rgba(20, 16, 74, 0.22),
+    0 20px 42px rgba(10, 14, 52, 0.16),
+    inset 0 2px 0 rgba(255, 255, 255, 0.9);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  white-space: normal;
+  overflow: visible;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1.35, 0.34, 1),
+    filter 160ms ease,
+    box-shadow 180ms cubic-bezier(0.16, 1.35, 0.34, 1),
+    background 160ms ease;
+}
+
+.vc-quiz-option:not(:disabled):hover {
+  filter: brightness(1.045) saturate(1.05);
+}
+
+.vc-shell .vc-quiz-option:not(:disabled):active {
+  transform: translateY(4px) scale(0.965) !important;
+  filter: brightness(0.98) saturate(1.08);
+}
+
+.vc-quiz-option-key {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  align-self: center;
+  justify-self: center;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #5b7cff, #41c8ff);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45), 0 8px 16px rgba(8, 13, 47, 0.16);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.vc-quiz-option:nth-child(2) .vc-quiz-option-key { background: linear-gradient(135deg, #ff8d46, #ffd158); color: #35200b; }
+.vc-quiz-option:nth-child(3) .vc-quiz-option-key { background: linear-gradient(135deg, #ff5fa8, #ff8dce); }
+.vc-quiz-option:nth-child(4) .vc-quiz-option-key { background: linear-gradient(135deg, #44cf7a, #a9e85b); color: #142b17; }
+
+.vc-quiz-option-text {
+  align-self: center;
+  display: block;
+  min-width: 0;
+  padding: 2px 2px 2px 0;
+  color: #172033;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  -webkit-box-orient: initial;
+  max-height: none;
+  font-size: clamp(14px, 2.15vw, 17px);
+  line-height: 1.3;
+  font-weight: 400;
+  letter-spacing: 0.002em;
+}
+
+.vc-quiz-option.correct {
+  background: linear-gradient(180deg, #f2ffea, #c9f96e);
+  border-color: rgba(199, 255, 91, 0.96);
+}
+
+.vc-quiz-option.wrong {
+  background: linear-gradient(180deg, #fff0f4, #ff9eb4);
+  border-color: rgba(255, 111, 142, 0.96);
+}
+
+.vc-quiz-option.dimmed {
+  opacity: 0.48;
+  filter: saturate(0.74);
+}
+
+.vc-quiz-mark {
+  align-self: center;
+  justify-self: center;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.vc-quiz-mark svg,
+.vc-action-icon {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.vc-quiz-button {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  color: #f8fbff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 13px 28px rgba(4, 10, 24, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  font-size: clamp(15px, 3.8vw, 18px);
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: 0.002em;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1.35, 0.34, 1),
+    filter 160ms ease,
+    box-shadow 180ms cubic-bezier(0.16, 1.35, 0.34, 1),
+    background 160ms ease;
+}
+
+.vc-quiz-button.primary {
+  color: #173123;
+  background: linear-gradient(135deg, #fff2a4, #a9f06a 60%, #45d68a);
+  border-color: rgba(255, 255, 255, 0.54);
+}
+
+.vc-quiz-button.secondary {
+  color: #f8fbff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.vc-quiz-button:not(:disabled):hover {
+  filter: brightness(1.055) saturate(1.04);
+}
+
+.vc-shell .vc-quiz-button:not(:disabled):active {
+  transform: translateY(4px) scale(0.965) !important;
+  filter: brightness(0.98) saturate(1.08);
+}
+
+.vc-quiz-feedback {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  margin-top: 10px;
+  border-radius: 28px;
+  text-align: center;
+}
+
+.vc-quiz-feedback.good {
+  background: rgba(193, 255, 171, 0.16);
+}
+
+.vc-quiz-feedback.try {
+  background: rgba(255, 175, 181, 0.16);
+}
+
+.vc-quiz-feedback-title {
+  font-size: clamp(18px, 4vw, 24px);
+  line-height: 1.08;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.vc-correct-coin-reward {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.vc-inline-coin-icon {
+  width: 1.2em;
+  height: 1.2em;
+  display: inline-block;
+  vertical-align: -0.16em;
+  filter: drop-shadow(0 2px 2px rgba(109, 66, 7, 0.2));
+}
+
+.vc-revive-card.feedback-open {
+  overflow: hidden;
+}
+
+.vc-revive-card.feedback-open::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgba(19, 24, 42, 0.34);
+  backdrop-filter: blur(4px) saturate(0.92);
+  -webkit-backdrop-filter: blur(4px) saturate(0.92);
+}
+
+.vc-revive-card.feedback-open .vc-quiz-question,
+.vc-revive-card.feedback-open .vc-quiz-options,
+.vc-revive-card.feedback-open .vc-revive-actions.pre-answer {
+  filter: blur(3.8px) saturate(0.78);
+  opacity: 0.42;
+  transform: scale(0.985);
+  pointer-events: none;
+  transition: filter 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.vc-revive-card.feedback-open .vc-revive-feedback {
+  position: absolute;
+  z-index: 24;
+  left: 50%;
+  top: 50%;
+  width: min(390px, calc(100% - 34px));
+  margin: 0;
+  padding: 20px;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 14px;
+  border-radius: 30px;
+  background:
+    linear-gradient(155deg, rgba(73, 61, 164, 0.98), rgba(44, 72, 162, 0.98) 48%, rgba(31, 43, 106, 0.99));
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 26px 72px rgba(9, 13, 30, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  animation: vc-revive-feedback-modal-pop 220ms cubic-bezier(0.15, 1.2, 0.28, 1) both;
+}
+
+.vc-revive-card.feedback-open.feedback-good .vc-revive-feedback {
+  background:
+    radial-gradient(circle at 50% -8%, rgba(255, 231, 105, 0.38), transparent 46%),
+    linear-gradient(155deg, rgba(46, 135, 96, 0.98), rgba(53, 108, 169, 0.98) 58%, rgba(38, 56, 127, 0.99));
+}
+
+.vc-revive-card.feedback-open.feedback-try .vc-revive-feedback {
+  background:
+    radial-gradient(circle at 50% -8%, rgba(255, 156, 93, 0.32), transparent 45%),
+    linear-gradient(155deg, rgba(147, 57, 92, 0.98), rgba(79, 65, 162, 0.98) 58%, rgba(43, 55, 126, 0.99));
+}
+
+.vc-revive-card.feedback-open .vc-quiz-feedback-title {
+  font-size: clamp(20px, 5.5vw, 28px);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.vc-explanation-page {
+  display: grid;
+  gap: 12px;
+  color: #f8fbff;
+}
+
+.vc-explanation-page .mini-badge {
+  justify-self: center;
+}
+
+.vc-explanation-page h2 {
+  text-align: center;
+  font-size: clamp(28px, 5.2vw, 38px);
+}
+
+.vc-explain-question {
+  border-radius: 18px;
+  padding: 13px 15px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  line-height: 1.32;
+  font-size: 14px;
+}
+
+.vc-explain-board {
+  min-height: clamp(280px, 44dvh, 420px);
+  border-radius: 24px;
+  padding: clamp(18px, 3.4vw, 28px);
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.1), transparent 32%),
+    linear-gradient(145deg, #123f38, #0d2f2d 72%, #0a2527);
+  border: 8px solid #9b6a2d;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.07), 0 18px 36px rgba(5, 12, 20, 0.18);
+  color: #f7fff0;
+}
+
+.vc-explain-board-label {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 2px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(235, 255, 220, 0.92);
+  color: #14532d;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vc-explain-board p {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  font-size: var(--explain-fit-size, 22px);
+  line-height: 1.48;
+  font-weight: 400;
+  letter-spacing: 0.002em;
+}
+
+.vc-quiz-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vc-quiz-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.vc-quiz-dots span.active {
+  background: #fff4a8;
+}
+
+@keyframes vc-revive-pending-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes vc-revive-offer-pop {
+  from { opacity: 0; transform: translateY(20px) scale(0.91); }
+  62% { opacity: 1; transform: translateY(-4px) scale(1.025); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes vc-quiz-loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes vc-revive-feedback-modal-pop {
+  0% { opacity: 0; transform: translate(-50%, -44%) scale(0.9); }
+  72% { opacity: 1; transform: translate(-50%, -51%) scale(1.025); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@media (max-width: 560px) {
+  .vc-quiz-overlay {
+    padding: 0;
+    place-items: stretch;
+  }
+
+  .vc-quiz-card {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding:
+      max(14px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(14px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+    align-content: center;
+    overflow: hidden auto;
+  }
+
+  .vc-quiz-question {
+    min-height: clamp(190px, 32dvh, 270px);
+    padding: 14px;
+  }
+
+  .vc-quiz-options {
+    grid-auto-rows: minmax(62px, auto);
+    gap: 11px;
+  }
+
+  .vc-quiz-option {
+    min-height: 62px;
+    padding: 11px 12px;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    column-gap: 10px;
+  }
+
+  .vc-quiz-option-key {
+    width: 40px;
+    height: 40px;
+  }
+
+  .vc-quiz-option-text {
+    font-size: clamp(13.5px, 4.2vw, 16px);
+    line-height: 1.24;
+  }
+
+  .vc-revive-card.feedback-open .vc-revive-feedback {
+    width: min(360px, calc(100vw - 28px));
+    padding: 18px;
+    border-radius: 28px;
+  }
+
+  .vc-explain-board {
+    min-height: 320px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .vc-quiz-card {
+    width: min(760px, calc(100vw - 24px));
+    max-height: calc(100dvh - 20px);
+    gap: 9px;
+  }
+
+  .vc-quiz-question {
+    min-height: 160px;
+  }
+}
+
+/*
+  v3.5.24 revive-offer rescue layer.
+  Root cause: phase 3 renamed the revive offer classes, but the old premium
+  offer card relied on legacy selectors and several old button selectors.
+  These rules are the new single owner for the compact revive offer only.
+*/
+.vc-shell .vc-revive-offer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--vc-quiz-z);
+  width: 100vw;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 225, 116, 0.18), rgba(18, 26, 30, 0.24) 36%, rgba(6, 10, 14, 0.52) 100%);
+  backdrop-filter: blur(8px) saturate(1.08) brightness(0.94);
+  -webkit-backdrop-filter: blur(8px) saturate(1.08) brightness(0.94);
+  pointer-events: auto;
+}
+
+.vc-shell .vc-revive-offer-card {
+  width: min(360px, calc(100vw - 36px));
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px 22px 20px;
+  border-radius: 30px;
+  text-align: center;
+  color: #f9fbff;
+  background:
+    radial-gradient(circle at 50% -12%, rgba(255, 227, 112, 0.24), transparent 48%),
+    linear-gradient(145deg, rgba(22, 31, 42, 0.92), rgba(38, 48, 60, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 34px 90px rgba(5, 10, 18, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  overflow: hidden;
+  isolation: isolate;
+  animation: vc-revive-offer-pop 360ms cubic-bezier(0.16, 1.28, 0.3, 1) both;
+}
+
+.vc-shell .vc-revive-offer-card::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: 29px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 44%),
+    radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.16), transparent 32%);
+  pointer-events: none;
+}
+
+.vc-shell .vc-revive-offer-icon {
+  width: 62px;
+  height: 62px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 23px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff5368, #ff9554);
+  box-shadow:
+    0 18px 34px rgba(212, 56, 86, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44);
+}
+
+.vc-shell .vc-revive-offer-card .mini-badge.gold {
+  margin: 2px 0 0;
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: #2b210a;
+  background: linear-gradient(135deg, #fff1a8, #ffd46d 62%, #f4b83d);
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  box-shadow:
+    0 12px 24px rgba(95, 62, 9, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.vc-shell .vc-revive-offer-card h2 {
+  margin: 2px 0 0;
+  font-size: clamp(34px, 8vw, 48px);
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18), 0 12px 26px rgba(0, 0, 0, 0.22);
+}
+
+.vc-shell .vc-revive-offer-copy {
+  max-width: 310px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.22;
+  color: rgba(248, 251, 255, 0.9);
+}
+
+.vc-shell .vc-revive-offer-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  justify-items: stretch;
+  align-items: stretch;
+  margin-top: 8px;
+}
+
+.vc-shell .vc-revive-offer-actions .vc-quiz-button {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  margin: 0;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  font-size: clamp(15px, 3.8vw, 18px);
+  line-height: 1;
+  letter-spacing: 0.002em;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow:
+    0 13px 28px rgba(4, 10, 24, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.vc-shell .vc-revive-offer-actions .vc-quiz-button.primary {
+  color: #173123;
+  background: linear-gradient(135deg, #fff2a4, #a9f06a 60%, #45d68a);
+  border-color: rgba(255, 255, 255, 0.54);
+}
+
+.vc-shell .vc-revive-offer-actions .vc-quiz-button.secondary {
+  color: #f8fbff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.vc-shell .vc-revive-offer-actions .vc-quiz-button:not(:disabled):active {
+  transform: translateY(4px) scale(0.965) !important;
+  filter: brightness(0.98) saturate(1.08);
+}
+
+@media (max-width: 560px) {
+  .vc-shell .vc-revive-offer-overlay {
+    padding: max(16px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  }
+
+  .vc-shell .vc-revive-offer-card {
+    width: min(342px, calc(100vw - 30px));
+    padding: 23px 20px 19px;
+  }
+}
