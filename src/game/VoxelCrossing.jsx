@@ -6,11 +6,13 @@ import './VoxelCrossing.css';
 
 const SETTINGS_KEY = 'ayam-sd-settings';
 const SAVE_GAME_KEY = 'ayam-sd-save-game-v1';
+const COINS_KEY = 'ayam-sd-coins-v1';
 const INSTALL_PROMPT_KEY = 'ayam-sd-install-prompt-v1';
 const SEEN_QUESTIONS_KEY = 'ayam-sd-seen-questions-v1';
-const QUIZ_SIZE = 5;
-const GAME_OVERS_BEFORE_QUIZ = 3;
-const QUIZ_APPEAR_DELAY_MS = 300;
+const QUIZ_SIZE = 1;
+const REVIVE_COIN_REWARD = 5;
+const QUIZ_APPEAR_DELAY_MS = 220;
+const REVIVE_OFFER_DELAY_MS = 460;
 const MAX_LIVES = 2;
 const PLAY_KEYS = new Set([' ', 'spacebar', 'enter', 'w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 const ACTIVE_QUIZ_STATES = new Set(['loading', 'running', 'complete']);
@@ -23,7 +25,9 @@ const QUIZ_INITIAL = {
   index: 0,
   selectedKey: null,
   correctCount: 0,
-  lastCorrect: null
+  lastCorrect: null,
+  explanationOpen: false,
+  reviveAwarded: false
 };
 
 function isPlayKey(event) {
@@ -72,6 +76,23 @@ function writeSavedGame(saveState) {
     localStorage.setItem(SAVE_GAME_KEY, JSON.stringify(saveState));
   } catch {
     // Save is optional; gameplay continues even when storage is blocked.
+  }
+}
+
+function loadCoins() {
+  try {
+    const value = Number(localStorage.getItem(COINS_KEY) || 0);
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveCoins(value) {
+  try {
+    localStorage.setItem(COINS_KEY, String(Math.max(0, Math.floor(Number(value) || 0))));
+  } catch {
+    // Coins are a reward layer only; gameplay still works when storage is blocked.
   }
 }
 
@@ -300,7 +321,15 @@ const MATERIAL_ICON_PATHS = Object.freeze({
   restore: 'M13 3c-4.97 0-9 4.03-9 9H1l4 4 4-4H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.78-4.95-2.05l-1.42 1.42C8.27 20 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.25 2.52.75-1.23-3.5-2.08V8z',
   workspace_premium: 'M12 3 14.39 8.26 20 8.91 15.86 12.7 16.97 18.25 12 15.46 7.03 18.25 8.14 12.7 4 8.91 9.61 8.26zM9 19.39 12 18l3 1.39V22l-3-1.4L9 22z',
   download: 'M5 20h14v-2H5zm14-9h-4V3H9v8H5l7 7z',
-  settings: 'M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z'
+  settings: 'M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z',
+  monetization_on: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 15.09V19h-2.67v-1.93c-1.76-.36-3.18-1.51-3.26-3.67h1.96c.1 1.05.82 1.87 2.64 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V5h2.67v1.95c1.92.46 2.88 1.9 2.94 3.45H14.4c-.05-1.11-.64-1.87-2.33-1.87-1.61 0-2.4.73-2.4 1.56 0 .72.54 1.35 2.67 1.9 2.13.54 4.18 1.43 4.18 3.91 0 1.83-1.38 2.91-3.11 3.19z',
+  favorite: 'M12 21.35 10.55 20.03C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z',
+  check_circle: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8z',
+  cancel: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12z',
+  school: 'M12 3 1 9l4 2.18v6L12 21l7-3.82v-6L21 10.09V17h2V9zM5.18 9 12 5.28 18.82 9 12 12.72z',
+  menu_book: 'M21 4.5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5C10.55 4.4 8.45 4 6.5 4 4.55 4 2.45 4.4 1 5.5v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 19.95 5.05 19.5 6.5 19.5c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V5.5c-.6-.45-1.25-.75-2-1zM21 18c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V7.5C13.35 6.65 15.8 6 17.5 6c1.2 0 2.4.15 3.5.5z',
+  arrow_back: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z',
+  add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z'
 });
 
 function MaterialIcon({ name, size = 24, className = '' }) {
@@ -310,6 +339,14 @@ function MaterialIcon({ name, size = 24, className = '' }) {
       <path d={path} fill="currentColor" />
     </svg>
   );
+}
+
+function CoinIcon() {
+  return <MaterialIcon name="monetization_on" size={18} className="coin-icon-glyph" />;
+}
+
+function ActionIcon({ name }) {
+  return <MaterialIcon name={name} size={18} className="action-icon" />;
 }
 
 function MenuIcon() {
@@ -338,7 +375,8 @@ function MenuActionIcon({ name }) {
     continue: 'restore',
     badge: 'workspace_premium',
     install: 'download',
-    settings: 'settings'
+    settings: 'settings',
+    close: 'close'
   }[name] || 'settings';
   return (
     <span className={`menu-action-icon-wrap ${name}`} aria-hidden="true">
@@ -563,6 +601,24 @@ function questionFitStyle(questionText = '') {
   return { '--question-fit-size': `${size}px` };
 }
 
+function explanationTextFitStyle(text = '') {
+  const length = String(text || '').length;
+  const size = Math.max(19, Math.min(28, Math.round(620 / Math.max(18, Math.sqrt(length) * 2.75))));
+  return { '--explain-fit-size': `${size}px` };
+}
+
+function ChalkboardExplanationText({ question }) {
+  const correctText = question?.options?.find((option) => option.key === question.answerKey)?.text || question?.answerKey || '';
+  const explanation = question?.explanationText || 'Gunakan cara singkat, lalu cocokkan dengan jawaban yang benar.';
+  const text = `Jawaban benar: ${correctText}\n\n${explanation}`;
+  return (
+    <div className="explain-board" style={explanationTextFitStyle(text)} aria-label="Papan pembahasan jawaban">
+      <div className="explain-board-label"><MaterialIcon name="menu_book" size={17} /> Pembahasan</div>
+      <p>{text}</p>
+    </div>
+  );
+}
+
 function runWhenIdle(callback, timeout = 900) {
   if (typeof window === 'undefined') return 0;
   if ('requestIdleCallback' in window) {
@@ -619,6 +675,7 @@ export default function VoxelCrossing({
   const quizStartingRef = useRef(false);
   const gameOverCycleRef = useRef(0);
   const quizActiveMountedRef = useRef(false);
+  const reviveOfferTimerRef = useRef(null);
   const confettiTimerRef = useRef(null);
   const nearMissTimerRef = useRef(null);
   const badgeQueueRef = useRef([]);
@@ -650,6 +707,8 @@ export default function VoxelCrossing({
   const [lastRunScore, setLastRunScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [lives, setLives] = useState(MAX_LIVES);
+  const [coins, setCoins] = useState(() => loadCoins());
+  const [coinBurst, setCoinBurst] = useState(null);
   const [lifeBlinkIndex, setLifeBlinkIndex] = useState(null);
   const [orientationHint, setOrientationHint] = useState('landscape');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -659,8 +718,9 @@ export default function VoxelCrossing({
   const [savedGame, setSavedGame] = useState(() => loadSavedGame());
   const [saveNotice, setSaveNotice] = useState('');
   const [quizDue, setQuizDue] = useState(false);
+  const [reviveOfferOpen, setReviveOfferOpen] = useState(false);
+  const [reviveOfferPending, setReviveOfferPending] = useState(false);
   const [quizReveal, setQuizReveal] = useState(false);
-  const [gameOversUntilQuiz, setGameOversUntilQuiz] = useState(GAME_OVERS_BEFORE_QUIZ);
   const [quiz, setQuiz] = useState(QUIZ_INITIAL);
   const [confettiBurst, setConfettiBurst] = useState(null);
   const [nearMissBurst, setNearMissBurst] = useState(null);
@@ -893,6 +953,7 @@ export default function VoxelCrossing({
     if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
     if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
     if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
+    if (reviveOfferTimerRef.current) window.clearTimeout(reviveOfferTimerRef.current);
     cancelDeferredMusicResume();
     if (restartPrepareTaskRef.current) cancelIdleTask(restartPrepareTaskRef.current);
     cancelDeferredAudioUnlock();
@@ -904,6 +965,20 @@ export default function VoxelCrossing({
     if (confettiTimerRef.current) window.clearTimeout(confettiTimerRef.current);
     setConfettiBurst({ id: Date.now(), level });
     confettiTimerRef.current = window.setTimeout(() => setConfettiBurst(null), 2100);
+  };
+
+  const awardCoins = (amount, { animate = false } = {}) => {
+    const value = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!value) return;
+    setCoins((current) => {
+      const next = current + value;
+      saveCoins(next);
+      return next;
+    });
+    if (animate) {
+      setCoinBurst({ id: Date.now(), amount: value });
+      window.setTimeout(() => setCoinBurst(null), 980);
+    }
   };
 
   const showNextBadge = () => {
@@ -1133,8 +1208,7 @@ export default function VoxelCrossing({
       },
       onHazardSound: ({ kind }) => {
         if (kind === 'carHorn') audioRef.current?.carHorn();
-        if (kind === 'train') audioRef.current?.trainPass(false);
-        if (kind === 'bulletTrain') audioRef.current?.trainPass(true);
+        if (kind === 'truckHorn') audioRef.current?.truckHorn();
         if (kind === 'trainHorn') audioRef.current?.trainHorn();
       },
       onNearMiss: triggerNearMiss,
@@ -1145,56 +1219,80 @@ export default function VoxelCrossing({
         setResult(null);
       },
       onGameOver: (nextResult) => {
-        if (livesRef.current > 0 && game.continueAfterLife?.()) {
-          const nextLives = Math.max(0, livesRef.current - 1);
+        // Native-game style learning loop:
+        // 1st impact consumes the reserve heart and respawns silently.
+        // 2nd impact pauses the game, then shows a centered revive offer card.
+        // Quiz is never shown until the player chooses it.
+        if (livesRef.current > 1) {
+          const nextLives = 1;
           livesRef.current = nextLives;
           setLives(nextLives);
-          setLifeBlinkIndex(nextLives);
+          setLifeBlinkIndex(0);
           if (lifeBlinkTimerRef.current) window.clearTimeout(lifeBlinkTimerRef.current);
           lifeBlinkTimerRef.current = window.setTimeout(() => {
             setLifeBlinkIndex(null);
             lifeBlinkTimerRef.current = null;
           }, 920);
+
+          const revived = gameRef.current?.continueAfterLife?.(1250) === true;
           setImpacting(false);
           setGameOver(false);
           setStarted(true);
           setResult(null);
           setQuizDue(false);
+          setReviveOfferOpen(false);
+          setReviveOfferPending(false);
           setQuizReveal(false);
-          setSaveNotice(nextLives > 0 ? `Nyawa tersisa ${nextLives}` : 'Kesempatan terakhir');
-          window.setTimeout(() => setSaveNotice(''), 1200);
+          setQuiz(QUIZ_INITIAL);
+          gameOverRef.current = false;
+          startedRef.current = true;
+          quizDueRef.current = false;
+          quizStatusRef.current = QUIZ_INITIAL.status;
+          trackProfileEvent('reserve_heart_used', { score: nextResult.score, reason: nextResult.reason });
+          if (revived) {
+            setSaveNotice('Hati cadangan terpakai · lanjut!');
+            window.setTimeout(() => setSaveNotice(''), 1350);
+            deferMusicResume(3600);
+          } else {
+            startGame();
+          }
           return;
         }
 
-        const nextCycleCount = gameOverCycleRef.current + 1;
-        const shouldStartQuiz = nextCycleCount >= GAME_OVERS_BEFORE_QUIZ;
-        gameOverCycleRef.current = shouldStartQuiz ? 0 : nextCycleCount;
+        gameOverCycleRef.current = 0;
+        livesRef.current = 0;
+        setLives(0);
+        setLifeBlinkIndex(null);
+        if (lifeBlinkTimerRef.current) {
+          window.clearTimeout(lifeBlinkTimerRef.current);
+          lifeBlinkTimerRef.current = null;
+        }
 
         setImpacting(false);
         setGameOver(true);
         gameOverRef.current = true;
         startedRef.current = false;
-        quizDueRef.current = shouldStartQuiz;
+        quizDueRef.current = false;
         quizStatusRef.current = QUIZ_INITIAL.status;
-        syncBackgroundMusicContext(shouldStartQuiz ? 'quiz-due' : 'game-over');
+        syncBackgroundMusicContext('revive-offer-pending');
         setStarted(false);
         setMenuOpen(false);
         setSettingsOpen(false);
         setResult(nextResult);
         setScore(nextResult.score);
         setLastRunScore(nextResult.score);
-        setQuizDue(shouldStartQuiz);
+        setQuizDue(false);
+        setReviveOfferOpen(false);
+        setReviveOfferPending(true);
         setQuizReveal(false);
-        setGameOversUntilQuiz(shouldStartQuiz ? 0 : GAME_OVERS_BEFORE_QUIZ - nextCycleCount);
-        trackProfileEvent('game_over', { score: nextResult.score });
-        if (restartPrepareTaskRef.current) cancelIdleTask(restartPrepareTaskRef.current);
-        // Prepare the next run behind the result card, not when the child taps
-        // Mulai Main. A short idle timeout avoids restart-button freezes while the
-        // visible result overlay masks the rebuild cost on weaker phones.
-        restartPrepareTaskRef.current = runWhenIdle(() => {
-          restartPrepareTaskRef.current = null;
-          gameRef.current?.prepareRestart?.();
-        }, 180);
+        setQuiz(QUIZ_INITIAL);
+        if (reviveOfferTimerRef.current) window.clearTimeout(reviveOfferTimerRef.current);
+        reviveOfferTimerRef.current = window.setTimeout(() => {
+          reviveOfferTimerRef.current = null;
+          setReviveOfferPending(false);
+          setReviveOfferOpen(true);
+        }, REVIVE_OFFER_DELAY_MS);
+        trackProfileEvent('revive_offer_pending', { score: nextResult.score, reason: nextResult.reason });
         onGameOver?.(nextResult);
       },
       onMilestone: (payload) => onQuestionGate?.(payload)
@@ -1234,6 +1332,28 @@ export default function VoxelCrossing({
   }, [quiz.status, quizDue]);
 
   useEffect(() => {
+    if (!quizDue || gameOver || menuOpen) return;
+
+    // Stale-state repair: quiz flags are only allowed to dim/disable gameplay
+    // while the game-over revive modal is mounted. If a flag leaks back into
+    // live gameplay, either restore the revive modal context or clear the leak.
+    if (result) {
+      setGameOver(true);
+      gameOverRef.current = true;
+      setStarted(false);
+      startedRef.current = false;
+      return;
+    }
+
+    setQuizDue(false);
+    setQuizReveal(false);
+    setQuiz(QUIZ_INITIAL);
+    quizDueRef.current = false;
+    quizStatusRef.current = QUIZ_INITIAL.status;
+    syncBackgroundMusicContext('quiz-stale-repair');
+  }, [quizDue, gameOver, menuOpen, result]);
+
+  useEffect(() => {
     const quizIsActive = ACTIVE_QUIZ_STATES.has(quiz.status);
 
     if (quizIsActive && !quizActiveMountedRef.current) {
@@ -1259,6 +1379,11 @@ export default function VoxelCrossing({
       restartPrepareTaskRef.current = null;
     }
     cancelDeferredMusicResume();
+    if (reviveOfferTimerRef.current) {
+      window.clearTimeout(reviveOfferTimerRef.current);
+      reviveOfferTimerRef.current = null;
+    }
+    setReviveOfferPending(false);
 
     // Start must stay frame-safe. Do not unlock audio, fetch media, start music,
     // or even resume the WebGL engine in this click handler. First paint the
@@ -1272,6 +1397,8 @@ export default function VoxelCrossing({
     setImpacting(false);
     setGameOver(false);
     setResult(null);
+    setReviveOfferOpen(false);
+    setReviveOfferPending(false);
     livesRef.current = MAX_LIVES;
     setLives(MAX_LIVES);
     setLifeBlinkIndex(null);
@@ -1326,6 +1453,8 @@ export default function VoxelCrossing({
     setImpacting(false);
     setGameOver(false);
     setResult(null);
+    setReviveOfferOpen(false);
+    setReviveOfferPending(false);
     setQuizDue(false);
     setQuizReveal(false);
     setQuiz(QUIZ_INITIAL);
@@ -1425,6 +1554,66 @@ export default function VoxelCrossing({
     }
   };
 
+
+  const openReviveQuiz = () => {
+    if (!gameOver || !result) return;
+    if (reviveOfferTimerRef.current) {
+      window.clearTimeout(reviveOfferTimerRef.current);
+      reviveOfferTimerRef.current = null;
+    }
+
+    // Force a real modal context before async question loading. This prevents
+    // the second revive cycle from leaking into a blurred gameplay state with
+    // no visible dialog.
+    quizStartingRef.current = false;
+    setImpacting(false);
+    setStarted(false);
+    setGameOver(true);
+    setReviveOfferOpen(false);
+    setReviveOfferPending(false);
+    setQuizReveal(false);
+    setQuizDue(true);
+    startedRef.current = false;
+    gameOverRef.current = true;
+    quizDueRef.current = true;
+    quizStatusRef.current = 'loading';
+    setQuiz({ ...QUIZ_INITIAL, status: 'loading', loading: true });
+    audioRef.current?.setMusicSuppressed?.(true);
+    audioRef.current?.forceStopMusic?.();
+
+    window.requestAnimationFrame(() => {
+      void beginQuizSession();
+    });
+
+    // Watchdog: if a stale async flag blocks the loader, retry while keeping
+    // the visible revive loading card mounted.
+    window.setTimeout(() => {
+      if (!gameOverRef.current || !quizDueRef.current) return;
+      if (quizStatusRef.current !== 'loading') return;
+      quizStartingRef.current = false;
+      void beginQuizSession();
+    }, 900);
+
+    trackProfileEvent('revive_quiz_chosen', { score: result.score });
+  };
+
+  const restartFromReviveOffer = () => {
+    if (reviveOfferTimerRef.current) {
+      window.clearTimeout(reviveOfferTimerRef.current);
+      reviveOfferTimerRef.current = null;
+    }
+    quizStartingRef.current = false;
+    setReviveOfferOpen(false);
+    setReviveOfferPending(false);
+    setQuizDue(false);
+    setQuizReveal(false);
+    setQuiz(QUIZ_INITIAL);
+    quizDueRef.current = false;
+    quizStatusRef.current = QUIZ_INITIAL.status;
+    trackProfileEvent('revive_offer_restart', { score: result?.score || lastRunScore });
+    startGame();
+  };
+
   const answerCurrentQuestion = (answerKey) => {
     if (quiz.status !== 'running' || quiz.selectedKey) return;
     unlockAudio({ allowMusic: false });
@@ -1434,44 +1623,81 @@ export default function VoxelCrossing({
     const isCorrect = answerKey === question.answerKey;
     if (isCorrect) {
       runHaptic('quizCorrect', settingsRef.current.hapticsEnabled);
-      audioRef.current?.quizCorrect();
-      trackProfileEvent('quiz_correct');
+      audioRef.current?.yayKids?.();
+      audioRef.current?.kidsYayReward?.(3);
+      audioRef.current?.reviveCorrect?.();
+      audioRef.current?.quizCorrect?.();
+      triggerConfetti('gold');
+      trackProfileEvent('revive_quiz_correct', { reward: REVIVE_COIN_REWARD });
     } else {
       runHaptic('quizWrong', settingsRef.current.hapticsEnabled);
-      audioRef.current?.quizWrong();
+      audioRef.current?.reviveWrong?.();
+      trackProfileEvent('revive_quiz_wrong');
     }
     setQuiz((current) => ({
       ...current,
       selectedKey: answerKey,
-      correctCount: current.correctCount + (isCorrect ? 1 : 0),
-      lastCorrect: isCorrect
+      correctCount: isCorrect ? 1 : 0,
+      lastCorrect: isCorrect,
+      reviveAwarded: isCorrect
     }));
+  };
+
+  const reviveFromQuiz = () => {
+    audioRef.current?.setMusicSuppressed?.(true);
+    if (quiz.reviveAwarded) {
+      audioRef.current?.coinCring?.();
+      awardCoins(REVIVE_COIN_REWARD, { animate: true });
+    }
+    const revived = gameRef.current?.continueAfterLife?.(1550) === true;
+    if (!revived) {
+      startGame();
+      return;
+    }
+    livesRef.current = MAX_LIVES;
+    setLives(MAX_LIVES);
+    setLifeBlinkIndex(null);
+    setImpacting(false);
+    setGameOver(false);
+    setStarted(true);
+    setResult(null);
+    if (reviveOfferTimerRef.current) {
+      window.clearTimeout(reviveOfferTimerRef.current);
+      reviveOfferTimerRef.current = null;
+    }
+    quizStartingRef.current = false;
+    setReviveOfferOpen(false);
+    setReviveOfferPending(false);
+    setQuizDue(false);
+    setQuizReveal(false);
+    setQuiz(QUIZ_INITIAL);
+    gameOverRef.current = false;
+    startedRef.current = true;
+    quizDueRef.current = false;
+    quizStatusRef.current = QUIZ_INITIAL.status;
+    setSaveNotice(`+${REVIVE_COIN_REWARD} koin · hidup lagi!`);
+    window.setTimeout(() => setSaveNotice(''), 1500);
+    trackProfileEvent('revived_by_quiz');
+    deferMusicResume(3200);
+  };
+
+  const showQuizExplanation = () => {
+    setQuiz((current) => ({ ...current, explanationOpen: true }));
+  };
+
+  const hideQuizExplanation = () => {
+    setQuiz((current) => ({ ...current, explanationOpen: false }));
   };
 
   const nextQuizStep = () => {
     audioRef.current?.setMusicSuppressed?.(true);
     audioRef.current?.forceStopMusic?.();
     if (quiz.status !== 'running' || !quiz.selectedKey) return;
-    if (quiz.index >= quiz.questions.length - 1) {
-      const stars = quiz.correctCount >= 5 ? 3 : quiz.correctCount >= 3 ? 2 : quiz.correctCount >= 1 ? 1 : 0;
-      audioRef.current?.quizComplete(quiz.correctCount);
-      if (stars >= 2) {
-        runHaptic('reward', settingsRef.current.hapticsEnabled);
-        audioRef.current?.kidsYayReward(stars);
-        triggerConfetti(stars >= 3 ? 'gold' : 'rainbow');
-      }
-      trackProfileEvent('quiz_finished', { stars });
-      quizStatusRef.current = 'complete';
-      syncBackgroundMusicContext('quiz-complete');
-      setQuiz((current) => ({ ...current, status: 'complete', selectedKey: null, lastCorrect: null }));
+    if (quiz.lastCorrect) {
+      reviveFromQuiz();
       return;
     }
-    setQuiz((current) => ({
-      ...current,
-      index: current.index + 1,
-      selectedKey: null,
-      lastCorrect: null
-    }));
+    showQuizExplanation();
   };
 
   useEffect(() => {
@@ -1479,7 +1705,7 @@ export default function VoxelCrossing({
       const tag = document.activeElement?.tagName?.toLowerCase();
       const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select';
       if (isTyping || menuOpen || !ready || impacting || activeBadge) return;
-      if (gameOver && (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status))) return;
+      if (gameOver && (reviveOfferOpen || quizDue || ACTIVE_QUIZ_STATES.has(quiz.status))) return;
       if ((gameOver || !started) && isPlayKey(event)) {
         event.preventDefault();
         startGame();
@@ -1487,7 +1713,7 @@ export default function VoxelCrossing({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [gameOver, impacting, menuOpen, quiz.status, quizDue, ready, started]);
+  }, [gameOver, impacting, menuOpen, quiz.status, quizDue, reviveOfferOpen, ready, started]);
 
   useEffect(() => {
     if (!gameOver || !result?.isNewHighScore) return undefined;
@@ -1512,11 +1738,11 @@ export default function VoxelCrossing({
 
   const currentQuizQuestion = quiz.questions[quiz.index];
   const quizAnswered = Boolean(quiz.selectedKey);
-  const quizTotal = quiz.questions.length || QUIZ_SIZE;
-  const learningStars = quiz.correctCount >= 5 ? 3 : quiz.correctCount >= 3 ? 2 : quiz.correctCount >= 1 ? 1 : 0;
+  const quizTotal = 1;
+  const modalOverlayActive = gameOver && !menuOpen && (reviveOfferPending || reviveOfferOpen || quizDue || ACTIVE_QUIZ_STATES.has(quiz.status) || quiz.status === 'error');
 
   return (
-    <section className={`vc-shell ${orientationHint} move-pad-${settings.movePadSide === 'left' ? 'left' : 'right'} ${menuOpen ? 'menu-open' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
+    <section className={`vc-shell ${orientationHint} move-pad-${settings.movePadSide === 'left' ? 'left' : 'right'} ${menuOpen ? 'menu-open' : ''} ${modalOverlayActive ? 'quiz-active' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
       <div ref={hostRef} className="vc-host" />
       <ConfettiBurst burst={confettiBurst} />
       <BadgeUnlockOverlay badge={activeBadge} onClose={closeBadge} />
@@ -1546,7 +1772,13 @@ export default function VoxelCrossing({
         <div className="score-label">score</div>
       </div>
 
-      <div className="vc-hud top-right">
+      <div className={`coin-hud ${coinBurst ? 'coin-bursting' : ''}`} aria-label={`Koin ${coins}`}>
+        <img className="coin-svg-icon" src={`${import.meta.env.BASE_URL}icons/coin.svg`} alt="" aria-hidden="true" />
+        <strong>{coins}</strong>
+        {coinBurst && <span key={coinBurst.id} className="coin-plus" aria-hidden="true">+{coinBurst.amount}</span>}
+      </div>
+
+      <div className="vc-hud top-right best-hud">
         <div className="high-label">best</div>
         <div className="high-value">{highScore}</div>
       </div>
@@ -1554,19 +1786,17 @@ export default function VoxelCrossing({
       {settings.cheatMode ? (
         <div className="cheat-chip" role="status" aria-label="Cheat mode aktif">CHEAT MODE</div>
       ) : (
-        <div className="life-hud" aria-label={`Nyawa tersisa ${lives} dari ${MAX_LIVES}`}>
-          {Array.from({ length: MAX_LIVES }, (_, index) => {
-            const stateClass = index < lives ? 'active' : index === lifeBlinkIndex ? 'lost' : 'spent';
-            return <span key={index} className={stateClass} aria-hidden="true">♥</span>;
-          })}
+        <div className="life-hud" aria-label={lives > 1 ? 'Hati cadangan tersedia' : 'Hati cadangan habis'}>
+          <span className={lifeBlinkIndex === 0 ? 'lost' : lives > 1 ? 'active' : 'spent'} aria-hidden="true">♥</span>
         </div>
       )}
 
       <button
         type="button"
-        className={`menu-button ${menuOpen ? 'active' : ''}`}
+        className={`menu-button ${menuOpen ? 'active' : ''} ${modalOverlayActive ? 'disabled-underlay' : ''}`}
         aria-label="Buka menu"
         aria-expanded={menuOpen}
+        disabled={modalOverlayActive}
         onPointerDown={(event) => {
           event.preventDefault();
           if (menuOpen) closeMenu({ resume: menuPausedRef.current });
@@ -1604,6 +1834,7 @@ export default function VoxelCrossing({
             <button type="button" className={`menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}><MenuActionIcon name="badge" />Papan Badge</button>
             {!standalonePwa && <button type="button" className="menu-action install" onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(false); setPwaPromptVisible(true); }}><MenuActionIcon name="install" />Install App</button>}
             <button type="button" className={`menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}><MenuActionIcon name="settings" />Settings</button>
+            <button type="button" className="menu-action" onClick={() => closeMenu({ resume: menuPausedRef.current })}><MenuActionIcon name="close" />Close</button>
           </div>
 
           {saveNotice && <div className="menu-save-note" role="status">{saveNotice}</div>}
@@ -1701,40 +1932,53 @@ export default function VoxelCrossing({
         </div>
       )}
 
-      {gameOver && !menuOpen && ACTIVE_QUIZ_STATES.has(quiz.status) && (
-        <div className={`vc-overlay quiz ${quiz.status} ${quizReveal ? 'reveal' : ''} ${result?.isNewHighScore ? 'new-record' : ''}`}>
-          <div className="quiz-card" role="dialog" aria-label="Quiz latihan">
-            <div className="quiz-glow" aria-hidden="true" />
-            <div className="quiz-topline" aria-label={`Progress quiz. Score ${resultScore}, best ${highScore}`}>
-              <span className="quiz-score-pill"><strong>{resultScore}</strong><small>Score</small></span>
-              <ProgressDots total={quizTotal} current={Math.min(quiz.index, quizTotal - 1)} />
-              <span className="quiz-score-pill"><strong>{highScore}</strong><small>Best</small></span>
+      {gameOver && !menuOpen && reviveOfferPending && quiz.status === 'idle' && (
+        <div className="vc-overlay revive-pending" aria-hidden="true" />
+      )}
+
+      {gameOver && !menuOpen && reviveOfferOpen && quiz.status === 'idle' && (
+        <div className="vc-overlay revive-offer" role="presentation">
+          <div className="revive-offer-card" role="dialog" aria-label="Tawaran hidup lagi">
+            <div className="revive-offer-icon" aria-hidden="true"><MaterialIcon name="favorite" size={30} /></div>
+            <div className="mini-badge gold">Kesempatan Kedua</div>
+            <h2>Lanjut?</h2>
+            <p className="revive-offer-copy">Score <strong>{resultScore}</strong></p>
+            <div className="revive-offer-actions">
+              <button type="button" className="quiz-next-button primary" onClick={openReviveQuiz}><ActionIcon name="school" />Jawab soal</button>
+              <button type="button" className="quiz-next-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
             </div>
+          </div>
+        </div>
+      )}
 
-            {result?.isNewHighScore && (
-              <div className="quiz-record-banner" aria-live="polite">
-                <div className="quiz-record-stars" aria-hidden="true"><span>★</span><span>★</span><span>★</span></div>
-                <strong>Rekor Baru!</strong>
-                <small>Fokusmu makin tajam.</small>
-              </div>
-            )}
-
-            {quiz.status === 'loading' && (
+      {gameOver && !menuOpen && (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status) || quiz.status === 'error') && (
+        <div className={`vc-overlay quiz revive ${(quizDue && quiz.status === 'idle') ? 'loading' : quiz.status} ${quizReveal ? 'reveal' : ''} ${quiz.explanationOpen ? 'explain-open' : ''}`}>
+          <div className={`quiz-card revive-card ${quizAnswered && !quiz.explanationOpen ? 'feedback-open' : ''} ${quizAnswered && quiz.lastCorrect ? 'feedback-good' : ''} ${quizAnswered && quiz.lastCorrect === false ? 'feedback-try' : ''}`} role="dialog" aria-label="Kesempatan hidup lagi">
+            <div className="quiz-glow" aria-hidden="true" />
+            {(quiz.status === 'loading' || (quizDue && quiz.status === 'idle')) && (
               <div className="quiz-loading" aria-live="polite">
                 <div className="quiz-loader-ring" aria-hidden="true" />
-                <h2>Quiz siap dimulai</h2>
-                <p>Jawab 5 soal. Lihat jawaban benar langsung setelah memilih.</p>
+                <h2>Kesempatan Hidup Lagi</h2>
+                <p>Jawab satu soal. Benar = lanjut dari skor ini dan dapat koin.</p>
               </div>
             )}
 
-            {quiz.status === 'running' && currentQuizQuestion && (
+            {quiz.status === 'running' && !currentQuizQuestion && !quiz.explanationOpen && (
+              <div className="quiz-loading" aria-live="polite">
+                <div className="quiz-loader-ring" aria-hidden="true" />
+                <h2>Menyiapkan soal…</h2>
+                <p>Sebentar ya.</p>
+              </div>
+            )}
+
+            {quiz.status === 'running' && currentQuizQuestion && !quiz.explanationOpen && (
               <>
                 <div className={`quiz-question ${questionLengthClass(currentQuizQuestion.questionText)}`} style={questionFitStyle(currentQuizQuestion.questionText)}>
-                  <div className="quiz-question-count">Soal {quiz.index + 1} dari {quizTotal}</div>
+                  <div className="quiz-question-count">Satu soal untuk revive</div>
                   <FittedQuestionText text={currentQuizQuestion.questionText} />
                 </div>
 
-                <div className="quiz-options">
+                <div className="quiz-options revive-options">
                   {currentQuizQuestion.options.map((option, optionIndex) => {
                     const isCorrect = option.key === currentQuizQuestion.answerKey;
                     const isSelected = option.key === quiz.selectedKey;
@@ -1755,37 +1999,67 @@ export default function VoxelCrossing({
                       >
                         <span className="quiz-option-key">{String.fromCharCode(65 + optionIndex)}</span>
                         <span className="quiz-option-text">{option.text}</span>
-                        {quizAnswered && isCorrect && <span className="quiz-mark">✓</span>}
-                        {quizAnswered && isSelected && !isCorrect && <span className="quiz-mark">×</span>}
+                        {quizAnswered && isCorrect && <span className="quiz-mark"><MaterialIcon name="check_circle" size={20} /></span>}
+                        {quizAnswered && isSelected && !isCorrect && <span className="quiz-mark"><MaterialIcon name="cancel" size={20} /></span>}
                       </button>
                     );
                   })}
                 </div>
 
+                {!quizAnswered && (
+                  <div className="revive-actions pre-answer">
+                    <button type="button" className="quiz-next-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
+                  </div>
+                )}
+
                 {quizAnswered && (
-                  <div className={`quiz-feedback ${quiz.lastCorrect ? 'good' : 'try'}`} aria-live="polite">
+                  <div className={`quiz-feedback revive-feedback ${quiz.lastCorrect ? 'good' : 'try'}`} aria-live="polite">
                     <div className="quiz-feedback-title">
-                      {quiz.lastCorrect ? 'Hebat! Jawabanmu benar.' : 'Belum tepat. Jawaban benar sudah ditandai hijau.'}
+                      {quiz.lastCorrect ? (
+                        <span className="correct-coin-reward">
+                          <span>Yey Benar! +{REVIVE_COIN_REWARD}</span>
+                          <img className="inline-coin-icon" src={`${import.meta.env.BASE_URL}icons/coin.svg`} alt="" aria-hidden="true" />
+                        </span>
+                      ) : 'Belum tepat'}
                     </div>
-                    <p>{currentQuizQuestion.explanationText}</p>
-                    <button type="button" className="quiz-next-button" onClick={nextQuizStep}>
-                      {quiz.index >= quiz.questions.length - 1 ? 'Lihat Hasil' : 'Soal Berikutnya'}
-                    </button>
+                    
+                    <div className="revive-actions">
+                      {quiz.lastCorrect ? (
+                        <>
+                          <button type="button" className="quiz-next-button" onClick={showQuizExplanation}><ActionIcon name="menu_book" />Pembahasan</button>
+                          <button type="button" className="quiz-next-button primary" onClick={reviveFromQuiz}><ActionIcon name="favorite" />Lanjut</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="quiz-next-button" onClick={showQuizExplanation}><ActionIcon name="menu_book" />Pembahasan</button>
+                          <button type="button" className="quiz-next-button secondary" onClick={restartFromReviveOffer}><ActionIcon name="refresh" />Ulang</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </>
             )}
 
+            {quiz.status === 'running' && currentQuizQuestion && quiz.explanationOpen && (
+              <div className="explanation-page" aria-live="polite">
+                <div className="mini-badge">Pembahasan</div>
+                <h2>Pembahasan</h2>
+                <div className="explain-question">{currentQuizQuestion.questionText}</div>
+                <ChalkboardExplanationText question={currentQuizQuestion} />
+                <div className="revive-actions explanation-actions">
+                  <button type="button" className="quiz-next-button secondary" onClick={hideQuizExplanation}><ActionIcon name="arrow_back" />Kembali</button>
+                </div>
+              </div>
+            )}
+
             {quiz.status === 'complete' && (
               <div className="quiz-complete" aria-live="polite">
-                <div className="quiz-complete-stars" aria-hidden="true">
-                  {[0, 1, 2].map((star) => <span key={star} className={star < learningStars ? 'active' : ''}>★</span>)}
-                </div>
-                <div className="mini-badge gold">Misi Belajar Selesai</div>
-                <h2>{quiz.correctCount} dari {quizTotal} benar</h2>
-                <p>{quiz.correctCount >= 4 ? 'Keren. Main lagi dan pertahankan streak belajarmu.' : 'Bagus. Main lagi, baca pelan-pelan, dan kumpulkan bintang lebih banyak.'}</p>
+                <div className="mini-badge gold">Revive Berhasil</div>
+                <h2>Ayam hidup lagi!</h2>
+                <p>+{REVIVE_COIN_REWARD} koin. Lanjutkan dari skor terakhir.</p>
                 <div className="quiz-complete-actions">
-                  <button type="button" className="quiz-next-button primary" onClick={startGame}>Lanjut Game</button>
+                  <button type="button" className="quiz-next-button primary" onClick={reviveFromQuiz}>Lanjut</button>
                 </div>
               </div>
             )}
@@ -1793,7 +2067,7 @@ export default function VoxelCrossing({
         </div>
       )}
 
-      {gameOver && !menuOpen && !quizDue && quiz.status === 'idle' && (
+      {gameOver && !menuOpen && !reviveOfferPending && !reviveOfferOpen && !quizDue && quiz.status === 'idle' && (
         <div className={`vc-overlay result ${result?.isNewHighScore ? 'new-record' : ''}`}>
           <div className="glass-card compact result-card">
             {result?.isNewHighScore ? (
