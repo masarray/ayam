@@ -1,0 +1,37 @@
+/* v3.5.21 CSS ownership tokens: shared values only, no component layout here. */
+.vc-shell {
+  --vc-control-side: max(22px, env(safe-area-inset-left));
+  --vc-control-right-side: max(22px, env(safe-area-inset-right));
+  --vc-control-bottom: calc(max(22px, env(safe-area-inset-bottom)) + 4px);
+  --vc-control-hit-size: 74px;
+  --vc-control-circle-size: 62px;
+  --vc-control-gap: 8px;
+  --vc-menu-panel-width: min(370px, calc(100% - 30px));
+  --vc-menu-blur: 30px;
+  --vc-menu-radius: clamp(24px, 6vw, 30px);
+  --vc-menu-action-height: clamp(46px, 6.4dvh, 54px);
+  --vc-menu-text-weight: 400;
+  --vc-menu-z-backdrop: 9;
+  --vc-menu-z-panel: 14;
+  --vc-control-z: 7;
+}
+
+.vc-shell.portrait {
+  --vc-control-side: max(22px, env(safe-area-inset-left));
+  --vc-control-right-side: max(22px, env(safe-area-inset-right));
+  --vc-control-bottom: calc(max(24px, env(safe-area-inset-bottom)) + 8px);
+  --vc-control-hit-size: 78px;
+  --vc-control-circle-size: 64px;
+}
+
+@media (max-width: 760px) and (orientation: landscape) {
+  .vc-shell {
+    --vc-control-side: max(18px, env(safe-area-inset-left));
+    --vc-control-right-side: max(18px, env(safe-area-inset-right));
+    --vc-control-bottom: max(18px, env(safe-area-inset-bottom));
+    --vc-control-hit-size: 64px;
+    --vc-control-circle-size: 52px;
+    --vc-control-gap: 6px;
+    --vc-menu-panel-width: min(390px, calc(100% - 28px));
+  }
+}

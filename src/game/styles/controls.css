@@ -1,0 +1,157 @@
+/*
+  v3.5.21 owner: bottom control dock.
+  Owns: .vc-control-dock, .vc-dock-button, .vc-dock-visual,
+  .vc-menu-trigger, .vc-move-pad, .vc-move-control, .vc-move-visual.
+  Do not style these selectors from legacy.css or menu.css.
+*/
+.vc-control-dock {
+  position: absolute;
+  z-index: var(--vc-control-z);
+  left: var(--vc-control-side);
+  right: var(--vc-control-right-side);
+  bottom: var(--vc-control-bottom);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  pointer-events: none;
+}
+
+.vc-shell.move-pad-left .vc-control-dock {
+  flex-direction: row-reverse;
+}
+
+.vc-dock-button {
+  appearance: none;
+  width: var(--vc-control-hit-size);
+  height: var(--vc-control-hit-size);
+  min-width: var(--vc-control-hit-size);
+  min-height: var(--vc-control-hit-size);
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: #223041;
+  cursor: pointer;
+  touch-action: manipulation;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transform: none;
+}
+
+.vc-dock-visual {
+  width: var(--vc-control-circle-size);
+  height: var(--vc-control-circle-size);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 10px 24px rgba(16, 24, 30, 0.18),
+    0 4px 0 rgba(31, 43, 55, 0.16);
+  transition:
+    transform 120ms cubic-bezier(0.12, 1.6, 0.24, 1),
+    filter 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease;
+}
+
+.vc-dock-button:not(:disabled):hover .vc-dock-visual {
+  filter: brightness(1.035) saturate(1.04);
+}
+
+/* Higher specificity is intentional to neutralize broad legacy button:active rules. */
+.vc-shell .vc-dock-button:not(:disabled):active {
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+.vc-shell .vc-dock-button:not(:disabled):active .vc-dock-visual {
+  transform: translateY(3px) scale(0.94) !important;
+  filter: brightness(0.98) saturate(1.08) !important;
+  box-shadow:
+    0 2px 0 rgba(19, 28, 30, 0.18),
+    0 6px 14px rgba(0, 0, 0, 0.13) !important;
+}
+
+.vc-dock-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.vc-menu-trigger {
+  z-index: 1;
+}
+
+.vc-menu-trigger .vc-dock-visual {
+  color: #f7fbff;
+  background: linear-gradient(180deg, rgba(32, 40, 49, 0.9), rgba(21, 27, 35, 0.84));
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 16px 30px rgba(8, 14, 20, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.vc-menu-trigger.active .vc-dock-visual {
+  filter: brightness(1.08) saturate(1.05);
+}
+
+.vc-menu-trigger svg,
+.vc-menu-trigger .material-symbols-rounded {
+  width: 28px;
+  height: 28px;
+  font-size: 28px;
+}
+
+.vc-shell.portrait .vc-menu-trigger svg,
+.vc-shell.portrait .vc-menu-trigger .material-symbols-rounded {
+  width: 29px;
+  height: 29px;
+  font-size: 29px;
+}
+
+.vc-move-pad {
+  display: grid;
+  grid-template-columns: repeat(3, var(--vc-control-hit-size));
+  grid-template-rows: repeat(2, var(--vc-control-hit-size));
+  gap: var(--vc-control-gap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.vc-move-control.up { grid-column: 2; grid-row: 1; }
+.vc-move-control.left { grid-column: 1; grid-row: 2; }
+.vc-move-control.down { grid-column: 2; grid-row: 2; }
+.vc-move-control.right { grid-column: 3; grid-row: 2; }
+
+.vc-move-control svg,
+.vc-move-control .material-symbols-rounded {
+  width: 32px;
+  height: 32px;
+  font-size: 32px;
+}
+
+.vc-shell.vc-menu-open .vc-control-dock,
+.vc-shell.quiz-active .vc-control-dock {
+  pointer-events: none;
+  opacity: 0.34;
+  filter: blur(1px) saturate(0.72);
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  .vc-menu-trigger .vc-dock-visual {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
