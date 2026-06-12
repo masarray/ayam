@@ -353,10 +353,6 @@ function MaterialIcon({ name, size = 24, className = '' }) {
   );
 }
 
-function CoinIcon() {
-  return <MaterialIcon name="monetization_on" size={18} className="coin-icon-glyph" />;
-}
-
 function ActionIcon({ name }) {
   return <MaterialIcon name={name} size={18} className="vc-action-icon" />;
 }
@@ -413,7 +409,7 @@ function ConfettiBurst({ burst }) {
   if (!burst) return null;
   const pieces = burst.level === 'gold' ? 84 : 68;
   return (
-    <div key={burst.id} className={`confetti-layer ${burst.level || 'rainbow'}`} aria-hidden="true">
+    <div key={burst.id} className={`vc-confetti-layer ${burst.level || 'rainbow'}`} aria-hidden="true">
       {Array.from({ length: pieces }, (_, index) => {
         const side = index % 2 === 0 ? 0 : 1;
         const origin = side === 0 ? 18 + ((index * 7) % 12) : 82 - ((index * 11) % 12);
@@ -421,7 +417,7 @@ function ConfettiBurst({ burst }) {
         return (
           <span
             key={index}
-            className={`confetti-piece piece-${index % 8}`}
+            className={`vc-confetti-piece vc-confetti-piece-${index % 8}`}
             style={{
               '--origin-x': `${origin}vw`,
               '--dx': `${dxBase}px`,

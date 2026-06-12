@@ -1,0 +1,76 @@
+/*
+  v3.5.31 owner: celebration burst primitives.
+  Owns: .vc-confetti-layer and .vc-confetti-piece-*.
+  Confetti must not use the old legacy classes: .confetti-layer, .confetti-piece, .piece-*.
+*/
+.vc-confetti-layer {
+  position: absolute;
+  z-index: var(--vc-celebration-z, 70);
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  contain: paint;
+}
+
+.vc-confetti-piece {
+  position: absolute;
+  left: var(--origin-x, 50vw);
+  bottom: -30px;
+  width: 10px;
+  height: 16px;
+  border-radius: 4px;
+  opacity: 0;
+  background: #ffe35d;
+  box-shadow: 0 7px 14px rgba(12, 17, 53, 0.16);
+  transform: translate3d(0, 0, 0) rotate(var(--rot, 0deg)) scale(0.72);
+  animation: vc-confetti-cannon var(--dur, 1280ms) cubic-bezier(0.14, 0.84, 0.22, 1) var(--delay, 0ms) both;
+  will-change: transform, opacity;
+}
+
+.vc-confetti-piece-0 { background: #ffdf4d; }
+.vc-confetti-piece-1 { width: 8px; height: 18px; background: #68e3ff; }
+.vc-confetti-piece-2 { border-radius: 999px; background: #ff6fb1; }
+.vc-confetti-piece-3 { background: #76ee72; }
+.vc-confetti-piece-4 { width: 14px; height: 9px; background: #ff944d; }
+.vc-confetti-piece-5 { background: #ffffff; }
+.vc-confetti-piece-6 { border-radius: 999px; background: #b693ff; }
+.vc-confetti-piece-7 { width: 9px; height: 9px; border-radius: 50%; background: #ffe35d; }
+
+.vc-confetti-layer.gold .vc-confetti-piece { background: #ffd84d; }
+.vc-confetti-layer.gold .vc-confetti-piece-1 { background: #fff3a1; }
+.vc-confetti-layer.gold .vc-confetti-piece-2 { background: #ffb64d; }
+.vc-confetti-layer.gold .vc-confetti-piece-3 { background: #ffffff; }
+.vc-confetti-layer.gold .vc-confetti-piece-4 { background: #f5c13d; }
+.vc-confetti-layer.gold .vc-confetti-piece-5 { background: #ffec7a; }
+.vc-confetti-layer.gold .vc-confetti-piece-6 { background: #fff8cf; }
+.vc-confetti-layer.gold .vc-confetti-piece-7 { background: #f7a928; }
+
+@keyframes vc-confetti-cannon {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(var(--rot, 0deg)) scale(0.55);
+  }
+  10% { opacity: 1; }
+  38% {
+    opacity: 1;
+    transform: translate3d(calc(var(--dx, 0px) * 0.58), calc(var(--apex, 52dvh) * -1), 0)
+      rotate(calc(var(--rot, 0deg) + var(--spin, 540deg))) scale(1.08);
+  }
+  70% {
+    opacity: 1;
+    transform: translate3d(var(--dx, 0px), calc(var(--apex, 52dvh) * -0.52), 0)
+      rotate(calc(var(--rot, 0deg) + var(--spin, 540deg) + 280deg)) scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--dx2, 0px), 34dvh, 0)
+      rotate(calc(var(--rot, 0deg) + var(--spin, 540deg) + 720deg)) scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-confetti-piece {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
+}

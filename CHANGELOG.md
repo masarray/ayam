@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.5.31
+
+- Added CSS Ownership Phase 7 for celebration/confetti burst primitives.
+- Replaced active legacy `confetti-layer`, `confetti-piece`, and `piece-*` JSX classes with `vc-confetti-*` owner classes.
+- Added `src/game/styles/celebrations.css` and a `--vc-celebration-z` token so reward burst visuals no longer depend on legacy CSS.
+- Removed the unused legacy `CoinIcon()` helper that carried the old `coin-icon-glyph` class.
+- Added verification guards to prevent legacy confetti class names from returning to `VoxelCrossing.jsx`.
+
 ## 3.5.30
 
 - Fixed revive quiz regression where portrait/tablet-width screens showed a centered card with a visible scrollbar instead of a true fullscreen learning screen.

@@ -2420,58 +2420,6 @@
   letter-spacing: 0.005em !important;
 }
 
-.confetti-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.confetti-piece {
-  position: absolute;
-  left: var(--x);
-  top: -24px;
-  width: 10px;
-  height: 16px;
-  border-radius: 4px;
-  background: #ffe35d;
-  opacity: 0;
-  transform: translate3d(0, 0, 0) rotate(var(--rot));
-  animation: confetti-fall var(--dur) cubic-bezier(0.16, 0.82, 0.32, 1) var(--delay) both;
-  box-shadow: 0 7px 14px rgba(12, 17, 53, 0.16);
-}
-
-.confetti-piece.piece-0 { background: #ffdf4d; }
-.confetti-piece.piece-1 { background: #68e3ff; width: 8px; height: 18px; }
-.confetti-piece.piece-2 { background: #ff6fb1; border-radius: 999px; }
-.confetti-piece.piece-3 { background: #76ee72; }
-.confetti-piece.piece-4 { background: #ff944d; width: 14px; height: 9px; }
-.confetti-piece.piece-5 { background: #ffffff; }
-.confetti-piece.piece-6 { background: #b693ff; border-radius: 999px; }
-.confetti-piece.piece-7 { background: #ffe35d; width: 9px; height: 9px; border-radius: 50%; }
-.confetti-layer.gold .confetti-piece { background: #ffd84d; }
-.confetti-layer.gold .confetti-piece.piece-1 { background: #fff3a1; }
-.confetti-layer.gold .confetti-piece.piece-2 { background: #ffb64d; }
-.confetti-layer.gold .confetti-piece.piece-3 { background: #ffffff; }
-.confetti-layer.gold .confetti-piece.piece-4 { background: #f5c13d; }
-.confetti-layer.gold .confetti-piece.piece-5 { background: #ffec7a; }
-.confetti-layer.gold .confetti-piece.piece-6 { background: #fff8cf; }
-.confetti-layer.gold .confetti-piece.piece-7 { background: #f7a928; }
-
-@keyframes confetti-fall {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, -34px, 0) rotate(var(--rot)) scale(0.7);
-  }
-  8% { opacity: 1; }
-  72% { opacity: 1; }
-  100% {
-    opacity: 0;
-    transform: translate3d(var(--dx), 108dvh, 0) rotate(calc(var(--rot) + 720deg)) scale(1);
-  }
-}
-
 @media (max-width: 560px) {
   .quiz-card {
     gap: clamp(7px, 1dvh, 11px) !important;
@@ -2671,38 +2619,6 @@
   100% { opacity: 0; transform: translateY(-42px) scale(0.92) rotate(0deg); }
 }
 
-.confetti-piece {
-  left: var(--origin-x) !important;
-  top: auto !important;
-  bottom: -30px !important;
-  opacity: 0;
-  transform: translate3d(0, 0, 0) rotate(var(--rot)) scale(0.72);
-  animation: confetti-cannon var(--dur) cubic-bezier(0.14, 0.84, 0.22, 1) var(--delay) both !important;
-}
-
-@keyframes confetti-cannon {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) rotate(var(--rot)) scale(0.55);
-  }
-  10% { opacity: 1; }
-  38% {
-    opacity: 1;
-    transform: translate3d(calc(var(--dx) * 0.58), calc(var(--apex) * -1), 0)
-      rotate(calc(var(--rot) + var(--spin))) scale(1.08);
-  }
-  70% {
-    opacity: 1;
-    transform: translate3d(var(--dx), calc(var(--apex) * -0.52), 0)
-      rotate(calc(var(--rot) + var(--spin) + 280deg)) scale(0.96);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(var(--dx2), 34dvh, 0)
-      rotate(calc(var(--rot) + var(--spin) + 720deg)) scale(0.82);
-  }
-}
-
 .quiz-question h2,
 .quiz-option-text,
 .quiz-feedback-title,
@@ -2719,8 +2635,7 @@
   .near-miss-stinger span,
   .quiz-option.correct,
   .quiz-option.wrong,
-  .quiz-option-key,
-  .confetti-piece {
+  .quiz-option-key {
     animation-duration: 1ms !important;
   }
 }
@@ -3884,12 +3799,6 @@
   box-shadow: inset 0 0 0 2px rgba(255,255,255,0.48), inset 0 -2px 0 rgba(153, 94, 6, 0.28), 0 3px 8px rgba(110, 72, 11, 0.18);
 }
 
-.coin-icon-glyph {
-  width: 17px;
-  height: 17px;
-  filter: drop-shadow(0 1px 0 rgba(255,255,255,0.3));
-}
-
 .coin-copy {
   display: flex;
   flex-direction: column;
@@ -4383,11 +4292,6 @@
 .vc-shell .coin-icon-shell {
   width: 25px !important;
   height: 25px !important;
-}
-
-.vc-shell .coin-icon-glyph {
-  width: 15px !important;
-  height: 15px !important;
 }
 
 .vc-shell .coin-hud strong {
@@ -5143,10 +5047,6 @@
 .coin-hud small,
 .coin-copy,
 .coin-icon-shell,
-.coin-icon-glyph {
-  display: none !important;
-}
-
 .coin-bursting .coin-svg-icon {
   animation: coin-pop-bump 620ms cubic-bezier(0.16, 1.4, 0.24, 1) both;
 }

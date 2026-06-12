@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3.5.30';
+const CACHE_VERSION = 'v3.5.31';
 const CACHE_NAME = `ayam-sd-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `ayam-sd-runtime-${CACHE_VERSION}`;
 // Keep install light: big quiz/audio files are cached on first use instead of precached.

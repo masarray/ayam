@@ -116,3 +116,8 @@
   --vc-badge-board-z: 46;
   --vc-badge-unlock-z: 62;
 }
+
+/* v3.5.31 celebration ownership tokens. */
+.vc-shell {
+  --vc-celebration-z: 70;
+}

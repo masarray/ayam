@@ -137,6 +137,7 @@ const cssSource = [
   'src/game/styles/buttons.css',
   'src/game/styles/overlays.css',
   'src/game/styles/effects.css',
+  'src/game/styles/celebrations.css',
   'src/game/styles/pwa.css',
   'src/game/styles/badges.css',
   'src/game/styles/hud.css',
@@ -437,6 +438,17 @@ if (!/v3\.5\.30 owner: revive quiz must be a true full-screen hard modal/.test(c
 }
 if (!/const quizRuntimeLockActive = gameOver && !menuOpen/.test(crossingSource) || !/quizRuntimeLockActive[\s\S]*gameRef\.current\?\.suspendRuntime\?\.\(\)/.test(crossingSource) || !/openReviveQuiz[\s\S]*gameRef\.current\?\.suspendRuntime\?\.\(\)/.test(crossingSource)) {
   console.error('Revive quiz must hard-pause the 3D runtime before and during the full-screen learning overlay.');
+  process.exit(1);
+}
+
+
+
+if (/className={`?(?:confetti-layer|confetti-piece)|className="(?:confetti-layer|confetti-piece|coin-icon-glyph)(?:\s|")/.test(crossingSource) || /className={`vc-confetti-piece piece-/.test(crossingSource)) {
+  console.error('CSS ownership phase 7 must not use legacy confetti or coin glyph class names in VoxelCrossing.jsx. Use vc-confetti-* owner classes.');
+  process.exit(1);
+}
+if (!/v3\.5\.31 owner: celebration burst primitives/.test(cssSource) || !/@import '\.\/celebrations\.css';/.test(cssSource) || !/vc-confetti-layer/.test(crossingSource) || !/vc-confetti-piece/.test(crossingSource) || !/--vc-celebration-z/.test(cssSource)) {
+  console.error('CSS ownership phase 7 celebration owner file, import, tokens, or JSX contract is incomplete.');
   process.exit(1);
 }
 
