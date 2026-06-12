@@ -385,3 +385,58 @@
     background: linear-gradient(145deg, rgba(20, 29, 37, 0.96), rgba(42, 54, 61, 0.9));
   }
 }
+
+/* v3.5.27 owner: PWA exit affordance and Android haptic test in menu. */
+.vc-menu-action.danger {
+  color: #fff5f5;
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.38), rgba(127, 29, 29, 0.26));
+  border-color: rgba(254, 202, 202, 0.22);
+}
+
+.vc-menu-action-icon-wrap.exit {
+  color: #b91c1c;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+}
+
+.vc-menu-action-icon-wrap.haptic {
+  color: #0f766e;
+  background: linear-gradient(135deg, #ccfbf1, #99f6e4);
+}
+
+.vc-menu-haptic-test {
+  appearance: none;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
+  gap: 8px;
+  padding: 8px 12px 8px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(153, 246, 228, 0.18);
+  color: #ecfeff;
+  background: rgba(15, 118, 110, 0.22);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: var(--vc-menu-text-weight);
+  line-height: 1.1;
+  text-align: left;
+  touch-action: manipulation;
+}
+
+.vc-menu-haptic-note {
+  margin: -2px 2px 2px;
+  padding: 9px 11px;
+  border-radius: 14px;
+  color: rgba(236, 254, 255, 0.9);
+  background: rgba(8, 47, 73, 0.36);
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  font-size: 11px;
+  font-weight: var(--vc-menu-text-weight);
+  line-height: 1.35;
+}
+
+.vc-shell .vc-menu-haptic-test:not(:disabled):active {
+  transform: translateY(2px) scale(0.98);
+}

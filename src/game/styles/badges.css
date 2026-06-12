@@ -1,0 +1,455 @@
+/*
+  v3.5.29 owner: badge unlock and badge board overlays.
+  Owns: .vc-badge-unlock-*, .vc-badge-board-*, .vc-badge-family-*, and .vc-badge-tile-*.
+*/
+.vc-badge-unlock-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--vc-badge-unlock-z, 62);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  pointer-events: auto;
+  background: rgba(9, 13, 38, 0.28);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: vc-badge-overlay-in 500ms ease both;
+}
+
+.vc-badge-unlock-card {
+  position: relative;
+  width: min(420px, calc(100dvw - 32px));
+  overflow: hidden;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 26px 20px 18px;
+  border-radius: 34px;
+  text-align: center;
+  color: #fff;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 238, 116, 0.3), transparent 38%),
+    radial-gradient(circle at 15% 20%, rgba(95, 231, 255, 0.22), transparent 34%),
+    linear-gradient(150deg, rgba(103, 85, 230, 0.96), rgba(53, 77, 204, 0.96) 48%, rgba(28, 26, 107, 0.98));
+  border: 2px solid rgba(255, 246, 176, 0.42);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.24),
+    0 34px 96px rgba(8, 9, 48, 0.42);
+  transform-origin: center bottom;
+  animation: vc-badge-card-pop 720ms cubic-bezier(0.12, 1.42, 0.2, 1) both;
+}
+
+.vc-badge-aura {
+  position: absolute;
+  inset: -38% -28% auto;
+  height: 62%;
+  pointer-events: none;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at 50% 42%, rgba(255, 227, 73, 0.52), rgba(255, 227, 73, 0.1) 42%, transparent 70%);
+  filter: blur(30px);
+}
+
+.vc-badge-emblem {
+  position: relative;
+  width: clamp(90px, 26vw, 128px);
+  height: clamp(90px, 26vw, 128px);
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, #fff7ba, #ffd447 48%, #ff9b2e),
+    radial-gradient(circle, #fff, transparent);
+  border: 4px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 16px 0 rgba(114, 65, 18, 0.16),
+    0 24px 68px rgba(255, 207, 64, 0.42),
+    inset 0 3px 0 rgba(255, 255, 255, 0.8);
+  animation: vc-badge-emblem-spin 920ms cubic-bezier(0.18, 1.32, 0.24, 1) both;
+}
+
+.vc-badge-emblem span {
+  font-size: clamp(42px, 13vw, 68px);
+  filter: drop-shadow(0 6px 9px rgba(60, 34, 8, 0.24));
+}
+
+.vc-badge-unlock-card h2 {
+  position: relative;
+  margin: 2px 0 0;
+  max-width: 100%;
+  color: #fff;
+  font-size: clamp(30px, 8.4vw, 50px);
+  font-weight: 500;
+  line-height: 0.96;
+  text-shadow: 0 5px 0 rgba(0, 0, 0, 0.13), 0 14px 34px rgba(0, 0, 0, 0.24);
+}
+
+.vc-badge-unlock-card p {
+  position: relative;
+  max-width: 300px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(15px, 4.2vw, 18px);
+  line-height: 1.25;
+}
+
+.vc-badge-meta {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.vc-badge-meta span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border-radius: 999px;
+  color: #fff9c8;
+  background: rgba(15, 18, 75, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.vc-badge-continue {
+  position: relative;
+  width: 100%;
+  min-height: 54px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 999px;
+  color: #352006;
+  background: linear-gradient(180deg, #fff2a5, #ffd956 58%, #ffbf36);
+  box-shadow:
+    0 8px 0 rgba(104, 58, 11, 0.22),
+    0 22px 42px rgba(255, 201, 45, 0.24),
+    inset 0 2px 0 rgba(255, 255, 255, 0.82);
+  font-size: 20px;
+  font-weight: 430;
+  cursor: pointer;
+}
+
+.vc-badge-board-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--vc-badge-board-z, 46);
+  display: grid;
+  place-items: center;
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 224, 106, 0.18), transparent 32%),
+    radial-gradient(circle at 88% 12%, rgba(68, 207, 122, 0.16), transparent 26%),
+    rgba(20, 25, 48, 0.64);
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  animation: vc-badge-board-in 220ms ease both;
+}
+
+.vc-badge-board-card {
+  width: min(980px, 100%);
+  height: min(860px, calc(100dvh - 28px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: clamp(14px, 2.8vw, 24px);
+  overflow: hidden;
+  border-radius: clamp(28px, 5vw, 42px);
+  background:
+    linear-gradient(160deg, rgba(94, 73, 202, 0.96), rgba(45, 71, 171, 0.96) 48%, rgba(31, 45, 111, 0.98)),
+    #473bb0;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 30px 100px rgba(18, 19, 48, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+.vc-badge-board-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  color: #fff;
+}
+
+.vc-badge-board-head h2 {
+  margin: 8px 0 4px;
+  font-size: clamp(30px, 7vw, 56px);
+  line-height: 0.96;
+  font-weight: 500;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.vc-badge-board-head p {
+  margin: 0;
+  max-width: 620px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: clamp(14px, 3.4vw, 18px);
+  line-height: 1.25;
+}
+
+.vc-badge-board-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vc-badge-board-summary div {
+  min-height: 62px;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  border-radius: 22px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.vc-badge-board-summary strong {
+  font-size: clamp(22px, 6vw, 34px);
+  line-height: 0.9;
+  color: #fff2a3;
+  font-weight: 500;
+}
+
+.vc-badge-board-summary span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.vc-badge-family-list {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+
+.vc-badge-family-card {
+  padding: 12px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+}
+
+.vc-badge-family-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #fff;
+  margin-bottom: 9px;
+}
+
+.vc-badge-family-title strong {
+  display: block;
+  font-size: 18px;
+  font-weight: 480;
+}
+
+.vc-badge-family-title small,
+.vc-badge-family-title span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
+.vc-badge-family-progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(17, 20, 56, 0.28);
+  margin-bottom: 12px;
+}
+
+.vc-badge-family-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffe66b, #ff8db8, #66ecff);
+  box-shadow: 0 0 24px rgba(255, 230, 107, 0.28);
+}
+
+.vc-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.vc-badge-tile {
+  position: relative;
+  min-height: 124px;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  align-items: center;
+  justify-items: center;
+  gap: 5px;
+  padding: 10px 8px;
+  overflow: hidden;
+  border-radius: 24px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.19), rgba(255, 255, 255, 0.09));
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  box-shadow: 0 12px 28px rgba(11, 15, 42, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.vc-badge-tile.unlocked {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 239, 138, 0.35), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12));
+}
+
+.vc-badge-tile.locked {
+  color: rgba(255, 255, 255, 0.56);
+  filter: grayscale(0.82);
+}
+
+.vc-badge-tile.locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 16, 45, 0.34);
+  pointer-events: none;
+}
+
+.vc-badge-tile-medal {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff6ae, #ffc94f 62%, #f29b21);
+  box-shadow: 0 8px 0 rgba(100, 57, 12, 0.22), 0 16px 30px rgba(255, 209, 64, 0.26);
+}
+
+.vc-badge-tile.locked .vc-badge-tile-medal {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.14));
+  box-shadow: none;
+}
+
+.vc-badge-tile-medal span {
+  font-size: 28px;
+  filter: drop-shadow(0 3px 5px rgba(50, 24, 0, 0.16));
+}
+
+.vc-badge-tile strong {
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+  line-height: 1.04;
+  font-weight: 480;
+}
+
+.vc-badge-tile small {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.vc-badge-tile-lock {
+  position: relative;
+  z-index: 1;
+  width: 82%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.vc-badge-tile-lock i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(255, 238, 122, 0.78);
+}
+
+.vc-badge-board-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.vc-badge-share-button {
+  min-height: 54px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(180deg, #39cf94, #19a972);
+  box-shadow: 0 8px 0 rgba(9, 91, 60, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+  font-size: 17px;
+  font-weight: 430;
+  cursor: pointer;
+}
+
+.vc-badge-share-button:active,
+.vc-badge-continue:active {
+  transform: translateY(5px) scale(0.98);
+  box-shadow: 0 3px 0 rgba(67, 42, 12, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+@keyframes vc-badge-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes vc-badge-card-pop {
+  0% { opacity: 0; transform: translateY(36px) scale(0.72) rotate(-2deg); filter: blur(7px); }
+  45% { opacity: 1; transform: translateY(-9px) scale(1.06) rotate(1deg); filter: blur(0); }
+  70% { transform: translateY(4px) scale(0.98) rotate(-0.4deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+
+@keyframes vc-badge-emblem-spin {
+  0% { transform: scale(0.38) rotateY(180deg) rotate(-12deg); opacity: 0; }
+  44% { transform: scale(1.12) rotateY(0deg) rotate(5deg); opacity: 1; }
+  72% { transform: scale(0.96) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+@keyframes vc-badge-board-in {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 720px) {
+  .vc-badge-board-card {
+    height: calc(100dvh - 20px);
+    border-radius: 30px;
+  }
+
+  .vc-badge-board-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vc-badge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vc-badge-tile {
+    min-height: 108px;
+  }
+
+  .vc-badge-board-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 680px) {
+  .vc-badge-board-summary div { min-height: 52px; }
+  .vc-badge-tile { min-height: 96px; }
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  .vc-badge-board-overlay,
+  .vc-badge-unlock-overlay {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

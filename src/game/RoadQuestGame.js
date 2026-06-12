@@ -271,6 +271,8 @@ export class RoadQuestGame {
     this.cameraOffset = new THREE.Vector3();
     this.cameraDesired = new THREE.Vector3();
     this.renderRequested = null;
+    this.isRuntimeSuspended = false;
+    this.isDestroyed = false;
     this.lastMilestone = 0;
     this.lastNearMissAt = 0;
     this.touchStart = null;
@@ -299,7 +301,7 @@ export class RoadQuestGame {
     this._warmUpRenderer();
     this.callbacks.onReady({ highScore: this.highScore });
     this.callbacks.onHighScore(this.highScore);
-    this.renderRequested = requestAnimationFrame(this._animate);
+    this._ensureAnimationLoop();
   }
 
   _warmUpRenderer() {
@@ -401,6 +403,8 @@ export class RoadQuestGame {
   }
 
   start() {
+    this.isRuntimeSuspended = false;
+    this._ensureAnimationLoop();
     if (this.isGameOver && !this.restartPrepared) this.reset(false);
     this.isGameOver = false;
     this.isImpacting = false;
@@ -428,6 +432,8 @@ export class RoadQuestGame {
   }
 
   resume() {
+    this.isRuntimeSuspended = false;
+    this._ensureAnimationLoop();
     if (!this.isGameOver && !this.isImpacting) {
       this.isPlaying = true;
       this.isUiPaused = false;
@@ -491,11 +497,15 @@ export class RoadQuestGame {
     this._updateCamera(true);
     this.callbacks.onScore(this.score);
     this.callbacks.onHighScore(this.highScore);
+    this.isRuntimeSuspended = false;
+    this._ensureAnimationLoop();
     return this.getSaveState();
   }
 
   continueAfterLife(invulnerableMs = 1200) {
     if (!this.player) return false;
+    this.isRuntimeSuspended = false;
+    this._ensureAnimationLoop();
     this.isGameOver = false;
     this.isImpacting = false;
     this.isPlaying = true;
@@ -563,7 +573,30 @@ export class RoadQuestGame {
     return true;
   }
 
+  _ensureAnimationLoop() {
+    if (this.isDestroyed || this.isRuntimeSuspended || this.renderRequested) return;
+    this.clock.getDelta();
+    this.renderRequested = requestAnimationFrame(this._animate);
+  }
+
+  suspendRuntime() {
+    this.pause();
+    this.isRuntimeSuspended = true;
+    if (this.renderRequested) {
+      cancelAnimationFrame(this.renderRequested);
+      this.renderRequested = null;
+    }
+  }
+
+  resumeRuntime({ resumeGameplay = false } = {}) {
+    this.isRuntimeSuspended = false;
+    this.clock.getDelta();
+    if (resumeGameplay) this.resume();
+    else this._ensureAnimationLoop();
+  }
+
   destroy() {
+    this.isDestroyed = true;
     if (this.renderRequested) cancelAnimationFrame(this.renderRequested);
     window.removeEventListener('keydown', this._handleKeyDown);
     this.renderer.domElement.removeEventListener('pointerdown', this._handlePointerDown);
@@ -918,6 +951,8 @@ export class RoadQuestGame {
   }
 
   _animate() {
+    this.renderRequested = null;
+    if (this.isDestroyed || this.isRuntimeSuspended) return;
     const delta = Math.min(this.clock.getDelta(), 0.035);
 
     if (this.isUiPaused && !this.isImpacting) {
@@ -926,7 +961,7 @@ export class RoadQuestGame {
         this.lastPausedRenderAt = nowMs;
         this.renderer.render(this.scene, this.camera);
       }
-      this.renderRequested = requestAnimationFrame(this._animate);
+      this._ensureAnimationLoop();
       return;
     }
 
@@ -950,7 +985,7 @@ export class RoadQuestGame {
     this._updateCamera(false, delta);
     if (this.isImpacting) this._applyCameraShake();
     this.renderer.render(this.scene, this.camera);
-    this.renderRequested = requestAnimationFrame(this._animate);
+    this._ensureAnimationLoop();
   }
 
   _updatePlayerMovement() {

@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.5.30
+
+- Fixed revive quiz regression where portrait/tablet-width screens showed a centered card with a visible scrollbar instead of a true fullscreen learning screen.
+- Added CSS Ownership Phase 6 for revive quiz fullscreen behavior and active overlay detachment from legacy `vc-overlay`.
+- Hard-paused the 3D runtime when the revive quiz opens and while the revive quiz overlay is active, so the game background no longer keeps running behind the learning screen.
+- Added verification guards for no active `vc-overlay` usage, portrait fullscreen revive quiz ownership, and quiz runtime suspension.
+
+## 3.5.29
+
+- Added CSS ownership Phase 5 for PWA install and badge overlays.
+- Added idle warm-cache for quiz and audio assets so installed PWA offline play is safer after first launch.
+- Hardened Android background/back lifecycle during impact so the app resumes from a saved safe state instead of a stuck impact frame.
+- Removed the duplicate Google Fonts import from legacy CSS.
+
 ## 3.5.24 - 2026-06-11
 
 - Added CSS Ownership Phase 3 for the revive quiz and revive offer overlays.

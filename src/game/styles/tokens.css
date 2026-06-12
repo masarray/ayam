@@ -85,3 +85,34 @@
   --vc-quiz-card-pad: clamp(14px, 2.6vw, 24px);
   --vc-quiz-card-radius: clamp(26px, 4.5vw, 38px);
 }
+
+/* v3.5.26 shell / overlay / primitive ownership tokens. */
+.vc-shell {
+  --vc-shell-radius: 30px;
+  --vc-shell-shadow: 0 30px 80px rgba(11, 24, 12, 0.22);
+  --vc-game-z: 1;
+  --vc-loader-z: 9;
+  --vc-overlay-z: 7;
+  --vc-overlay-pad: clamp(18px, 4vw, 28px);
+  --vc-glass-card-width: min(540px, 92vw);
+  --vc-result-card-width: min(430px, 90vw);
+  --vc-glass-card-radius: clamp(28px, 5vw, 32px);
+  --vc-primitive-button-height: 52px;
+  --vc-primitive-button-radius: 999px;
+  --vc-primitive-button-weight: 450;
+}
+
+@media (max-width: 560px) {
+  .vc-shell {
+    --vc-shell-radius: 0;
+    --vc-overlay-pad: 18px;
+  }
+}
+
+
+/* v3.5.29 PWA and badge overlay ownership tokens. */
+.vc-shell {
+  --vc-pwa-install-z: 70;
+  --vc-badge-board-z: 46;
+  --vc-badge-unlock-z: 62;
+}

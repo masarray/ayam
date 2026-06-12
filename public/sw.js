@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3.5.25';
+const CACHE_VERSION = 'v3.5.30';
 const CACHE_NAME = `ayam-sd-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `ayam-sd-runtime-${CACHE_VERSION}`;
 // Keep install light: big quiz/audio files are cached on first use instead of precached.
@@ -85,6 +85,20 @@ async function navigationFallback(request) {
     return caches.match(scopedUrl('./index.html')) || caches.match(scopedUrl('./'));
   }
 }
+
+
+self.addEventListener('message', (event) => {
+  const { data } = event;
+  if (!data || data.type !== 'AYAM_SD_WARM_CACHE' || !Array.isArray(data.paths)) return;
+
+  event.waitUntil((async () => {
+    const cache = await caches.open(RUNTIME_CACHE);
+    const urls = data.paths
+      .filter((path) => typeof path === 'string' && !path.includes('://'))
+      .map((path) => scopedUrl(path));
+    await Promise.allSettled(urls.map((url) => cache.add(url)));
+  })());
+});
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;

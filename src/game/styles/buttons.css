@@ -1,0 +1,84 @@
+/*
+  v3.5.26 owner: shared UI button primitives.
+  Owns: .vc-primary-button and .vc-icon-button.
+  Feature-specific buttons stay in their component owner files.
+*/
+.vc-primary-button,
+.vc-icon-button {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  touch-action: manipulation;
+  transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.vc-primary-button {
+  min-height: var(--vc-primitive-button-height);
+  min-width: min(210px, 72vw);
+  margin-top: 20px;
+  padding: 13px 24px 14px;
+  border-radius: var(--vc-primitive-button-radius);
+  color: #1f2530;
+  background: linear-gradient(135deg, #ffe891, #f5d36d 58%, #e6b948);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  box-shadow:
+    0 18px 34px rgba(90, 67, 18, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.56);
+  font-size: 15px;
+  font-weight: var(--vc-primitive-button-weight);
+  letter-spacing: -0.01em;
+}
+
+.vc-primary-button:not(:disabled):hover {
+  filter: brightness(1.04);
+}
+
+.vc-primary-button:not(:disabled):active {
+  transform: translateY(2px) scale(0.99);
+}
+
+.vc-primary-button:disabled,
+.vc-icon-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.vc-icon-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #f8fbff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 10px 22px rgba(10, 18, 24, 0.16);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.vc-icon-button svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.vc-icon-button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.vc-icon-button:not(:disabled):active {
+  transform: translateY(1px) scale(0.96);
+}
+
+.vc-primary-button.ghost {
+  color: #f8fbff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 14px 28px rgba(10, 18, 24, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}

@@ -7,7 +7,7 @@
 ![Three.js](https://img.shields.io/badge/Three.js-0.184-black?logo=threedotjs)
 ![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)
 
-**Ayam SD** is a free and open-source browser mini-game built with **React, Vite, and Three.js**. The player controls a voxel chicken through roads, trains, rivers, sinking planks, rewards, sound effects, badge progress, and a post-game learning quiz loop.
+**Ayam SD** is a free and open-source browser mini-game built with **React, Vite, and Three.js**. The player controls a voxel chicken through roads, trains, rivers, sinking planks, rewards, sound effects, badge progress, and a one-question revive learning loop.
 
 It is designed for kids, lightweight public deployment, and easy integration into an educational web app.
 
@@ -21,7 +21,7 @@ https://masarray.github.io/ayam/
 
 ## Why this game is useful
 
-Many educational games become heavy, slow, or too complicated before the learning loop is even enjoyable. Ayam SD keeps the core loop simple: short play session, clear reward, then a randomized quiz after repeated game-over events. This makes the game suitable as a small engagement layer for a learning site, quiz app, or children-focused PWA.
+Many educational games become heavy, slow, or too complicated before the learning loop is even enjoyable. Ayam SD keeps the core loop simple: short play session, clear reward, then one child-readable revive question after the reserve heart is used. This makes the game suitable as a small engagement layer for a learning site, quiz app, or children-focused PWA.
 
 The repository avoids third-party game branding and official copyrighted game assets. Visuals are built from procedural Three.js geometry, with user-supplied audio clearly documented.
 
@@ -30,10 +30,10 @@ The repository avoids third-party game branding and official copyrighted game as
 - **Three.js voxel gameplay** with procedural chicken, roads, vehicles, trains, rivers, planks, particles, and camera movement.
 - **Responsive browser controls** for keyboard, swipe, and on-screen mobile D-pad.
 - **Game-feel polish** including screen shake, splash feedback, feather burst, near-miss text, high-score reward, confetti, and tactile quiz answer animation.
-- **Learning loop** with a lazy-loaded question bank, 5 randomized questions, shuffled answers, explanation text, and fresh-question rotation.
+- **Learning loop** with a lazy-loaded question bank, one-question revive flow, shuffled answers, explanation text, and fresh-question rotation.
 - **Badge and reward system** to give children visible progress beyond only a high score.
 - **Audio layer** with lazy-loaded music, optional sound effects, runtime-generated Web Audio feedback, and settings toggles.
-- **PWA-ready structure** with manifest, service worker, icons, sitemap, robots file, and GitHub Pages workflow.
+- **PWA-ready structure** with manifest, service worker, icons, warm offline cache for quiz/audio assets, sitemap, robots file, and GitHub Pages workflow.
 - **Public-repo hygiene** with Apache-2.0 license, third-party notices, asset licensing guide, security policy, contribution guide, issue templates, CI, and Pages deployment.
 
 ## Quick start

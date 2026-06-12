@@ -7,8 +7,6 @@
   tokens.css, controls.css, menu.css, etc.
 */
 
-@import url("https://fonts.googleapis.com/css2?family=Sniglet:wght@400;800&display=swap");
-
 .vc-shell {
   position: relative;
   width: 100%;

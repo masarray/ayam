@@ -1,0 +1,65 @@
+/*
+  v3.5.26 owner: game shell and WebGL host.
+  Owns: .vc-app-shell, .vc-game-host, .vc-loading-overlay, .vc-loader-orb.
+  The legacy root class .vc-shell remains only as state namespace for older CSS
+  while migration continues; new shell geometry must be edited here.
+*/
+.vc-app-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+  overflow: hidden;
+  color: #f8fbff;
+  background: #83c83f;
+  border-radius: var(--vc-shell-radius);
+  isolation: isolate;
+  touch-action: none;
+  user-select: none;
+  box-shadow: var(--vc-shell-shadow);
+  font-family: "Sniglet", ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+}
+
+.vc-game-host,
+.vc-game-host canvas,
+.vc-game-host .vc-canvas,
+.vc-game-host .crossing-game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.vc-game-host {
+  z-index: var(--vc-game-z);
+}
+
+.vc-loading-overlay {
+  position: absolute;
+  z-index: var(--vc-loader-z);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(180deg, rgba(131, 200, 63, 0.96), rgba(110, 167, 51, 0.96));
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: opacity 180ms ease;
+}
+
+.vc-loader-orb {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 4px solid rgba(255, 255, 255, 0.26);
+  border-top-color: #ffffff;
+  box-shadow: 0 18px 42px rgba(20, 33, 19, 0.18);
+  animation: vc-loader-spin 780ms linear infinite;
+}
+
+@keyframes vc-loader-spin {
+  to { transform: rotate(360deg); }
+}

@@ -133,6 +133,12 @@ const cssSource = [
   'src/game/styles/index.css',
   'src/game/styles/legacy.css',
   'src/game/styles/tokens.css',
+  'src/game/styles/shell.css',
+  'src/game/styles/buttons.css',
+  'src/game/styles/overlays.css',
+  'src/game/styles/effects.css',
+  'src/game/styles/pwa.css',
+  'src/game/styles/badges.css',
   'src/game/styles/hud.css',
   'src/game/styles/controls.css',
   'src/game/styles/menu.css',
@@ -347,8 +353,6 @@ if (passabilityErrors.length > 0) {
   process.exit(1);
 }
 
-console.log('Repository verification passed.');
-
 if (!/v3\.5\.21 owner: bottom control dock/.test(cssSource) || !/v3\.5\.22 owner: gameplay HUD/.test(cssSource) || !/\.vc-shell\.move-pad-left \.vc-control-dock[\s\S]*flex-direction: row-reverse/.test(cssSource) || !/\.vc-move-pad[\s\S]*grid-template-columns: repeat\(3, var\(--vc-control-hit-size\)\)/.test(cssSource) || !/\.vc-best-hud[\s\S]*top: calc\(var\(--vc-hud-top\) \+ var\(--vc-coin-height\) \+ 5px\)/.test(cssSource)) {
   console.error('HUD/control ownership must keep menu opposite the move pad and keep coin/best in a compact top-right stack.');
   process.exit(1);
@@ -366,6 +370,78 @@ if (!/ChalkboardExplanationText/.test(crossingSource) || /ExplanationVisual/.tes
 }
 if (!/quiz-active/.test(crossingSource) || !/vc-quiz-options[\s\S]*grid-template-columns: 1fr/.test(cssSource) || !/vc-explain-board/.test(cssSource)) {
   console.error('Revive quiz layout must disable background controls, stack action buttons, and use chalkboard explanation.');
+  process.exit(1);
+}
+
+
+if (/className="(?:glass-card|mini-badge|start-button|icon-close|vc-boot-loader|loader-orb|impact-stinger|near-miss-stinger|result-card|reward-aura|star-reward|gold-star|reward-copy)(?:\s|")/.test(crossingSource)) {
+  console.error('CSS ownership phase 4 must not use legacy shell/overlay/button/effect primitive class names in VoxelCrossing.jsx.');
+  process.exit(1);
+}
+if (!/v3\.5\.26 owner: game shell/.test(cssSource) || !/v3\.5\.26 owner: shared UI button primitives/.test(cssSource) || !/v3\.5\.26 owner: screen overlay and glass-card primitives/.test(cssSource) || !/v3\.5\.26 owner: impact and reward visual effects/.test(cssSource)) {
+  console.error('CSS ownership phase 4 owner file headers are missing.');
+  process.exit(1);
+}
+if (!/vc-app-shell/.test(crossingSource) || !/vc-game-host/.test(crossingSource) || !/vc-loading-overlay/.test(crossingSource) || !/vc-screen-overlay/.test(crossingSource) || !/vc-glass-card/.test(crossingSource) || !/vc-mini-badge/.test(crossingSource) || !/vc-primary-button/.test(crossingSource) || !/vc-icon-button/.test(crossingSource) || !/vc-impact-stinger/.test(crossingSource) || !/vc-near-miss-stinger/.test(crossingSource) || !/vc-result-overlay/.test(crossingSource)) {
+  console.error('CSS ownership phase 4 class contract is incomplete in VoxelCrossing.jsx.');
+  process.exit(1);
+}
+if (!/@import '\.\/shell\.css';/.test(cssSource) || !/@import '\.\/buttons\.css';/.test(cssSource) || !/@import '\.\/overlays\.css';/.test(cssSource) || !/@import '\.\/effects\.css';/.test(cssSource)) {
+  console.error('CSS ownership phase 4 owner files must be imported from styles/index.css.');
+  process.exit(1);
+}
+
+
+if (!/APP_EXIT_FALLBACK_DELAY_MS = 260/.test(crossingSource) || !/window\.close\(\)/.test(crossingSource) || !/Keluar App/.test(crossingSource) || !/Tutup Menu/.test(crossingSource) || !/Tes Getar/.test(crossingSource) || !/function canUseHaptics/.test(crossingSource) || !/test:\s*\[80, 55, 95, 55, 120\]/.test(crossingSource)) {
+  console.error('PWA close fallback and Android haptic test contract must stay intact.');
+  process.exit(1);
+}
+if (!/v3\.5\.27 owner: PWA exit affordance and Android haptic test/.test(cssSource) || !/vc-menu-haptic-test/.test(cssSource) || !/vc-app-exit-overlay/.test(cssSource) || !/vc-primary-button\.ghost/.test(cssSource)) {
+  console.error('PWA close/haptic v3.5.27 styling ownership is incomplete.');
+  process.exit(1);
+}
+
+
+if (!/OFFLINE_WARM_ASSET_PATHS[\s\S]*data\/questionBanks\.json[\s\S]*audio\/mushroom-dance\.mp3[\s\S]*audio\/kids-yay\.mp3/.test(crossingSource) || !/AYAM_SD_WARM_CACHE/.test(crossingSource) || !/AYAM_SD_WARM_CACHE/.test(readFileSync('public/sw.js', 'utf8'))) {
+  console.error('PWA hardening phase 5 must warm-cache quiz and audio assets for offline play after first app idle.');
+  process.exit(1);
+}
+if (!/const suspendedDuringImpact = impactingRef\.current === true;/.test(crossingSource) || !/suspendedDuringImpact/.test(crossingSource) || !/continueFromAppPause/.test(crossingSource)) {
+  console.error('PWA hardening phase 5 must handle Android background/back during impact without returning to a stuck impact state.');
+  process.exit(1);
+}
+if (/fonts\.googleapis/.test(readFileSync('src/game/styles/legacy.css', 'utf8'))) {
+  console.error('Legacy CSS must not duplicate the Google Fonts import; the app shell owns the single font import.');
+  process.exit(1);
+}
+if (/className="(?:pwa-install-overlay|pwa-install-card|pwa-install-orbit|pwa-benefits|pwa-install-help|pwa-install-actions|pwa-install-primary|pwa-install-later|badge-unlock-overlay|badge-unlock-card|badge-aura|badge-emblem|badge-meta|badge-continue|badge-board-overlay|badge-board-card|badge-board-head|badge-board-summary|badge-family-list|badge-family-card|badge-family-title|badge-family-progress|badge-grid|badge-tile|badge-tile-medal|badge-tile-lock|badge-board-actions|badge-share-button)(?:\s|")/.test(crossingSource) || /className=\{`(?:badge-unlock-overlay|badge-tile)/.test(crossingSource)) {
+  console.error('CSS ownership phase 5 must not use legacy PWA install or badge overlay class names in VoxelCrossing.jsx.');
+  process.exit(1);
+}
+if (!/v3\.5\.29 owner: PWA install prompt/.test(cssSource) || !/v3\.5\.29 owner: badge unlock and badge board overlays/.test(cssSource) || !/@import '\.\/pwa\.css';/.test(cssSource) || !/@import '\.\/badges\.css';/.test(cssSource)) {
+  console.error('CSS ownership phase 5 owner files and imports are missing.');
+  process.exit(1);
+}
+if (!/vc-pwa-install-overlay/.test(crossingSource) || !/vc-pwa-install-card/.test(crossingSource) || !/vc-badge-unlock-overlay/.test(crossingSource) || !/vc-badge-board-overlay/.test(crossingSource) || !/vc-badge-tile/.test(crossingSource) || !/vc-badge-share-button/.test(crossingSource)) {
+  console.error('CSS ownership phase 5 class contract is incomplete in VoxelCrossing.jsx.');
+  process.exit(1);
+}
+
+if (/className={?`?[^\n]*vc-overlay/.test(crossingSource) || /className="vc-overlay/.test(crossingSource)) {
+  console.error('CSS ownership phase 6 must detach active React overlays from the legacy vc-overlay primitive.');
+  process.exit(1);
+}
+if (!/v3\.5\.30 owner: revive quiz must be a true full-screen hard modal/.test(cssSource) || !/\.vc-shell\.portrait \.vc-revive-quiz-overlay[\s\S]*height: 100dvh/.test(cssSource) || !/\.vc-shell\.portrait \.vc-revive-quiz-overlay \.vc-revive-card[\s\S]*overflow: hidden/.test(cssSource)) {
+  console.error('CSS ownership phase 6 must keep revive quiz full-screen in portrait and prevent card/page scrollbars.');
+  process.exit(1);
+}
+if (!/const quizRuntimeLockActive = gameOver && !menuOpen/.test(crossingSource) || !/quizRuntimeLockActive[\s\S]*gameRef\.current\?\.suspendRuntime\?\.\(\)/.test(crossingSource) || !/openReviveQuiz[\s\S]*gameRef\.current\?\.suspendRuntime\?\.\(\)/.test(crossingSource)) {
+  console.error('Revive quiz must hard-pause the 3D runtime before and during the full-screen learning overlay.');
+  process.exit(1);
+}
+
+if (!/APP_BACKGROUND_PAUSE_REASONS/.test(crossingSource) || !/hardPauseAppRuntime/.test(crossingSource) || !/visibilitychange/.test(crossingSource) || !/pagehide/.test(crossingSource) || !/beforeunload/.test(crossingSource) || !/popstate/.test(crossingSource) || !/suspendRuntime/.test(gameSource) || !/resumeRuntime/.test(gameSource) || !/isRuntimeSuspended/.test(gameSource)) {
+  console.error('PWA lifecycle hard-pause contract must stop game runtime and audio on Android Home/Back/background.');
   process.exit(1);
 }
 
@@ -397,3 +473,5 @@ if (!/function usesHeavyVehicleHorn/.test(gameSource) || !/kind: heavyVehicle \?
   console.error('Heavy vehicle horn routing must keep truck/bus horn separate from small car horn.');
   process.exit(1);
 }
+
+console.log('Repository verification passed.');

@@ -14,6 +14,14 @@ const REVIVE_COIN_REWARD = 5;
 const QUIZ_FEEDBACK_DELAY_MS = 2000;
 const QUIZ_APPEAR_DELAY_MS = 220;
 const REVIVE_OFFER_DELAY_MS = 460;
+const HAPTIC_TEST_NOTICE_MS = 1900;
+const APP_EXIT_FALLBACK_DELAY_MS = 260;
+const APP_BACKGROUND_PAUSE_REASONS = new Set(['background', 'pagehide', 'freeze', 'back']);
+const OFFLINE_WARM_ASSET_PATHS = Object.freeze([
+  'data/questionBanks.json',
+  'audio/mushroom-dance.mp3',
+  'audio/kids-yay.mp3'
+]);
 const MAX_LIVES = 2;
 const PLAY_KEYS = new Set([' ', 'spacebar', 'enter', 'w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 const ACTIVE_QUIZ_STATES = new Set(['loading', 'running', 'complete']);
@@ -324,6 +332,8 @@ const MATERIAL_ICON_PATHS = Object.freeze({
   workspace_premium: 'M12 3 14.39 8.26 20 8.91 15.86 12.7 16.97 18.25 12 15.46 7.03 18.25 8.14 12.7 4 8.91 9.61 8.26zM9 19.39 12 18l3 1.39V22l-3-1.4L9 22z',
   download: 'M5 20h14v-2H5zm14-9h-4V3H9v8H5l7 7z',
   settings: 'M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z',
+  logout: 'M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.59L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z',
+  vibration: 'M0 15h2V9H0v6zm3 3h2V6H3v12zm19-9v6h2V9h-2zm-3 9h2V6h-2v12zM16 1H8C6.9 1 6 1.9 6 3v18c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H8V5h8v14z',
   monetization_on: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 15.09V19h-2.67v-1.93c-1.76-.36-3.18-1.51-3.26-3.67h1.96c.1 1.05.82 1.87 2.64 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V5h2.67v1.95c1.92.46 2.88 1.9 2.94 3.45H14.4c-.05-1.11-.64-1.87-2.33-1.87-1.61 0-2.4.73-2.4 1.56 0 .72.54 1.35 2.67 1.9 2.13.54 4.18 1.43 4.18 3.91 0 1.83-1.38 2.91-3.11 3.19z',
   favorite: 'M12 21.35 10.55 20.03C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z',
   check_circle: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8z',
@@ -378,7 +388,9 @@ function MenuActionIcon({ name }) {
     badge: 'workspace_premium',
     install: 'download',
     settings: 'settings',
-    close: 'close'
+    close: 'close',
+    exit: 'logout',
+    haptic: 'vibration'
   }[name] || 'settings';
   return (
     <span className={`vc-menu-action-icon-wrap ${name}`} aria-hidden="true">
@@ -432,28 +444,28 @@ function ConfettiBurst({ burst }) {
 function PwaInstallPrompt({ canInstall, status, onInstall, onDismiss }) {
   const isManual = status === 'manual' || !canInstall;
   return (
-    <div className="pwa-install-overlay" role="dialog" aria-modal="true" aria-label="Install Ayam SD">
-      <div className="pwa-install-card">
-        <div className="pwa-install-orbit" aria-hidden="true">
-          <span className="pwa-chicken">🐔</span>
-          <i className="spark s1">★</i>
-          <i className="spark s2">✓</i>
-          <i className="spark s3">🏅</i>
+    <div className="vc-pwa-install-overlay" role="dialog" aria-modal="true" aria-label="Install Ayam SD">
+      <div className="vc-pwa-install-card">
+        <div className="vc-pwa-install-orbit" aria-hidden="true">
+          <span className="vc-pwa-chicken">🐔</span>
+          <i className="vc-pwa-spark s1">★</i>
+          <i className="vc-pwa-spark s2">✓</i>
+          <i className="vc-pwa-spark s3">🏅</i>
         </div>
-        <div className="mini-badge gold">Bisa Offline</div>
+        <div className="vc-mini-badge gold">Bisa Offline</div>
         <h2>Install Ayam SD</h2>
         <p>Main lebih cepat, skor dan badge tersimpan, lalu bisa dimainkan lagi walau internet sedang tidak stabil.</p>
-        <div className="pwa-benefits" aria-label="Manfaat install">
+        <div className="vc-pwa-benefits" aria-label="Manfaat install">
           <span>🏆 Skor tersimpan</span>
           <span>📴 Offline setelah dibuka</span>
           <span>🎮 Buka seperti aplikasi</span>
         </div>
         {isManual && (
-          <small className="pwa-install-help">Gunakan menu browser lalu pilih <strong>Install app</strong> atau <strong>Add to Home Screen</strong>.</small>
+          <small className="vc-pwa-install-help">Gunakan menu browser lalu pilih <strong>Install app</strong> atau <strong>Add to Home Screen</strong>.</small>
         )}
-        <div className="pwa-install-actions">
-          <button type="button" className="pwa-install-primary" onClick={onInstall}>{canInstall ? 'Install Sekarang' : 'Oke, Saya Mengerti'}</button>
-          <button type="button" className="pwa-install-later" onClick={onDismiss}>Nanti Saja</button>
+        <div className="vc-pwa-install-actions">
+          <button type="button" className="vc-pwa-install-primary" onClick={onInstall}>{canInstall ? 'Install Sekarang' : 'Oke, Saya Mengerti'}</button>
+          <button type="button" className="vc-pwa-install-later" onClick={onDismiss}>Nanti Saja</button>
         </div>
       </div>
     </div>
@@ -464,20 +476,20 @@ function BadgeUnlockOverlay({ badge, onClose }) {
   if (!badge) return null;
   const tierLabel = `Tier ${badge.tier}`;
   return (
-    <div className={`badge-unlock-overlay tier-${badge.tier}`} role="dialog" aria-live="polite" aria-label="Badge baru terbuka">
-      <div className="badge-unlock-card">
-        <div className="badge-aura" aria-hidden="true" />
-        <div className="badge-emblem" aria-hidden="true">
+    <div className={`vc-badge-unlock-overlay tier-${badge.tier}`} role="dialog" aria-live="polite" aria-label="Badge baru terbuka">
+      <div className="vc-badge-unlock-card">
+        <div className="vc-badge-aura" aria-hidden="true" />
+        <div className="vc-badge-emblem" aria-hidden="true">
           <span>{badge.emoji}</span>
         </div>
-        <div className="mini-badge gold">Badge Baru</div>
+        <div className="vc-mini-badge gold">Badge Baru</div>
         <h2>{badge.name}</h2>
         <p>{badge.copy}</p>
-        <div className="badge-meta">
+        <div className="vc-badge-meta">
           <span>{badge.label}</span>
           <span>{tierLabel}</span>
         </div>
-        <button type="button" className="badge-continue" onClick={onClose}>Lanjut Game</button>
+        <button type="button" className="vc-badge-continue" onClick={onClose}>Lanjut Game</button>
       </div>
     </div>
   );
@@ -528,48 +540,48 @@ function BadgeBoardOverlay({ profile, onClose }) {
   };
 
   return (
-    <div className="badge-board-overlay" role="dialog" aria-label="Papan badge Ayam SD">
-      <div className="badge-board-card">
-        <div className="badge-board-head">
+    <div className="vc-badge-board-overlay" role="dialog" aria-label="Papan badge Ayam SD">
+      <div className="vc-badge-board-card">
+        <div className="vc-badge-board-head">
           <div>
-            <span className="mini-badge gold">Papan Badge</span>
+            <span className="vc-mini-badge gold">Papan Badge</span>
             <h2>Koleksi Prestasimu</h2>
             <p>{unlockedCount} dari {totalCount} badge terbuka. Badge gelap berarti masih terkunci.</p>
           </div>
-          <button type="button" className="icon-close" onClick={onClose} aria-label="Tutup papan badge">×</button>
+          <button type="button" className="vc-icon-button" onClick={onClose} aria-label="Tutup papan badge">×</button>
         </div>
 
-        <div className="badge-board-summary">
+        <div className="vc-badge-board-summary">
           <div><strong>{profile?.bestRunScore || 0}</strong><span>Best Score</span></div>
           <div><strong>{profile?.nearMisses || 0}</strong><span>Nyaris</span></div>
           <div><strong>{profile?.totalCorrectAnswers || 0}</strong><span>Jawaban Benar</span></div>
           <div><strong>{unlockedCount}</strong><span>Badge</span></div>
         </div>
 
-        <div className="badge-family-list">
+        <div className="vc-badge-family-list">
           {BADGE_FAMILIES.map((family) => {
             const progress = getFamilyProgress(profile, family);
             return (
-              <section className="badge-family-card" key={family.family}>
-                <div className="badge-family-title">
+              <section className="vc-badge-family-card" key={family.family}>
+                <div className="vc-badge-family-title">
                   <div>
                     <strong>{family.label}</strong>
                     <small>{progress.unlockedCount}/{progress.total} terbuka</small>
                   </div>
                   <span>{progress.nextTier ? `${progress.currentValue}/${progress.nextTier.threshold}` : 'Selesai'}</span>
                 </div>
-                <div className="badge-family-progress" aria-hidden="true"><i style={{ width: `${progress.percent}%` }} /></div>
-                <div className="badge-grid">
+                <div className="vc-badge-family-progress" aria-hidden="true"><i style={{ width: `${progress.percent}%` }} /></div>
+                <div className="vc-badge-grid">
                   {family.tiers.map((badge) => {
                     const isUnlocked = unlocked.has(badge.id);
                     const counterValue = Number(profile?.[badge.counter || family.counter] || 0);
                     const pct = Math.min(100, Math.round((counterValue / badge.threshold) * 100));
                     return (
-                      <div className={`badge-tile ${isUnlocked ? 'unlocked' : 'locked'} tier-${badge.tier}`} key={badge.id}>
-                        <div className="badge-tile-medal"><span>{badge.emoji}</span></div>
+                      <div className={`vc-badge-tile ${isUnlocked ? 'unlocked' : 'locked'} tier-${badge.tier}`} key={badge.id}>
+                        <div className="vc-badge-tile-medal"><span>{badge.emoji}</span></div>
                         <strong>{badge.name}</strong>
                         <small>{isUnlocked ? 'Terbuka' : `${counterValue}/${badge.threshold}`}</small>
-                        {!isUnlocked && <div className="badge-tile-lock"><i style={{ width: `${pct}%` }} /></div>}
+                        {!isUnlocked && <div className="vc-badge-tile-lock"><i style={{ width: `${pct}%` }} /></div>}
                       </div>
                     );
                   })}
@@ -579,9 +591,9 @@ function BadgeBoardOverlay({ profile, onClose }) {
           })}
         </div>
 
-        <div className="badge-board-actions">
-          <button type="button" className="badge-share-button" onClick={shareBoard}>{shareState === 'done' ? 'Teks Disalin!' : 'Bagikan Progress'}</button>
-          <button type="button" className="badge-continue" onClick={onClose}>Kembali</button>
+        <div className="vc-badge-board-actions">
+          <button type="button" className="vc-badge-share-button" onClick={shareBoard}>{shareState === 'done' ? 'Teks Disalin!' : 'Bagikan Progress'}</button>
+          <button type="button" className="vc-badge-continue" onClick={onClose}>Kembali</button>
         </div>
       </div>
     </div>
@@ -635,23 +647,47 @@ function cancelIdleTask(id) {
   else window.clearTimeout(id);
 }
 
+function getAppBaseUrl() {
+  return (import.meta.env?.BASE_URL || '/').replace(/\/?$/, '/');
+}
+
+async function warmOfflineAsset(path) {
+  const baseUrl = getAppBaseUrl();
+  const url = `${baseUrl}${path}`;
+  const response = await fetch(url, { cache: 'force-cache' });
+  if (!response || !response.ok) throw new Error(`Offline warm cache failed for ${path}`);
+  return response;
+}
+
 const HAPTIC_PATTERNS = Object.freeze({
-  start: 12,
-  jump: 8,
-  blocked: [10, 24, 10],
-  nearMiss: 16,
-  traffic: [28, 32, 34],
-  train: [45, 38, 58],
-  water: [22, 30, 28],
-  reward: [18, 35, 18],
-  quizCorrect: 10,
-  quizWrong: [18, 38, 24]
+  // Short 8-16ms pulses are too subtle on several Android phones. These values
+  // stay kid-friendly, but are long enough to be felt on Xiaomi/MIUI devices.
+  start: 38,
+  jump: 30,
+  blocked: [36, 34, 42],
+  nearMiss: 44,
+  traffic: [62, 42, 76],
+  train: [88, 48, 112],
+  water: [54, 38, 64],
+  reward: [48, 34, 48],
+  quizCorrect: [34, 28, 42],
+  quizWrong: [56, 38, 76],
+  menu: 28,
+  exit: [42, 36, 42],
+  test: [80, 55, 95, 55, 120]
 });
 
+function canUseHaptics() {
+  return typeof navigator !== 'undefined'
+    && typeof navigator.vibrate === 'function'
+    && (typeof document === 'undefined' || document.visibilityState !== 'hidden');
+}
+
 function runHaptic(patternName, enabled = true) {
-  if (!enabled || typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return false;
+  if (!enabled || !canUseHaptics()) return false;
   const pattern = HAPTIC_PATTERNS[patternName] ?? patternName;
   try {
+    navigator.vibrate(0);
     return navigator.vibrate(pattern);
   } catch {
     return false;
@@ -681,6 +717,12 @@ export default function VoxelCrossing({
   const quizFeedbackTimerRef = useRef(null);
   const confettiTimerRef = useRef(null);
   const nearMissTimerRef = useRef(null);
+  const hapticNoticeTimerRef = useRef(null);
+  const appExitFallbackTimerRef = useRef(null);
+  const appExitWasRunningRef = useRef(false);
+  const appPauseRestoreSnapshotRef = useRef(false);
+  const appBackgroundPausedRef = useRef(false);
+  const appExitHintOpenRef = useRef(false);
   const badgeQueueRef = useRef([]);
   const badgeTimerRef = useRef(null);
   const pendingBadgeShowTimerRef = useRef(null);
@@ -733,10 +775,15 @@ export default function VoxelCrossing({
   const playerProfileRef = useRef(playerProfile);
   const deferredInstallPromptRef = useRef(null);
   const pwaPromptTimerRef = useRef(null);
+  const offlineWarmTaskRef = useRef(null);
+  const offlineWarmStartedRef = useRef(false);
   const [canInstallPwa, setCanInstallPwa] = useState(false);
   const [pwaPromptVisible, setPwaPromptVisible] = useState(false);
   const [pwaPromptStatus, setPwaPromptStatus] = useState('ready');
   const [standalonePwa, setStandalonePwa] = useState(() => isStandaloneDisplay());
+  const [hapticNotice, setHapticNotice] = useState('');
+  const [appExitHintOpen, setAppExitHintOpen] = useState(false);
+  const [appPauseReason, setAppPauseReason] = useState('exit');
 
   const livesRef = useRef(MAX_LIVES);
   const lifeBlinkTimerRef = useRef(null);
@@ -762,6 +809,10 @@ export default function VoxelCrossing({
     quizDueRef.current = quizDue;
     quizStatusRef.current = quiz.status;
   }, [gameOver, impacting, menuOpen, quizDue, quiz.status]);
+
+  useEffect(() => {
+    appExitHintOpenRef.current = appExitHintOpen;
+  }, [appExitHintOpen]);
 
   useEffect(() => {
     if (isStandaloneDisplay()) {
@@ -807,6 +858,29 @@ export default function VoxelCrossing({
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
       if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (offlineWarmStartedRef.current) return undefined;
+    offlineWarmStartedRef.current = true;
+
+    offlineWarmTaskRef.current = runWhenIdle(() => {
+      offlineWarmTaskRef.current = null;
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'AYAM_SD_WARM_CACHE',
+          paths: OFFLINE_WARM_ASSET_PATHS
+        });
+      }
+      Promise.allSettled(OFFLINE_WARM_ASSET_PATHS.map((path) => warmOfflineAsset(path))).catch(() => {});
+    }, 2600);
+
+    return () => {
+      if (offlineWarmTaskRef.current) {
+        cancelIdleTask(offlineWarmTaskRef.current);
+        offlineWarmTaskRef.current = null;
+      }
     };
   }, []);
 
@@ -928,6 +1002,8 @@ export default function VoxelCrossing({
     !gameOverRef.current &&
     !impactingRef.current &&
     !menuOpenRef.current &&
+    !appBackgroundPausedRef.current &&
+    !appExitHintOpenRef.current &&
     !isQuizMusicLocked()
   );
 
@@ -962,6 +1038,12 @@ export default function VoxelCrossing({
     if (badgeTimerRef.current) window.clearTimeout(badgeTimerRef.current);
     if (pendingBadgeShowTimerRef.current) window.clearTimeout(pendingBadgeShowTimerRef.current);
     if (pwaPromptTimerRef.current) window.clearTimeout(pwaPromptTimerRef.current);
+    if (offlineWarmTaskRef.current) {
+      cancelIdleTask(offlineWarmTaskRef.current);
+      offlineWarmTaskRef.current = null;
+    }
+    if (hapticNoticeTimerRef.current) window.clearTimeout(hapticNoticeTimerRef.current);
+    if (appExitFallbackTimerRef.current) window.clearTimeout(appExitFallbackTimerRef.current);
     if (reviveOfferTimerRef.current) window.clearTimeout(reviveOfferTimerRef.current);
     clearQuizFeedbackTimer();
     cancelDeferredMusicResume();
@@ -1105,7 +1187,7 @@ export default function VoxelCrossing({
   useEffect(() => {
     const isGameplayPointerTarget = (target) => {
       if (!target?.closest) return false;
-      if (target.closest('.start-button, .vc-menu-action, .icon-close, .vc-menu-settings, .pwa-install-overlay, .badge-board-overlay, .badge-unlock-overlay, input, textarea, select')) {
+      if (target.closest('.vc-primary-button, .vc-menu-action, .vc-icon-button, .vc-menu-settings, .vc-pwa-install-overlay, .vc-badge-board-overlay, .vc-badge-unlock-overlay, input, textarea, select')) {
         return false;
       }
       return Boolean(target.closest('.vc-move-pad, .vc-canvas'));
@@ -1137,7 +1219,7 @@ export default function VoxelCrossing({
 
   async function loadQuestionPool() {
     if (questionPoolRef.current) return questionPoolRef.current;
-    const baseUrl = (import.meta.env?.BASE_URL || '/').replace(/\/?$/, '/');
+    const baseUrl = getAppBaseUrl();
     const response = await fetch(`${baseUrl}data/questionBanks.json`, { cache: 'force-cache' });
     if (!response.ok) throw new Error(`Question bank failed to load: ${response.status}`);
     const data = await response.json();
@@ -1399,11 +1481,15 @@ export default function VoxelCrossing({
     // or even resume the WebGL engine in this click handler. First paint the
     // game screen, then start the engine two animation frames later.
     menuPausedRef.current = false;
+    appBackgroundPausedRef.current = false;
+    setAppPauseReason('exit');
     setStarted(true);
     setPwaPromptVisible(false);
+    setAppExitHintOpen(false);
     setMenuOpen(false);
     setSettingsOpen(false);
     setBadgeBoardOpen(false);
+    setAppExitHintOpen(false);
     setImpacting(false);
     setGameOver(false);
     setResult(null);
@@ -1443,23 +1529,85 @@ export default function VoxelCrossing({
     });
   };
 
-  const saveGame = () => {
-    const saveState = gameRef.current?.getSaveState?.({ lives });
-    if (!saveState) return;
+  const saveCurrentGameSnapshot = (extra = {}) => {
+    const saveState = gameRef.current?.getSaveState?.({ lives: livesRef.current, ...extra });
+    if (!saveState) return null;
     writeSavedGame(saveState);
     setSavedGame(saveState);
+    return saveState;
+  };
+
+  const saveGame = () => {
+    const saveState = saveCurrentGameSnapshot();
+    if (!saveState) return;
     setSaveNotice(`Tersimpan di score ${saveState.score}`);
     window.setTimeout(() => setSaveNotice(''), 1500);
+  };
+
+
+  const showHapticNotice = (message) => {
+    setHapticNotice(message);
+    if (hapticNoticeTimerRef.current) window.clearTimeout(hapticNoticeTimerRef.current);
+    hapticNoticeTimerRef.current = window.setTimeout(() => {
+      hapticNoticeTimerRef.current = null;
+      setHapticNotice('');
+    }, HAPTIC_TEST_NOTICE_MS);
+  };
+
+  const testHaptic = () => {
+    const supported = canUseHaptics();
+    const sent = runHaptic('test', true);
+    showHapticNotice(
+      !supported
+        ? 'Browser/perangkat tidak membuka API getar.'
+        : sent
+          ? 'Tes getar dikirim. Jika belum terasa, cek Silent/DND, Battery Saver, dan pengaturan getar sistem.'
+          : 'Perintah getar ditolak oleh browser/perangkat.'
+    );
+  };
+
+  const exitApp = () => {
+    appExitWasRunningRef.current = Boolean(startedRef.current && !gameOverRef.current);
+    appPauseRestoreSnapshotRef.current = false;
+    runHaptic('exit', settingsRef.current.hapticsEnabled);
+    setAppPauseReason('exit');
+    appBackgroundPausedRef.current = true;
+    if (ready && !gameOver) saveCurrentGameSnapshot({ pausedBy: 'exit' });
+    gameRef.current?.suspendRuntime?.();
+    audioRef.current?.forceStopMusic?.();
+    audioRef.current?.stopAll?.();
+    setMenuOpen(false);
+    setSettingsOpen(false);
+    setBadgeBoardOpen(false);
+    setPwaPromptVisible(false);
+    setAppExitHintOpen(false);
+
+    try {
+      window.close();
+    } catch {
+      // Most installed PWAs are not script-closable. Fall back to a proper pause screen.
+    }
+
+    if (appExitFallbackTimerRef.current) window.clearTimeout(appExitFallbackTimerRef.current);
+    appExitFallbackTimerRef.current = window.setTimeout(() => {
+      appExitFallbackTimerRef.current = null;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      setAppExitHintOpen(true);
+    }, APP_EXIT_FALLBACK_DELAY_MS);
   };
 
   const continueSavedGame = () => {
     const saveState = savedGame || loadSavedGame();
     if (!saveState) return;
+    appBackgroundPausedRef.current = false;
+    appPauseRestoreSnapshotRef.current = false;
+    setAppPauseReason('exit');
     gameRef.current?.loadSaveState?.(saveState, true);
     menuPausedRef.current = false;
     setMenuOpen(false);
     setSettingsOpen(false);
     setBadgeBoardOpen(false);
+    setAppExitHintOpen(false);
     setImpacting(false);
     setGameOver(false);
     setResult(null);
@@ -1483,12 +1631,30 @@ export default function VoxelCrossing({
     deferMusicResume(3800);
   };
 
+
+  const continueFromAppPause = () => {
+    appBackgroundPausedRef.current = false;
+    setAppExitHintOpen(false);
+
+    if (appPauseRestoreSnapshotRef.current) {
+      appPauseRestoreSnapshotRef.current = false;
+      continueSavedGame();
+      return;
+    }
+
+    if (appExitWasRunningRef.current) resumeGame({ deferEngine: true });
+    else setMenuOpen(true);
+  };
+
   const resumeGame = ({ deferEngine = false } = {}) => {
     if (impacting) return;
+    appBackgroundPausedRef.current = false;
+    setAppPauseReason('exit');
     menuPausedRef.current = false;
     setMenuOpen(false);
     setSettingsOpen(false);
     setBadgeBoardOpen(false);
+    setAppExitHintOpen(false);
     setStarted(true);
     startedRef.current = true;
     syncBackgroundMusicContext('resume');
@@ -1508,6 +1674,103 @@ export default function VoxelCrossing({
     if (!keepStarted) setStarted(false);
   };
 
+  const hardPauseAppRuntime = (reason = 'background') => {
+    const reasonKey = APP_BACKGROUND_PAUSE_REASONS.has(reason) ? reason : 'background';
+    const wasActive = Boolean(startedRef.current && !gameOverRef.current);
+    const suspendedDuringImpact = impactingRef.current === true;
+    const wasRunning = wasActive && !suspendedDuringImpact;
+    const shouldShowPauseScreen = wasActive || menuOpenRef.current || reasonKey === 'back';
+    appExitWasRunningRef.current = wasActive;
+    appPauseRestoreSnapshotRef.current = suspendedDuringImpact;
+    appBackgroundPausedRef.current = shouldShowPauseScreen;
+    menuPausedRef.current = wasRunning;
+
+    cancelDeferredResume();
+    cancelDeferredStart();
+    cancelDeferredMusicResume();
+    cancelDeferredAudioUnlock();
+    clearQuizFeedbackTimer();
+
+    if (wasActive || gameRef.current?.isPlaying) {
+      saveCurrentGameSnapshot({ pausedBy: reasonKey, suspendedDuringImpact });
+    }
+
+    gameRef.current?.suspendRuntime?.();
+    audioRef.current?.forceStopMusic?.();
+    audioRef.current?.stopAll?.();
+
+    setAppPauseReason(reasonKey);
+    setMenuOpen(false);
+    setSettingsOpen(false);
+    setBadgeBoardOpen(false);
+    setPwaPromptVisible(false);
+    if (suspendedDuringImpact) {
+      impactingRef.current = false;
+      setImpacting(false);
+    }
+
+    if (shouldShowPauseScreen && (typeof document === 'undefined' || document.visibilityState !== 'hidden')) {
+      setAppExitHintOpen(true);
+    }
+  };
+
+  useEffect(() => {
+    const pauseFromLifecycle = (reason) => hardPauseAppRuntime(reason);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        pauseFromLifecycle('background');
+        return;
+      }
+      if (appBackgroundPausedRef.current) {
+        setAppPauseReason('background');
+        setAppExitHintOpen(true);
+      }
+    };
+
+    const handlePageHide = () => pauseFromLifecycle('pagehide');
+    const handleFreeze = () => pauseFromLifecycle('freeze');
+    const handleBeforeUnload = () => {
+      if (startedRef.current && !gameOverRef.current) saveCurrentGameSnapshot({ pausedBy: 'beforeunload' });
+      audioRef.current?.forceStopMusic?.();
+      audioRef.current?.stopAll?.();
+      gameRef.current?.suspendRuntime?.();
+    };
+
+    const installBackGuard = () => {
+      try {
+        if (!history.state?.ayamPauseGuard) history.pushState({ ...(history.state || {}), ayamPauseGuard: true }, '', window.location.href);
+      } catch {
+        // History guard is best-effort only. Page lifecycle events still protect audio/game state.
+      }
+    };
+
+    const handlePopState = () => {
+      if (appExitHintOpenRef.current || appBackgroundPausedRef.current) return;
+      if (!standalonePwa && !startedRef.current && !menuOpenRef.current) return;
+      pauseFromLifecycle('back');
+      if (standalonePwa) window.setTimeout(installBackGuard, 0);
+    };
+
+    if (standalonePwa) installBackGuard();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+    document.addEventListener?.('freeze', handleFreeze);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+      document.removeEventListener?.('freeze', handleFreeze);
+    };
+    // The handler reads live refs so it can react to Android Home/Back without
+    // being rebuilt for every score/menu/quiz state change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [standalonePwa]);
+
   const openMenu = () => {
     if (impacting) return;
     // Menu must be a pure UI transition. Do not unlock audio, preload media,
@@ -1518,6 +1781,8 @@ export default function VoxelCrossing({
     setSettingsOpen(false);
     setBadgeBoardOpen(false);
     setPwaPromptVisible(false);
+    setAppExitHintOpen(false);
+    runHaptic('menu', settingsRef.current.hapticsEnabled);
     setMenuOpen(true);
   };
 
@@ -1571,6 +1836,11 @@ export default function VoxelCrossing({
       window.clearTimeout(reviveOfferTimerRef.current);
       reviveOfferTimerRef.current = null;
     }
+
+    cancelDeferredResume();
+    cancelDeferredStart();
+    cancelDeferredMusicResume();
+    gameRef.current?.suspendRuntime?.();
 
     // Force a real modal context before async question loading. This prevents
     // the second revive cycle from leaking into a blurred gameplay state with
@@ -1748,6 +2018,20 @@ export default function VoxelCrossing({
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [gameOver, result?.isNewHighScore]);
 
+  useEffect(() => {
+    const quizRuntimeLockActive = gameOver && !menuOpen && (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status) || quiz.status === 'error');
+    if (!quizRuntimeLockActive) return;
+
+    // Revive quiz is a hard modal: freeze the 3D runtime and stop BGM so the
+    // child is reading a calm full-screen learning page, not a moving game.
+    cancelDeferredResume();
+    cancelDeferredStart();
+    cancelDeferredMusicResume();
+    gameRef.current?.suspendRuntime?.();
+    audioRef.current?.forceStopMusic?.();
+    audioRef.current?.setMusicSuppressed?.(true);
+  }, [gameOver, menuOpen, quizDue, quiz.status]);
+
   const visibleScore = gameOver ? (result?.score ?? lastRunScore) : score;
   const resultScore = result?.score ?? lastRunScore;
   const resultReasonText = result?.reason === 'water'
@@ -1760,11 +2044,17 @@ export default function VoxelCrossing({
   const quizAnswered = Boolean(quiz.selectedKey);
   const quizFeedbackVisible = quizAnswered && quiz.feedbackVisible;
   const quizTotal = 1;
-  const modalOverlayActive = gameOver && !menuOpen && (reviveOfferPending || reviveOfferOpen || quizDue || ACTIVE_QUIZ_STATES.has(quiz.status) || quiz.status === 'error');
+  const modalOverlayActive = appExitHintOpen || (gameOver && !menuOpen && (reviveOfferPending || reviveOfferOpen || quizDue || ACTIVE_QUIZ_STATES.has(quiz.status) || quiz.status === 'error'));
+  const appPauseTitle = appPauseReason === 'exit' ? 'Ayam SD masih terbuka' : 'Game sudah dijeda total';
+  const appPauseCopy = appPauseReason === 'exit'
+    ? 'Android/Chrome biasanya tidak mengizinkan PWA menutup dirinya sendiri. Score sudah disimpan bila game sedang berjalan. Tekan Back/Home dari HP untuk keluar.'
+    : appPauseReason === 'back'
+      ? 'Tombol Back sudah menghentikan engine game dan audio agar tidak berjalan di background. Pilih Lanjutkan untuk main lagi, atau tekan Back/Home sekali lagi untuk keluar dari PWA.'
+      : 'Ayam SD otomatis pause saat aplikasi masuk background. Engine game, musik, dan efek suara sudah dihentikan agar tidak tetap berjalan di belakang layar.';
 
   return (
-    <section className={`vc-shell ${orientationHint} move-pad-${settings.movePadSide === 'left' ? 'left' : 'right'} ${menuOpen ? 'vc-menu-open' : ''} ${modalOverlayActive ? 'quiz-active' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
-      <div ref={hostRef} className="vc-host" />
+    <section className={`vc-shell vc-app-shell ${orientationHint} move-pad-${settings.movePadSide === 'left' ? 'left' : 'right'} ${menuOpen ? 'vc-menu-open' : ''} ${modalOverlayActive ? 'quiz-active' : ''} ${impacting ? `impact ${impactReason}` : ''} ${className}`}>
+      <div ref={hostRef} className="vc-host vc-game-host" />
       <ConfettiBurst burst={confettiBurst} />
       <BadgeUnlockOverlay badge={activeBadge} onClose={closeBadge} />
       {pwaPromptVisible && !standalonePwa && (
@@ -1776,14 +2066,14 @@ export default function VoxelCrossing({
         />
       )}
       {nearMissBurst && (
-        <div key={nearMissBurst.id} className="near-miss-stinger" aria-hidden="true">
+        <div key={nearMissBurst.id} className="vc-near-miss-stinger" aria-hidden="true">
           <span>NYARIS!</span>
         </div>
       )}
 
       {!ready && (
-        <div className="vc-boot-loader" aria-live="polite">
-          <div className="loader-orb" aria-hidden="true" />
+        <div className="vc-loading-overlay" aria-live="polite">
+          <div className="vc-loader-orb" aria-hidden="true" />
           <span>Menyiapkan arena…</span>
         </div>
       )}
@@ -1843,7 +2133,7 @@ export default function VoxelCrossing({
               <strong>Menu</strong>
               <span>{menuPausedRef.current ? 'Game dijeda' : 'Atur game'}</span>
             </div>
-            <button type="button" className="icon-close vc-menu-close" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); closeMenu({ resume: menuPausedRef.current }); }} aria-label="Tutup menu"><CloseIcon /></button>
+            <button type="button" className="vc-icon-button vc-menu-close" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); closeMenu({ resume: menuPausedRef.current }); }} aria-label="Tutup menu"><CloseIcon /></button>
           </div>
 
           <div className="vc-badge-progress-pill" aria-label={`Badge terbuka ${playerProfile.unlockedBadges.length} dari ${getBadgeCount()}`}>
@@ -1864,7 +2154,8 @@ export default function VoxelCrossing({
             <button type="button" className={`vc-menu-action ${badgeBoardOpen ? 'active' : ''}`} onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(true); }}><MenuActionIcon name="badge" />Papan Badge</button>
             {!standalonePwa && <button type="button" className="vc-menu-action install" onClick={() => { setSettingsOpen(false); setBadgeBoardOpen(false); setPwaPromptVisible(true); }}><MenuActionIcon name="install" />Install App</button>}
             <button type="button" className={`vc-menu-action ${settingsOpen ? 'active' : ''}`} onClick={() => { setBadgeBoardOpen(false); setSettingsOpen((open) => !open); }}><MenuActionIcon name="settings" />Settings</button>
-            <button type="button" className="vc-menu-action" onClick={() => closeMenu({ resume: menuPausedRef.current })}><MenuActionIcon name="close" />Close</button>
+            <button type="button" className="vc-menu-action" onClick={() => closeMenu({ resume: menuPausedRef.current })}><MenuActionIcon name="close" />Tutup Menu</button>
+            {standalonePwa && <button type="button" className="vc-menu-action danger" onClick={exitApp}><MenuActionIcon name="exit" />Keluar App</button>}
           </div>
 
           {saveNotice && <div className="vc-menu-save-note" role="status">{saveNotice}</div>}
@@ -1909,6 +2200,8 @@ export default function VoxelCrossing({
                 />
                 <i className="vc-menu-switch" aria-hidden="true" />
               </label>
+              <button type="button" className="vc-menu-haptic-test" onClick={testHaptic}><MenuActionIcon name="haptic" />Tes Getar</button>
+              {hapticNotice && <div className="vc-menu-haptic-note" role="status">{hapticNotice}</div>}
 
               <div className="vc-menu-setting-row vc-menu-move-pad-setting">
                 <span>
@@ -1927,28 +2220,42 @@ export default function VoxelCrossing({
         </div>
       )}
 
+      {appExitHintOpen && (
+        <div className="vc-screen-overlay vc-app-exit-overlay" role="dialog" aria-label="Game dijeda">
+          <div className="vc-glass-card vc-app-exit-card">
+            <div className="vc-mini-badge">Game dijeda</div>
+            <h2>{appPauseTitle}</h2>
+            <p>{appPauseCopy}</p>
+            <div className="vc-app-exit-actions">
+              <button type="button" className="vc-primary-button" onClick={continueFromAppPause}>Lanjutkan</button>
+              <button type="button" className="vc-primary-button ghost" onClick={() => { appBackgroundPausedRef.current = false; setAppPauseReason('exit'); setAppExitHintOpen(false); setMenuOpen(true); }}>Menu</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {badgeBoardOpen && (
         <BadgeBoardOverlay profile={playerProfile} onClose={() => setBadgeBoardOpen(false)} />
       )}
 
       {impacting && (
-        <div className={`impact-stinger ${impactReason}`} aria-hidden="true">
+        <div className={`vc-impact-stinger ${impactReason}`} aria-hidden="true">
           <span>{impactReason === 'train' ? 'KERETA!' : impactReason === 'water' ? 'JEBURR!' : 'TUBRUK!'}</span>
         </div>
       )}
 
       {!started && !gameOver && !impacting && !menuOpen && (
-        <div className="vc-overlay intro">
-          <div className="glass-card">
-            <div className="mini-badge">Mini Game</div>
+        <div className="vc-screen-overlay vc-intro-overlay">
+          <div className="vc-glass-card">
+            <div className="vc-mini-badge">Mini Game</div>
             <h1>{title}</h1>
             <p>{subtitle}</p>
-            <div className="hint-row">
+            <div className="vc-hint-row">
               <span>Space / Enter untuk mulai</span>
               <span>Arrow / WASD untuk bergerak</span>
               <span>Swipe atau tombol untuk mobile</span>
             </div>
-            <button type="button" className="start-button" onClick={startGame} disabled={!ready}>
+            <button type="button" className="vc-primary-button" onClick={startGame} disabled={!ready}>
               {ready ? 'Mulai Main' : 'Loading…'}
             </button>
           </div>
@@ -1956,14 +2263,14 @@ export default function VoxelCrossing({
       )}
 
       {gameOver && !menuOpen && reviveOfferPending && quiz.status === 'idle' && (
-        <div className="vc-overlay vc-revive-pending" aria-hidden="true" />
+        <div className="vc-screen-overlay vc-revive-pending" aria-hidden="true" />
       )}
 
       {gameOver && !menuOpen && reviveOfferOpen && quiz.status === 'idle' && (
-        <div className="vc-overlay vc-revive-offer-overlay" role="presentation">
+        <div className="vc-screen-overlay vc-revive-offer-overlay" role="presentation">
           <div className="vc-revive-offer-card" role="dialog" aria-label="Tawaran hidup lagi">
             <div className="vc-revive-offer-icon" aria-hidden="true"><MaterialIcon name="favorite" size={30} /></div>
-            <div className="mini-badge gold">Kesempatan Kedua</div>
+            <div className="vc-mini-badge gold">Kesempatan Kedua</div>
             <h2>Lanjut?</h2>
             <p className="vc-revive-offer-copy">Score <strong>{resultScore}</strong></p>
             <div className="vc-revive-offer-actions">
@@ -1975,7 +2282,7 @@ export default function VoxelCrossing({
       )}
 
       {gameOver && !menuOpen && (quizDue || ACTIVE_QUIZ_STATES.has(quiz.status) || quiz.status === 'error') && (
-        <div className={`vc-overlay vc-quiz-overlay vc-revive-quiz-overlay ${(quizDue && quiz.status === 'idle') ? 'loading' : quiz.status} ${quizReveal ? 'reveal' : ''} ${quiz.explanationOpen ? 'explain-open' : ''}`}>
+        <div className={`vc-screen-overlay vc-quiz-overlay vc-revive-quiz-overlay ${(quizDue && quiz.status === 'idle') ? 'loading' : quiz.status} ${quizReveal ? 'reveal' : ''} ${quiz.explanationOpen ? 'explain-open' : ''}`}>
           <div className={`vc-quiz-card vc-revive-card ${quizFeedbackVisible && !quiz.explanationOpen ? 'feedback-open' : ''} ${quizFeedbackVisible && quiz.lastCorrect ? 'feedback-good' : ''} ${quizFeedbackVisible && quiz.lastCorrect === false ? 'feedback-try' : ''}`} role="dialog" aria-label="Kesempatan hidup lagi">
             <div className="vc-quiz-glow" aria-hidden="true" />
             {(quiz.status === 'loading' || (quizDue && quiz.status === 'idle')) && (
@@ -2066,7 +2373,7 @@ export default function VoxelCrossing({
 
             {quiz.status === 'running' && currentQuizQuestion && quiz.explanationOpen && (
               <div className="vc-explanation-page" aria-live="polite">
-                <div className="mini-badge">Pembahasan</div>
+                <div className="vc-mini-badge">Pembahasan</div>
                 <h2>Pembahasan</h2>
                 <div className="vc-explain-question">{currentQuizQuestion.questionText}</div>
                 <ChalkboardExplanationText question={currentQuizQuestion} />
@@ -2078,7 +2385,7 @@ export default function VoxelCrossing({
 
             {quiz.status === 'complete' && (
               <div className="vc-quiz-complete" aria-live="polite">
-                <div className="mini-badge gold">Revive Berhasil</div>
+                <div className="vc-mini-badge gold">Revive Berhasil</div>
                 <h2>Ayam hidup lagi!</h2>
                 <p>+{REVIVE_COIN_REWARD} koin. Lanjutkan dari skor terakhir.</p>
                 <div className="vc-quiz-complete-actions">
@@ -2091,55 +2398,55 @@ export default function VoxelCrossing({
       )}
 
       {gameOver && !menuOpen && !reviveOfferPending && !reviveOfferOpen && !quizDue && quiz.status === 'idle' && (
-        <div className={`vc-overlay result ${result?.isNewHighScore ? 'new-record' : ''}`}>
-          <div className="glass-card compact result-card">
+        <div className={`vc-screen-overlay vc-result-overlay ${result?.isNewHighScore ? 'new-record' : ''}`}>
+          <div className="vc-glass-card vc-card-compact vc-result-card">
             {result?.isNewHighScore ? (
               <>
-                <div className="reward-aura" aria-hidden="true" />
-                <div className="mini-badge gold">Rekor Baru</div>
-                <div className="star-reward" aria-hidden="true">
-                  <span className="gold-star s1">★</span>
-                  <span className="gold-star s2">★</span>
-                  <span className="gold-star s3">★</span>
+                <div className="vc-reward-aura" aria-hidden="true" />
+                <div className="vc-mini-badge gold">Rekor Baru</div>
+                <div className="vc-star-reward" aria-hidden="true">
+                  <span className="vc-gold-star s1">★</span>
+                  <span className="vc-gold-star s2">★</span>
+                  <span className="vc-gold-star s3">★</span>
                 </div>
                 <h2>Score {resultScore}</h2>
-                <p className="reward-copy">Tiga bintang untuk rekor terbaikmu. Pertahankan fokus dan cari jalur paling aman.</p>
+                <p className="vc-reward-copy">Tiga bintang untuk rekor terbaikmu. Pertahankan fokus dan cari jalur paling aman.</p>
               </>
             ) : (
               <>
-                <div className="mini-badge danger">Game Over</div>
+                <div className="vc-mini-badge danger">Game Over</div>
                 <h2>Score {resultScore}</h2>
                 <p>{resultReasonText}</p>
               </>
             )}
-            <button type="button" className="start-button" onClick={startGame}>Main Lagi</button>
+            <button type="button" className="vc-primary-button" onClick={startGame}>Main Lagi</button>
           </div>
         </div>
       )}
 
       {gameOver && !menuOpen && quiz.status === 'error' && (
-        <div className={`vc-overlay result ${result?.isNewHighScore ? 'new-record' : ''}`}>
-          <div className="glass-card compact result-card">
+        <div className={`vc-screen-overlay vc-result-overlay ${result?.isNewHighScore ? 'new-record' : ''}`}>
+          <div className="vc-glass-card vc-card-compact vc-result-card">
             {result?.isNewHighScore ? (
               <>
-                <div className="reward-aura" aria-hidden="true" />
-                <div className="mini-badge gold">Rekor Baru</div>
-                <div className="star-reward" aria-hidden="true">
-                  <span className="gold-star s1">★</span>
-                  <span className="gold-star s2">★</span>
-                  <span className="gold-star s3">★</span>
+                <div className="vc-reward-aura" aria-hidden="true" />
+                <div className="vc-mini-badge gold">Rekor Baru</div>
+                <div className="vc-star-reward" aria-hidden="true">
+                  <span className="vc-gold-star s1">★</span>
+                  <span className="vc-gold-star s2">★</span>
+                  <span className="vc-gold-star s3">★</span>
                 </div>
                 <h2>Score {resultScore}</h2>
-                <p className="reward-copy">Tiga bintang untuk rekor terbaikmu. Pertahankan fokus dan coba menyeberang lebih jauh.</p>
+                <p className="vc-reward-copy">Tiga bintang untuk rekor terbaikmu. Pertahankan fokus dan coba menyeberang lebih jauh.</p>
               </>
             ) : (
               <>
-                <div className="mini-badge danger">Game Over</div>
+                <div className="vc-mini-badge danger">Game Over</div>
                 <h2>Score {resultScore}</h2>
                 <p>{resultReasonText} Best score: {highScore}.</p>
               </>
             )}
-            <button type="button" className="start-button" onClick={startGame}>Main Lagi</button>
+            <button type="button" className="vc-primary-button" onClick={startGame}>Main Lagi</button>
           </div>
         </div>
       )}

@@ -5,7 +5,13 @@
 */
 @import './legacy.css';
 @import './tokens.css';
+@import './shell.css';
+@import './buttons.css';
+@import './overlays.css';
+@import './effects.css';
+@import './pwa.css';
+@import './badges.css';
 @import './hud.css';
 @import './controls.css';
 @import './menu.css';
-@import "./quiz.css";
+@import './quiz.css';

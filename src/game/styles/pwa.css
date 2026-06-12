@@ -1,0 +1,230 @@
+/*
+  v3.5.29 owner: PWA install prompt and offline warm-cache affordance.
+  Owns: .vc-pwa-install-* and the menu install action accent.
+*/
+.vc-pwa-install-overlay {
+  position: absolute;
+  z-index: var(--vc-pwa-install-z, 70);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 244, 155, 0.22), transparent 34%),
+    linear-gradient(180deg, rgba(12, 24, 18, 0.32), rgba(8, 14, 18, 0.58));
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  animation: vc-pwa-overlay-in 260ms ease both;
+}
+
+.vc-pwa-install-card {
+  position: relative;
+  width: min(430px, calc(100vw - 34px));
+  overflow: hidden;
+  padding: 26px 22px 20px;
+  border-radius: 34px;
+  color: #27331b;
+  text-align: center;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.88), transparent 40%),
+    linear-gradient(180deg, #fff8d7, #f2eab7 54%, #dceca3);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  box-shadow:
+    0 26px 80px rgba(15, 24, 10, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: vc-pwa-card-pop 560ms cubic-bezier(0.12, 1.48, 0.22, 1) both;
+}
+
+.vc-pwa-install-card::before {
+  content: '';
+  position: absolute;
+  inset: auto -16% -26% -16%;
+  height: 45%;
+  border-radius: 50% 50% 0 0;
+  background: rgba(148, 204, 71, 0.2);
+  pointer-events: none;
+}
+
+.vc-pwa-install-orbit {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, #fffef1 0 42%, rgba(255, 215, 76, 0.45) 43% 64%, rgba(105, 182, 65, 0.22) 65% 100%);
+  box-shadow:
+    0 16px 34px rgba(119, 92, 7, 0.18),
+    inset 0 0 0 7px rgba(255, 255, 255, 0.44);
+}
+
+.vc-pwa-chicken {
+  font-size: 50px;
+  filter: drop-shadow(0 8px 12px rgba(58, 52, 4, 0.16));
+  animation: vc-pwa-chicken-bob 1200ms ease-in-out infinite;
+}
+
+.vc-pwa-spark {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  color: #5f4712;
+  background: #fff3a1;
+  box-shadow: 0 8px 16px rgba(74, 54, 12, 0.14);
+  font-style: normal;
+  font-size: 14px;
+}
+
+.vc-pwa-spark.s1 { top: 4px; right: 8px; }
+.vc-pwa-spark.s2 { bottom: 6px; right: 0; }
+.vc-pwa-spark.s3 { bottom: 2px; left: 4px; }
+
+.vc-pwa-install-card h2 {
+  position: relative;
+  z-index: 1;
+  margin: 8px 0 8px;
+  font-size: clamp(30px, 6vw, 44px);
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+  font-weight: 480;
+}
+
+.vc-pwa-install-card p {
+  position: relative;
+  z-index: 1;
+  max-width: 34ch;
+  margin: 0 auto 14px;
+  color: rgba(42, 52, 29, 0.78);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.vc-pwa-benefits {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 14px;
+}
+
+.vc-pwa-benefits span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: #293c16;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.vc-pwa-install-help {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin: 3px auto 12px;
+  max-width: 34ch;
+  color: rgba(46, 47, 26, 0.7);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.vc-pwa-install-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.vc-pwa-install-primary,
+.vc-pwa-install-later {
+  min-height: 55px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 430;
+  transition: transform 95ms cubic-bezier(0.1, 1.6, 0.22, 1), filter 95ms ease, box-shadow 95ms ease;
+  transform-origin: center center;
+}
+
+.vc-pwa-install-primary {
+  color: #fffdf3;
+  background: linear-gradient(180deg, #ffca45, #f2971f 64%, #d77918);
+  box-shadow:
+    0 8px 0 rgba(143, 83, 12, 0.34),
+    0 18px 34px rgba(225, 143, 20, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.vc-pwa-install-later {
+  color: #3b4b27;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow:
+    0 6px 0 rgba(93, 111, 55, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.vc-pwa-install-primary:active,
+.vc-pwa-install-later:active {
+  transform: translateY(5px) scale(0.97);
+  filter: brightness(0.98) saturate(1.05);
+  box-shadow:
+    0 2px 0 rgba(91, 55, 12, 0.26),
+    0 8px 18px rgba(91, 55, 12, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.vc-menu-action.install {
+  background: linear-gradient(180deg, rgba(255, 214, 78, 0.3), rgba(255, 168, 45, 0.19));
+  border-color: rgba(255, 227, 124, 0.3);
+}
+
+@keyframes vc-pwa-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes vc-pwa-card-pop {
+  from { opacity: 0; transform: translateY(18px) scale(0.92); }
+  64% { opacity: 1; transform: translateY(-3px) scale(1.018); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes vc-pwa-chicken-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-5px) rotate(3deg); }
+}
+
+@media (min-width: 680px) {
+  .vc-pwa-install-card {
+    padding: 30px 28px 24px;
+  }
+
+  .vc-pwa-install-actions {
+    grid-template-columns: 1.15fr 0.85fr;
+  }
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  .vc-pwa-install-overlay {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

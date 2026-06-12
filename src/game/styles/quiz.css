@@ -14,10 +14,13 @@
   inset: 0;
   z-index: var(--vc-quiz-z);
   width: 100vw;
+  height: 100dvh;
   min-height: 100dvh;
+  max-height: 100dvh;
   display: grid;
   place-items: center;
   overflow: hidden;
+  overscroll-behavior: contain;
   font-family: "Sniglet", ui-rounded, "Trebuchet MS", system-ui, sans-serif;
 }
 
@@ -129,6 +132,7 @@
 
 .vc-quiz-card {
   position: relative;
+  box-sizing: border-box;
   width: min(var(--vc-quiz-card-width), calc(100vw - 28px));
   max-height: calc(100dvh - 28px);
   min-height: auto;
@@ -564,7 +568,7 @@
   color: #f8fbff;
 }
 
-.vc-explanation-page .mini-badge {
+.vc-explanation-page .vc-mini-badge {
   justify-self: center;
 }
 
@@ -661,7 +665,7 @@
   100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
-@media (max-width: 560px) {
+@media (orientation: portrait) {
   .vc-quiz-overlay {
     padding: 0;
     place-items: stretch;
@@ -678,21 +682,22 @@
       max(14px, env(safe-area-inset-bottom))
       max(12px, env(safe-area-inset-left));
     align-content: center;
-    overflow: hidden auto;
+    overflow: hidden;
+    overscroll-behavior: contain;
   }
 
   .vc-quiz-question {
-    min-height: clamp(190px, 32dvh, 270px);
+    min-height: clamp(162px, 28dvh, 252px);
     padding: 14px;
   }
 
   .vc-quiz-options {
-    grid-auto-rows: minmax(62px, auto);
-    gap: 11px;
+    grid-auto-rows: minmax(clamp(56px, 7.2dvh, 62px), auto);
+    gap: clamp(8px, 1.15dvh, 11px);
   }
 
   .vc-quiz-option {
-    min-height: 62px;
+    min-height: clamp(56px, 7.2dvh, 62px);
     padding: 11px 12px;
     grid-template-columns: 44px minmax(0, 1fr) auto;
     column-gap: 10px;
@@ -728,6 +733,69 @@
 
   .vc-quiz-question {
     min-height: 160px;
+  }
+}
+
+/*
+  v3.5.30 owner: revive quiz must be a true full-screen hard modal in
+  portrait/PWA contexts. Do not return to card-in-page layout or visible
+  scrollbars for the learning question screen.
+*/
+.vc-shell.portrait .vc-revive-quiz-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  padding: 0;
+  place-items: stretch;
+  overflow: hidden;
+}
+
+.vc-shell.portrait .vc-revive-quiz-overlay .vc-revive-card {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  border-radius: 0;
+  overflow: hidden;
+  align-content: center;
+}
+
+.vc-shell.portrait .vc-revive-quiz-overlay .vc-quiz-question,
+.vc-shell.portrait .vc-revive-quiz-overlay .vc-quiz-options,
+.vc-shell.portrait .vc-revive-quiz-overlay .vc-revive-actions {
+  min-width: 0;
+}
+
+.vc-shell.portrait .vc-revive-quiz-overlay .vc-quiz-question {
+  min-height: clamp(158px, 28dvh, 252px);
+}
+
+.vc-shell.portrait .vc-revive-quiz-overlay .vc-quiz-options {
+  grid-auto-rows: minmax(clamp(54px, 7.2dvh, 62px), auto);
+  gap: clamp(8px, 1.15dvh, 11px);
+}
+
+.vc-shell.portrait .vc-revive-quiz-overlay .vc-quiz-option {
+  min-height: clamp(54px, 7.2dvh, 62px);
+}
+
+@media (orientation: portrait) and (max-height: 740px) {
+  .vc-shell.portrait .vc-revive-quiz-overlay .vc-revive-card {
+    gap: 8px;
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+  }
+
+  .vc-shell.portrait .vc-revive-quiz-overlay .vc-quiz-question {
+    min-height: clamp(138px, 24dvh, 190px);
   }
 }
 
@@ -801,7 +869,7 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.44);
 }
 
-.vc-shell .vc-revive-offer-card .mini-badge.gold {
+.vc-shell .vc-revive-offer-card .vc-mini-badge.gold {
   margin: 2px 0 0;
   min-height: 34px;
   padding: 0 16px;

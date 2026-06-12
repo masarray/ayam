@@ -44,6 +44,6 @@ export default function GamePage() {
 Keep the game canvas inside a stable parent container. The component uses `ResizeObserver` to adapt camera and layout to portrait or landscape.
 
 
-## Post-game quiz
+## Revive learning loop
 
-After a run ends, the game loads `public/data/questionBanks.json` lazily and presents 5 randomized questions. Answer order is shuffled for each question. Questions already shown in the current browser session are skipped until the pool is exhausted.
+After the reserve heart is used and a later run ends, the game offers one revive question. The question bank at `public/data/questionBanks.json` is lazy-loaded and warmed in the offline cache after the app becomes idle. Answer order is shuffled for each question, and questions already shown in the current browser session are skipped until the pool is exhausted.
