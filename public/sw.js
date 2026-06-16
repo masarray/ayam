@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3.5.39';
+const CACHE_VERSION = 'v3.5.40';
 const CACHE_NAME = `ayam-sd-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `ayam-sd-runtime-${CACHE_VERSION}`;
 // Keep install light: big quiz/audio files are cached on first use instead of precached.
@@ -26,7 +26,7 @@ async function precacheBuiltAssets(cache) {
   await cache.put(scopedUrl('./'), response.clone());
 
   const html = await response.text();
-  const assetMatches = [...html.matchAll(/(?:src|href)=\"([^\"]*\/assets\/[^\"]+)\"/g)];
+  const assetMatches = [...html.matchAll(/(?:src|href)="([^"]*\/assets\/[^"]+)"/g)];
   const assetUrls = assetMatches.map((match) => new URL(match[1], self.registration.scope).toString());
   await Promise.allSettled(assetUrls.map((url) => cache.add(url)));
 }
