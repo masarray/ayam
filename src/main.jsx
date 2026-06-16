@@ -4,6 +4,7 @@ import './game/runtimeFixes.js';
 import './game/smoothTrafficFixes.js';
 import './game/stageBalanceFixes.js';
 import './game/desktopShadowFixes.js';
+import './game/mobileContactShadowFixes.js';
 import App from './App.jsx';
 import './styles.css';
 
