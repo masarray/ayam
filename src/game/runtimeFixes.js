@@ -115,6 +115,8 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     if (rowIndex <= 24) {
       laneItems.forEach((vehicle, index) => {
         const data = vehicle.userData || {};
+        if (data.playabilityProfileApplied) return;
+
         const compact = isCompactVehicle(data);
         const heavy = isHeavyVehicle(data);
         const originalBase = data.baseSpeed || data.speed || 140;
@@ -135,6 +137,7 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
         data.brakePower = Math.max(data.brakePower || 0, compact ? 168 : heavy ? 132 : 150);
         data.currentSpeed = clampNumber(data.currentSpeed || targetBase, targetBase * 0.94, data.maxSpeed);
         data.minFollowGap = Math.max(data.minFollowGap || TRAFFIC_MIN_GAP, data.width * (compact ? 0.48 : 0.56), rowIndex <= 12 ? 92 : 84);
+        data.playabilityProfileApplied = true;
       });
     }
 
