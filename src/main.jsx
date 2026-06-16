@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './game/runtimeFixes.js';
 import './game/smoothTrafficFixes.js';
+import './game/stageBalanceFixes.js';
 import App from './App.jsx';
 import './styles.css';
 
