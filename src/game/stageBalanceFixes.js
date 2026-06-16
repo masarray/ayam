@@ -32,7 +32,6 @@ if (!RoadQuestGame.__ayamStageBalanceFixesAppliedV1) {
   };
 
   const isDesktopGame = (game) => game.renderProfile?.name === 'desktop-premium';
-  const isMobileGame = (game) => !isDesktopGame(game);
   const desktopMode = (game) => game.__ayamDesktopPerformanceMode || 'normal';
   const mobileMode = (game) => game.__ayamMobilePerformanceMode || 'normal';
   const deviceMode = (game) => (isDesktopGame(game) ? desktopMode(game) : mobileMode(game));
@@ -77,7 +76,7 @@ if (!RoadQuestGame.__ayamStageBalanceFixesAppliedV1) {
     if (item.material && !item.material.__shared) item.material.dispose?.();
   };
 
-  const capFxItemsForAllDevices = (game) => {
+  const capFxItemsForAllDevicesNow = (game) => {
     if (!Array.isArray(game.fxItems)) return;
     const mode = deviceMode(game);
     const desktop = isDesktopGame(game);
@@ -399,9 +398,9 @@ if (!RoadQuestGame.__ayamStageBalanceFixesAppliedV1) {
     observeDesktopFrameHealth(this, rawDelta);
   };
 
-  proto._capFxItemsForMobile = function capFxItemsForAllDevices() {
+  proto._capFxItemsForMobile = function capFxItemsForAllDevicesPatched() {
     originalCapFxItemsForMobile?.call(this);
-    capFxItemsForAllDevices(this);
+    capFxItemsForAllDevicesNow(this);
   };
 
   proto._addRowsAround = function addRowsAroundWithStageBalance(centerRow, forwardRows = 24, backwardRows = 24) {
