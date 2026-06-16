@@ -8,16 +8,18 @@ import {
 } from './constants.js';
 
 // Runtime engine guard for mobile playability regressions.
-// Keep this file small and deterministic: it patches lifecycle/simulation
-// behavior without touching UI state, audio, or quiz flow.
-if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
-  RoadQuestGame.__ayamRuntimeFixesAppliedV3 = true;
+// Keep this file deterministic: it patches simulation load, traffic density,
+// and traffic following without touching UI state, audio, or quiz flow.
+if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
+  RoadQuestGame.__ayamRuntimeFixesAppliedV4 = true;
 
   const proto = RoadQuestGame.prototype;
   const originalSetupLights = proto._setupLights;
   const originalReset = proto.reset;
   const originalLoadSaveState = proto.loadSaveState;
   const originalAddRow = proto._addRow;
+  const originalAddRowsAround = proto._addRowsAround;
+  const originalCompleteMove = proto._completeMove;
 
   const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
   const deterministicNoise = (rowIndex, index) => {
@@ -31,6 +33,19 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
   const laneProgress = (vehicle, direction, wrapMin, wrapMax) => (
     direction > 0 ? vehicle.position.x - wrapMin : wrapMax - vehicle.position.x
   );
+  const disposeDynamicMaterials = (object) => {
+    object?.traverse?.((child) => {
+      if (!child.material) return;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((material) => {
+        if (!material.__shared) material.dispose?.();
+      });
+    });
+  };
+  const removeMovingItem = (game, item) => {
+    disposeDynamicMaterials(item);
+    game.vehicleGroup.remove(item);
+  };
   const isCompactVehicle = (data = {}) => {
     const kind = String(data.kind || '').toLowerCase();
     if (/car|taxi|scooter|bike|motor|pickup|van/.test(kind)) return true;
@@ -41,11 +56,12 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     if (/bus|truck|tanker|container|dump|tractor|articulated/.test(kind)) return true;
     return Number(data.width || 0) >= 118;
   };
+  const isSuperVehicle = (data = {}) => /super|sport/.test(String(data.kind || '').toLowerCase());
   const targetTrafficCount = (rowIndex, currentCount) => {
     if (rowIndex <= 12) return Math.min(currentCount, 1);
     if (rowIndex <= 24) return Math.min(currentCount, 2);
-    if (rowIndex <= 40) return Math.min(currentCount, 3);
-    return currentCount;
+    if (rowIndex <= 80) return Math.min(currentCount, 3);
+    return Math.min(currentCount, 4);
   };
   const selectEvenlySpacedVehicles = (items, desiredCount) => {
     if (items.length <= desiredCount) return items;
@@ -62,13 +78,61 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     const limit = (speedDelta >= 0 ? accel : brake) * delta;
     return current + clampNumber(speedDelta, -limit, limit);
   };
+  const speedBandForRow = (rowIndex, data) => {
+    const compact = isCompactVehicle(data);
+    const heavy = isHeavyVehicle(data);
+    const superVehicle = isSuperVehicle(data);
 
-  proto._trimSimulationWindow = function trimSimulationWindow(centerRow = 0, forwardRows = 18, backwardRows = 0) {
+    if (superVehicle) {
+      if (rowIndex <= 80) return { min: 245, max: 390, variance: 52 };
+      return { min: 275, max: 470, variance: 68 };
+    }
+    if (rowIndex <= 12) {
+      return compact
+        ? { min: 190, max: 252, variance: 34 }
+        : heavy
+          ? { min: 158, max: 218, variance: 28 }
+          : { min: 174, max: 236, variance: 32 };
+    }
+    if (rowIndex <= 40) {
+      return compact
+        ? { min: 176, max: 252, variance: 38 }
+        : heavy
+          ? { min: 146, max: 218, variance: 30 }
+          : { min: 162, max: 238, variance: 34 };
+    }
+    if (rowIndex <= 80) {
+      return compact
+        ? { min: 184, max: 286, variance: 46 }
+        : heavy
+          ? { min: 152, max: 242, variance: 34 }
+          : { min: 168, max: 266, variance: 40 };
+    }
+    return compact
+      ? { min: 198, max: 330, variance: 54 }
+      : heavy
+        ? { min: 164, max: 268, variance: 38 }
+        : { min: 182, max: 308, variance: 48 };
+  };
+  const activeWindowFor = (game, centerRow = 0) => {
+    const mobileLike = game.renderProfile?.name !== 'desktop-premium';
+    if (mobileLike) {
+      return centerRow >= 38
+        ? { forward: 20, backward: 10 }
+        : { forward: 22, backward: 8 };
+    }
+    return centerRow >= 38
+      ? { forward: 28, backward: 14 }
+      : { forward: 32, backward: 14 };
+  };
+
+  proto._trimSimulationWindow = function trimSimulationWindow(centerRow = 0, forwardRows = 20, backwardRows = 10) {
     const minRow = Math.max(0, centerRow - backwardRows);
     const maxRow = centerRow + forwardRows;
 
     for (const [rowIndex, rowGroup] of Array.from(this.rowGroups.entries())) {
       if (rowIndex >= minRow && rowIndex <= maxRow) continue;
+      disposeDynamicMaterials(rowGroup);
       this.worldGroup.remove(rowGroup);
       this.rowGroups.delete(rowIndex);
       this.waterFlowRows.delete(rowIndex);
@@ -77,7 +141,7 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     const keepMovingItem = (item) => {
       const rowIndex = item.userData?.rowIndex ?? 0;
       if (rowIndex >= minRow && rowIndex <= maxRow) return true;
-      this.vehicleGroup.remove(item);
+      removeMovingItem(this, item);
       return false;
     };
 
@@ -97,6 +161,13 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     });
   };
 
+  proto._keepRuntimeWindowNearPlayer = function keepRuntimeWindowNearPlayer() {
+    const row = this.playerPosition?.row || 0;
+    const { forward, backward } = activeWindowFor(this, row);
+    this._normalizeVisibleTrafficLanes();
+    this._trimSimulationWindow(row, forward, backward);
+  };
+
   proto._normalizeTrafficLaneForPlayability = function normalizeTrafficLaneForPlayability(rowIndex, items) {
     if (!Array.isArray(items) || items.length === 0) return items;
 
@@ -106,42 +177,57 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     if (desiredCount < items.length) {
       const selected = new Set(selectEvenlySpacedVehicles(items, desiredCount));
       const removed = new Set(items.filter((vehicle) => !selected.has(vehicle)));
-      removed.forEach((vehicle) => this.vehicleGroup.remove(vehicle));
+      removed.forEach((vehicle) => removeMovingItem(this, vehicle));
       this.vehicles = this.vehicles.filter((vehicle) => !removed.has(vehicle));
       laneItems = items.filter((vehicle) => selected.has(vehicle));
       this.trafficRows.set(rowIndex, laneItems);
     }
 
-    if (rowIndex <= 24) {
-      laneItems.forEach((vehicle, index) => {
-        const data = vehicle.userData || {};
-        if (data.playabilityProfileApplied) return;
+    laneItems.forEach((vehicle, index) => {
+      const data = vehicle.userData || {};
+      if (data.playabilityProfileAppliedV4) return;
 
-        const compact = isCompactVehicle(data);
-        const heavy = isHeavyVehicle(data);
-        const originalBase = data.baseSpeed || data.speed || 140;
-        const noise = deterministicNoise(rowIndex, index);
-        const minSpeed = rowIndex <= 12
-          ? (compact ? 190 : heavy ? 158 : 174)
-          : (compact ? 172 : heavy ? 142 : 158);
-        const maxSpeed = rowIndex <= 12
-          ? (compact ? 252 : heavy ? 218 : 236)
-          : (compact ? 238 : heavy ? 204 : 222);
-        const targetBase = clampNumber(Math.max(originalBase, minSpeed) + (noise - 0.5) * 34, minSpeed, maxSpeed);
+      const compact = isCompactVehicle(data);
+      const heavy = isHeavyVehicle(data);
+      const superVehicle = isSuperVehicle(data);
+      const originalBase = data.baseSpeed || data.speed || 140;
+      const band = speedBandForRow(rowIndex, data);
+      const highCap = Math.max(band.max, originalBase * (superVehicle ? 1.04 : 1.02));
+      const targetBase = clampNumber(
+        Math.max(originalBase, band.min) + (deterministicNoise(rowIndex, index) - 0.5) * band.variance,
+        band.min,
+        highCap
+      );
 
-        data.speed = targetBase;
-        data.baseSpeed = targetBase;
-        data.cruiseSpeed = targetBase * (0.94 + deterministicNoise(rowIndex, index + 11) * 0.14);
-        data.maxSpeed = targetBase * (compact ? 1.24 : heavy ? 1.08 : 1.14);
-        data.acceleration = Math.max(data.acceleration || 0, compact ? 115 : heavy ? 62 : 84);
-        data.brakePower = Math.max(data.brakePower || 0, compact ? 168 : heavy ? 132 : 150);
-        data.currentSpeed = clampNumber(data.currentSpeed || targetBase, targetBase * 0.94, data.maxSpeed);
-        data.minFollowGap = Math.max(data.minFollowGap || TRAFFIC_MIN_GAP, data.width * (compact ? 0.48 : 0.56), rowIndex <= 12 ? 92 : 84);
-        data.playabilityProfileApplied = true;
-      });
-    }
+      data.speed = targetBase;
+      data.baseSpeed = targetBase;
+      data.cruiseSpeed = targetBase * (0.94 + deterministicNoise(rowIndex, index + 11) * 0.14);
+      data.maxSpeed = targetBase * (superVehicle ? 1.26 : compact ? 1.2 : heavy ? 1.08 : 1.14);
+      data.acceleration = Math.max(data.acceleration || 0, superVehicle ? 140 : compact ? 116 : heavy ? 62 : 88);
+      data.brakePower = Math.max(data.brakePower || 0, superVehicle ? 190 : compact ? 168 : heavy ? 132 : 150);
+      data.currentSpeed = clampNumber(data.currentSpeed || targetBase, targetBase * 0.94, data.maxSpeed);
+      data.minFollowGap = Math.max(
+        data.minFollowGap || TRAFFIC_MIN_GAP,
+        data.width * (compact || superVehicle ? 0.48 : heavy ? 0.6 : 0.54),
+        rowIndex <= 12 ? 92 : rowIndex <= 40 ? 84 : 76
+      );
+      data.playabilityProfileAppliedV4 = true;
+    });
 
     return laneItems;
+  };
+
+  proto._limitRailRowForPerformance = function limitRailRowForPerformance(rowIndex) {
+    const trains = this.vehicles.filter((vehicle) => vehicle.userData?.type === 'train' && vehicle.userData?.rowIndex === rowIndex);
+    const maxTrains = this.renderProfile?.name === 'desktop-premium' && rowIndex >= 100 ? 2 : 1;
+    if (trains.length <= maxTrains) return;
+
+    const keep = new Set(trains.slice(0, maxTrains));
+    trains.forEach((train) => {
+      if (keep.has(train)) return;
+      removeMovingItem(this, train);
+    });
+    this.vehicles = this.vehicles.filter((vehicle) => vehicle.userData?.rowIndex !== rowIndex || vehicle.userData?.type !== 'train' || keep.has(vehicle));
   };
 
   proto._normalizeVisibleTrafficLanes = function normalizeVisibleTrafficLanes() {
@@ -162,27 +248,34 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     }
   };
 
+  proto._addRowsAround = function addRowsAroundWithBoundedRuntimeWindow(centerRow, forwardRows = 24, backwardRows = 24) {
+    const { forward, backward } = activeWindowFor(this, centerRow || 0);
+    return originalAddRowsAround.call(
+      this,
+      centerRow,
+      Math.min(forwardRows, forward),
+      Math.min(backwardRows, backward)
+    );
+  };
+
   proto._addRow = function addRowWithTrafficNormalization(row) {
     originalAddRow.call(this, row);
     if (row?.type === 'traffic') {
       const items = this.trafficRows.get(row.index);
       this._normalizeTrafficLaneForPlayability(row.index, items);
+    } else if (row?.type === 'rail') {
+      this._limitRailRowForPerformance(row.index);
     }
   };
 
   proto.reset = function resetWithLightOpeningScene(startImmediately = false) {
     originalReset.call(this, startImmediately);
-    this._normalizeVisibleTrafficLanes();
-    // Keep the active render/simulation window small on mobile. The row data is
-    // still generated, but off-screen geometry does not burn frame time.
-    this._trimSimulationWindow(0, 20, 0);
+    this._keepRuntimeWindowNearPlayer();
   };
 
   proto.loadSaveState = function loadSaveStateWithTrim(state, startImmediately = true) {
     const result = originalLoadSaveState.call(this, state, startImmediately);
-    const row = this.playerPosition?.row || 0;
-    this._normalizeVisibleTrafficLanes();
-    this._trimSimulationWindow(row, 28, 16);
+    this._keepRuntimeWindowNearPlayer();
     return result;
   };
 
@@ -197,16 +290,24 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     this.lastPausedRenderAt = 0;
     this.restartPrepared = false;
 
-    this._normalizeVisibleTrafficLanes();
+    this._keepRuntimeWindowNearPlayer();
     this._clearSpawnAroundPlayer?.(2, 220);
     this.clock.getDelta();
     this._ensureAnimationLoop();
   };
 
+  proto._completeMove = function completeMoveWithRuntimeTrim() {
+    originalCompleteMove.call(this);
+    if (!this.isDestroyed) this._keepRuntimeWindowNearPlayer();
+  };
+
   proto._animate = function animate() {
     this.renderRequested = null;
     if (this.isDestroyed || this.isRuntimeSuspended) return;
-    const delta = Math.min(this.clock.getDelta(), 0.035);
+    // Do not cap at 0.035. When mobile FPS briefly drops below ~28 FPS, that cap
+    // makes every obstacle look globally slower, including trains. A 0.05 cap
+    // preserves perceived speed while still preventing huge background-tab jumps.
+    const delta = Math.min(this.clock.getDelta(), 0.05);
 
     if (this.isUiPaused && !this.isImpacting) {
       const nowMs = performance.now();
@@ -256,6 +357,18 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
     const wrapMax = maxX + maxVehicleWidth;
     const span = wrapMax - wrapMin;
 
+    const moveTrafficVehicle = (vehicle) => {
+      const data = vehicle.userData || {};
+      const width = data.width || maxVehicleWidth;
+      vehicle.position.x += direction * (data.currentSpeed || data.baseSpeed || data.speed || 120) * delta;
+
+      if (direction > 0 && vehicle.position.x > wrapMax + width * 0.5) {
+        vehicle.position.x = wrapMin - width * 0.5;
+      } else if (direction < 0 && vehicle.position.x < wrapMin - width * 0.5) {
+        vehicle.position.x = wrapMax + width * 0.5;
+      }
+    };
+
     if (laneItems.length === 1) {
       const data = laneItems[0].userData || {};
       const base = data.baseSpeed || data.speed || 140;
@@ -268,7 +381,7 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
         data.brakePower || 130,
         delta
       );
-      this._updateFreeMovingObstacle(laneItems[0], delta, VEHICLE_SAFE_MARGIN);
+      moveTrafficVehicle(laneItems[0]);
       return;
     }
 
@@ -288,25 +401,28 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
       const gap = frontProgress - item.progress - ((data.width || 72) + (frontData.width || 72)) * 0.5;
       const compact = isCompactVehicle(data);
       const heavy = isHeavyVehicle(data);
+      const superVehicle = isSuperVehicle(data);
       const currentSpeed = data.currentSpeed || data.baseSpeed || data.speed || 120;
       const frontSpeed = frontData.currentSpeed || frontData.baseSpeed || frontData.speed || currentSpeed;
       const base = data.baseSpeed || data.speed || currentSpeed;
       const cruise = data.cruiseSpeed || base;
-      const maxSpeed = data.maxSpeed || base * (compact ? 1.2 : 1.1);
-      const hardGap = Math.max(data.minFollowGap || TRAFFIC_MIN_GAP, (data.width || 72) * 0.55, rowIndex <= 24 ? 86 : TRAFFIC_MIN_GAP);
-      const comfortGap = hardGap + (rowIndex <= 24 ? 78 : 112) + currentSpeed * (compact ? 0.08 : 0.12);
-      const chaseGap = comfortGap + (compact ? 180 : 72);
+      const maxSpeed = data.maxSpeed || base * (compact || superVehicle ? 1.2 : 1.1);
+      const hardGap = Math.max(data.minFollowGap || TRAFFIC_MIN_GAP, (data.width || 72) * 0.55, rowIndex <= 24 ? 86 : 68);
+      const comfortGap = hardGap + (rowIndex <= 24 ? 78 : 96) + currentSpeed * (compact || superVehicle ? 0.075 : 0.105);
+      const chaseGap = comfortGap + (compact || superVehicle ? 190 : 84);
       let targetSpeed = cruise;
 
       if (gap < hardGap) {
         // Real braking only when the front vehicle is already too close.
-        const emergencyFloor = rowIndex <= 24 ? (compact ? 118 : 92) : 46;
-        targetSpeed = Math.max(emergencyFloor, Math.min(cruise, frontSpeed * (compact ? 0.68 : 0.62)));
+        const emergencyFloor = rowIndex <= 24
+          ? (compact || superVehicle ? 118 : 92)
+          : (compact || superVehicle ? 98 : heavy ? 76 : 86);
+        targetSpeed = Math.max(emergencyFloor, Math.min(cruise, frontSpeed * (compact || superVehicle ? 0.7 : 0.64)));
       } else if (gap < comfortGap) {
         const ratio = clampNumber((gap - hardGap) / Math.max(1, comfortGap - hardGap), 0, 1);
-        const followSpeed = frontSpeed * (0.78 + 0.18 * ratio);
-        targetSpeed = Math.min(cruise, followSpeed + (compact ? 22 : 12) * ratio);
-      } else if (compact && gap < chaseGap) {
+        const followSpeed = frontSpeed * (0.8 + 0.17 * ratio);
+        targetSpeed = Math.min(cruise, followSpeed + (compact || superVehicle ? 24 : 13) * ratio);
+      } else if ((compact || superVehicle) && gap < chaseGap) {
         // Small vehicles may speed up to close the distance, then the previous
         // branches make them brake naturally when they approach the next car.
         const ratio = 1 - clampNumber((gap - comfortGap) / Math.max(1, chaseGap - comfortGap), 0, 1);
@@ -315,26 +431,19 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
         targetSpeed = Math.min(maxSpeed, cruise * 1.04);
       }
 
-      const acceleration = data.acceleration || (compact ? 112 : heavy ? 58 : 82);
-      const brakePower = data.brakePower || (compact ? 168 : heavy ? 128 : 146);
+      const acceleration = data.acceleration || (compact || superVehicle ? 112 : heavy ? 58 : 82);
+      const brakePower = data.brakePower || (compact || superVehicle ? 168 : heavy ? 128 : 146);
+      const minOperationalSpeed = rowIndex <= 24
+        ? (compact || superVehicle ? 102 : 82)
+        : (compact || superVehicle ? 88 : heavy ? 72 : 80);
       data.currentSpeed = clampNumber(
         approach(currentSpeed, targetSpeed, acceleration, brakePower, delta),
-        rowIndex <= 24 ? (compact ? 102 : 82) : 32,
+        minOperationalSpeed,
         maxSpeed
       );
     }
 
-    laneItems.forEach((vehicle) => {
-      const data = vehicle.userData || {};
-      const width = data.width || maxVehicleWidth;
-      vehicle.position.x += direction * (data.currentSpeed || data.baseSpeed || data.speed || 120) * delta;
-
-      if (direction > 0 && vehicle.position.x > wrapMax + width * 0.5) {
-        vehicle.position.x = wrapMin - width * 0.5;
-      } else if (direction < 0 && vehicle.position.x < wrapMin - width * 0.5) {
-        vehicle.position.x = wrapMax + width * 0.5;
-      }
-    });
+    laneItems.forEach(moveTrafficVehicle);
 
     const settled = laneItems
       .map((vehicle) => ({
@@ -353,9 +462,11 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV3) {
       const requiredProgress = frontProgress - ((data.width || 72) + (frontData.width || 72)) * 0.5 - minGap;
       if (item.progress > requiredProgress) {
         item.vehicle.position.x = direction > 0 ? wrapMin + requiredProgress : wrapMax - requiredProgress;
+        const base = data.baseSpeed || data.speed || 0;
+        const floor = rowIndex <= 24 ? base * 0.56 : Math.max(base * 0.66, isCompactVehicle(data) || isSuperVehicle(data) ? 88 : 72);
         data.currentSpeed = Math.min(
-          data.currentSpeed || data.baseSpeed || 0,
-          Math.max((frontData.currentSpeed || frontData.baseSpeed || 0) * 0.9, (data.baseSpeed || data.speed || 0) * 0.56)
+          data.currentSpeed || base,
+          Math.max((frontData.currentSpeed || frontData.baseSpeed || 0) * 0.9, floor)
         );
       }
     }
