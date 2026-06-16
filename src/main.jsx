@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import './game/runtimeFixes.js';
 import App from './App.jsx';
 import './styles.css';
 
