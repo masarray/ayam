@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3.5.31';
+const CACHE_VERSION = 'v3.5.32';
 const CACHE_NAME = `ayam-sd-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `ayam-sd-runtime-${CACHE_VERSION}`;
 // Keep install light: big quiz/audio files are cached on first use instead of precached.
@@ -61,16 +61,19 @@ async function cacheFirst(request) {
   return response;
 }
 
-async function staleWhileRevalidate(request) {
-  const cached = await caches.match(request);
-  const networkPromise = fetch(request).then(async (response) => {
+async function networkFirstAsset(request) {
+  const fallback = caches.match(request) || caches.match(scopedUrl('./index.html'));
+  try {
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response && response.ok) {
       const cache = await caches.open(RUNTIME_CACHE);
       cache.put(request, response.clone());
+      return response;
     }
-    return response;
-  }).catch(() => null);
-  return cached || networkPromise || caches.match(scopedUrl('./index.html'));
+  } catch {
+    // Offline/devices with flaky network fall back to the latest cached asset.
+  }
+  return fallback;
 }
 
 async function navigationFallback(request) {
@@ -86,7 +89,6 @@ async function navigationFallback(request) {
   }
 }
 
-
 self.addEventListener('message', (event) => {
   const { data } = event;
   if (!data || data.type !== 'AYAM_SD_WARM_CACHE' || !Array.isArray(data.paths)) return;
@@ -96,7 +98,16 @@ self.addEventListener('message', (event) => {
     const urls = data.paths
       .filter((path) => typeof path === 'string' && !path.includes('://'))
       .map((path) => scopedUrl(path));
-    await Promise.allSettled(urls.map((url) => cache.add(url)));
+
+    // Warm optional assets gently. Do this sequentially so the first gameplay
+    // frames are not competing with many cache fetches on mobile.
+    for (const url of urls) {
+      try {
+        await cache.add(url);
+      } catch {
+        // Optional warm-cache item failed; continue with the next asset.
+      }
+    }
   })());
 });
 
@@ -114,7 +125,7 @@ self.addEventListener('fetch', (event) => {
 
   const path = url.pathname;
   if (path.includes('/assets/') || path.endsWith('.js') || path.endsWith('.css')) {
-    event.respondWith(staleWhileRevalidate(request));
+    event.respondWith(networkFirstAsset(request));
     return;
   }
 
