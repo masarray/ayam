@@ -4,6 +4,8 @@ import { RoadQuestGame } from './RoadQuestGame.js';
 const CONTACT_SHADOW_MAX_INSTANCES = 160;
 const CONTACT_SHADOW_Z = 0.72;
 const CONTACT_SHADOW_COLOR = 0x111827;
+const HIGH_MOBILE_SHADOW_MAP_SIZE = 512;
+const MID_MOBILE_SHADOW_MAP_SIZE = 384;
 
 const scratchPosition = new THREE.Vector3();
 const scratchQuaternion = new THREE.Quaternion();
@@ -15,10 +17,84 @@ function isMobileProfile(game) {
   return profile.includes('mobile') || profile.includes('light');
 }
 
+function mobilePerformanceMode(game) {
+  return game?.__ayamMobilePerformanceMode || 'normal';
+}
+
+function readNavigatorNumber(name) {
+  const value = Number(globalThis.navigator?.[name] || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function hasReducedMotion() {
+  return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+}
+
+function deviceCanTryRealMobileShadow(game) {
+  if (!isMobileProfile(game)) return false;
+  if (game?.renderProfile?.name === 'mobile-light') return false;
+  if (hasReducedMotion()) return false;
+
+  const memory = readNavigatorNumber('deviceMemory');
+  const cores = readNavigatorNumber('hardwareConcurrency');
+  const dpr = Number(globalThis.devicePixelRatio || 1);
+  const maxTextureSize = Number(game?.renderer?.capabilities?.maxTextureSize || 0);
+
+  // Browser privacy can hide memory/CPU values. Treat unknown values as neutral,
+  // but require a sane WebGL texture limit so old/weak GPUs stay on blob shadows.
+  const memoryOk = memory === 0 || memory >= 6;
+  const coresOk = cores === 0 || cores >= 6;
+  const gpuOk = maxTextureSize === 0 || maxTextureSize >= 4096;
+  const dprOk = dpr <= 3.25;
+
+  return memoryOk && coresOk && gpuOk && dprOk;
+}
+
+function configureShadowMapSize(sunlight, size) {
+  if (!sunlight?.shadow?.mapSize || !size) return;
+  if (sunlight.shadow.mapSize.width === size && sunlight.shadow.mapSize.height === size) return;
+
+  sunlight.shadow.mapSize.set(size, size);
+  sunlight.shadow.map?.dispose?.();
+  sunlight.shadow.map = null;
+  sunlight.shadow.needsUpdate = true;
+}
+
+function configureAdaptiveMobileShadow(game) {
+  if (!isMobileProfile(game) || !game?.renderer) return;
+
+  const mode = mobilePerformanceMode(game);
+  const canTryReal = deviceCanTryRealMobileShadow(game);
+  const useRealShadow = canTryReal && mode === 'normal';
+
+  game.__ayamMobileShadowTier = useRealShadow ? 'real' : 'contact';
+  game.__ayamMobileShadowCanTryReal = canTryReal;
+
+  if (!useRealShadow) {
+    game.renderer.shadowMap.enabled = false;
+    if (game.sunlight) game.sunlight.castShadow = false;
+    return;
+  }
+
+  const shadowSize = mode === 'pressure' ? MID_MOBILE_SHADOW_MAP_SIZE : HIGH_MOBILE_SHADOW_MAP_SIZE;
+  game.renderer.shadowMap.enabled = true;
+  game.renderer.shadowMap.type = THREE.PCFShadowMap;
+
+  if (game.sunlight) {
+    game.sunlight.castShadow = true;
+    configureShadowMapSize(game.sunlight, shadowSize);
+  }
+}
+
 function shouldUseContactShadows(game) {
   if (!game || game.isDestroyed) return false;
-  // Mobile uses fake contact shadows instead of real shadow maps. On desktop,
-  // keep fake shadows as a fallback only when real shadows are unavailable.
+
+  // Strong phones can use a small real shadow map in normal mode. When that is
+  // active, hide blob shadows to avoid double-dark contact shadows.
+  if (game.__ayamMobileShadowTier === 'real') return false;
+
+  // Low/mid phones, pressure mode, severe mode, and desktop fallback all use the
+  // cheap instanced blob-shadow path.
   if (isMobileProfile(game)) return true;
   return !(game.renderer?.shadowMap?.enabled && game.sunlight?.castShadow);
 }
@@ -69,6 +145,8 @@ function applyShadowInstance(mesh, index, x, y, scaleX, scaleY, opacityWeight = 
 }
 
 function updateMobileContactShadows(game) {
+  configureAdaptiveMobileShadow(game);
+
   const mesh = ensureContactShadowMesh(game);
   const enabled = shouldUseContactShadows(game);
   if (!enabled) {
@@ -120,8 +198,15 @@ function updateMobileContactShadows(game) {
 
 function installMobileContactShadowFixes() {
   const proto = RoadQuestGame?.prototype;
-  if (!proto || proto.__mobileContactShadowFixesInstalled) return;
-  proto.__mobileContactShadowFixesInstalled = true;
+  if (!proto || proto.__mobileContactShadowFixesInstalledV2) return;
+  proto.__mobileContactShadowFixesInstalledV2 = true;
+
+  const originalApplyQualityProfile = proto._applyMobileQualityProfile;
+  proto._applyMobileQualityProfile = function applyQualityProfileWithAdaptiveMobileShadows(...args) {
+    const result = originalApplyQualityProfile?.apply(this, args);
+    configureAdaptiveMobileShadow(this);
+    return result;
+  };
 
   const originalUpdateCamera = proto._updateCamera;
   proto._updateCamera = function updateCameraWithMobileContactShadows(...args) {
