@@ -1,38 +1,54 @@
 import { RoadQuestGame } from './RoadQuestGame.js';
+import { createInitialRows } from './world.js';
+import { createFoundation, createPlayer } from './renderers.js';
 import {
   MAX_TILE,
   MIN_TILE,
+  PREGENERATE_ROWS,
   TILE_SIZE,
   TRAFFIC_MIN_GAP,
   VEHICLE_SAFE_MARGIN
 } from './constants.js';
 
 // Runtime engine guard for mobile playability regressions.
-// Keep this file deterministic: it patches simulation load, traffic density,
-// and traffic following without touching UI state, audio, or quiz flow.
-if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
-  RoadQuestGame.__ayamRuntimeFixesAppliedV4 = true;
+// The game must stay light on real phones: bounded active rows, capped pixel
+// ratio, no mobile shadows, controlled traffic density, and adaptive degradation
+// when a device starts missing frames.
+if (!RoadQuestGame.__ayamRuntimeFixesAppliedV5) {
+  RoadQuestGame.__ayamRuntimeFixesAppliedV5 = true;
 
   const proto = RoadQuestGame.prototype;
   const originalSetupLights = proto._setupLights;
-  const originalReset = proto.reset;
   const originalLoadSaveState = proto.loadSaveState;
   const originalAddRow = proto._addRow;
   const originalAddRowsAround = proto._addRowsAround;
   const originalCompleteMove = proto._completeMove;
+  const originalResize = proto._resize;
 
   const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
+  const performanceRank = { normal: 0, pressure: 1, severe: 2 };
+
   const deterministicNoise = (rowIndex, index) => {
     const x = Math.sin((rowIndex + 1) * 91.73 + (index + 3) * 37.19) * 43758.5453;
     return x - Math.floor(x);
   };
+
+  const isMobileGame = (game) => game.renderProfile?.name !== 'desktop-premium';
+
+  const performanceMode = (game) => {
+    if (!isMobileGame(game)) return 'normal';
+    return game.__ayamMobilePerformanceMode || 'normal';
+  };
+
   const laneBounds = (margin = VEHICLE_SAFE_MARGIN) => ({
     minX: MIN_TILE * TILE_SIZE - margin,
     maxX: MAX_TILE * TILE_SIZE + margin
   });
+
   const laneProgress = (vehicle, direction, wrapMin, wrapMax) => (
     direction > 0 ? vehicle.position.x - wrapMin : wrapMax - vehicle.position.x
   );
+
   const disposeDynamicMaterials = (object) => {
     object?.traverse?.((child) => {
       if (!child.material) return;
@@ -42,27 +58,57 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
       });
     });
   };
+
+  const disposeFxGeometries = (object) => {
+    object?.traverse?.((child) => {
+      child.geometry?.dispose?.();
+    });
+  };
+
   const removeMovingItem = (game, item) => {
     disposeDynamicMaterials(item);
     game.vehicleGroup.remove(item);
   };
+
+  const removeFxItem = (game, item) => {
+    game.fxGroup.remove(item);
+    item.geometry?.dispose?.();
+    if (item.material && !item.material.__shared) item.material.dispose?.();
+  };
+
   const isCompactVehicle = (data = {}) => {
     const kind = String(data.kind || '').toLowerCase();
     if (/car|taxi|scooter|bike|motor|pickup|van/.test(kind)) return true;
     return Number(data.width || 0) <= 94;
   };
+
   const isHeavyVehicle = (data = {}) => {
     const kind = String(data.kind || '').toLowerCase();
     if (/bus|truck|tanker|container|dump|tractor|articulated/.test(kind)) return true;
     return Number(data.width || 0) >= 118;
   };
+
   const isSuperVehicle = (data = {}) => /super|sport/.test(String(data.kind || '').toLowerCase());
-  const targetTrafficCount = (rowIndex, currentCount) => {
+
+  const targetTrafficCount = (rowIndex, currentCount, game) => {
+    const mode = performanceMode(game);
+    if (mode === 'severe') {
+      if (rowIndex <= 24) return Math.min(currentCount, 1);
+      if (rowIndex <= 120) return Math.min(currentCount, 2);
+      return Math.min(currentCount, 3);
+    }
+    if (mode === 'pressure') {
+      if (rowIndex <= 18) return Math.min(currentCount, 1);
+      if (rowIndex <= 80) return Math.min(currentCount, 2);
+      return Math.min(currentCount, 3);
+    }
+
     if (rowIndex <= 12) return Math.min(currentCount, 1);
     if (rowIndex <= 24) return Math.min(currentCount, 2);
     if (rowIndex <= 80) return Math.min(currentCount, 3);
     return Math.min(currentCount, 4);
   };
+
   const selectEvenlySpacedVehicles = (items, desiredCount) => {
     if (items.length <= desiredCount) return items;
     const sorted = [...items].sort((a, b) => a.position.x - b.position.x);
@@ -73,11 +119,13 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
     }
     return selected.length ? selected : sorted.slice(0, desiredCount);
   };
+
   const approach = (current, target, accel, brake, delta) => {
     const speedDelta = target - current;
     const limit = (speedDelta >= 0 ? accel : brake) * delta;
     return current + clampNumber(speedDelta, -limit, limit);
   };
+
   const speedBandForRow = (rowIndex, data) => {
     const compact = isCompactVehicle(data);
     const heavy = isHeavyVehicle(data);
@@ -114,16 +162,103 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
         ? { min: 164, max: 268, variance: 38 }
         : { min: 182, max: 308, variance: 48 };
   };
+
   const activeWindowFor = (game, centerRow = 0) => {
-    const mobileLike = game.renderProfile?.name !== 'desktop-premium';
-    if (mobileLike) {
+    const mode = performanceMode(game);
+
+    if (isMobileGame(game)) {
+      if (mode === 'severe') {
+        return centerRow >= 38
+          ? { forward: 14, backward: 6 }
+          : { forward: 16, backward: 6 };
+      }
+      if (mode === 'pressure') {
+        return centerRow >= 38
+          ? { forward: 17, backward: 7 }
+          : { forward: 19, backward: 7 };
+      }
       return centerRow >= 38
         ? { forward: 20, backward: 10 }
         : { forward: 22, backward: 8 };
     }
+
     return centerRow >= 38
       ? { forward: 28, backward: 14 }
       : { forward: 32, backward: 14 };
+  };
+
+  const pixelRatioCapFor = (game) => {
+    if (!isMobileGame(game)) return game.renderProfile?.maxPixelRatio || 1.75;
+
+    const mode = performanceMode(game);
+    if (mode === 'severe') return 0.9;
+    if (mode === 'pressure') return 1.0;
+    return game.renderProfile?.name === 'mobile-light' ? 1.0 : 1.15;
+  };
+
+  proto._applyMobileQualityProfile = function applyMobileQualityProfile() {
+    if (!isMobileGame(this)) return;
+
+    const cap = pixelRatioCapFor(this);
+    this.renderProfile.maxPixelRatio = Math.min(this.renderProfile.maxPixelRatio || cap, cap);
+    this.renderer.shadowMap.enabled = false;
+    if (this.sunlight) this.sunlight.castShadow = false;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
+  };
+
+  proto._observeMobileFrameHealth = function observeMobileFrameHealth(rawDelta) {
+    if (!isMobileGame(this)) return;
+
+    const now = performance.now();
+    const stats = this.__ayamFrameStats || {
+      samples: 0,
+      sum: 0,
+      max: 0,
+      lastModeChange: now,
+      goodWindows: 0
+    };
+
+    const observedDelta = clampNumber(rawDelta, 0, 0.09);
+    stats.samples += 1;
+    stats.sum += observedDelta;
+    stats.max = Math.max(stats.max, observedDelta);
+
+    if (stats.samples < 90) {
+      this.__ayamFrameStats = stats;
+      return;
+    }
+
+    const avg = stats.sum / Math.max(1, stats.samples);
+    const currentMode = performanceMode(this);
+    let nextMode = 'normal';
+
+    // Keep at least ~45-50 FPS on phones. Once the average frame goes beyond
+    // that budget, reduce simulation density and render resolution automatically.
+    if (avg > 1 / 38 || stats.max > 0.07) nextMode = 'severe';
+    else if (avg > 1 / 50 || stats.max > 0.047) nextMode = 'pressure';
+
+    if (nextMode === 'normal') stats.goodWindows += 1;
+    else stats.goodWindows = 0;
+
+    const mayChange = now - stats.lastModeChange > 2600;
+    const shouldDegrade = performanceRank[nextMode] > performanceRank[currentMode];
+    const shouldRecover = performanceRank[nextMode] < performanceRank[currentMode] && stats.goodWindows >= 4;
+
+    if (mayChange && (shouldDegrade || shouldRecover)) {
+      this.__ayamMobilePerformanceMode = nextMode;
+      stats.lastModeChange = now;
+      this._applyMobileQualityProfile();
+      originalResize.call(this);
+      this._keepRuntimeWindowNearPlayer();
+    }
+
+    this.__ayamFrameStats = {
+      samples: 0,
+      sum: 0,
+      max: 0,
+      lastModeChange: stats.lastModeChange,
+      goodWindows: stats.goodWindows
+    };
   };
 
   proto._trimSimulationWindow = function trimSimulationWindow(centerRow = 0, forwardRows = 20, backwardRows = 10) {
@@ -161,17 +296,28 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
     });
   };
 
+  proto._capFxItemsForMobile = function capFxItemsForMobile() {
+    if (!isMobileGame(this) || !Array.isArray(this.fxItems)) return;
+    const mode = performanceMode(this);
+    const limit = mode === 'severe' ? 42 : mode === 'pressure' ? 64 : 96;
+    if (this.fxItems.length <= limit) return;
+
+    const removed = this.fxItems.splice(0, this.fxItems.length - limit);
+    removed.forEach((item) => removeFxItem(this, item));
+  };
+
   proto._keepRuntimeWindowNearPlayer = function keepRuntimeWindowNearPlayer() {
     const row = this.playerPosition?.row || 0;
     const { forward, backward } = activeWindowFor(this, row);
     this._normalizeVisibleTrafficLanes();
     this._trimSimulationWindow(row, forward, backward);
+    this._capFxItemsForMobile();
   };
 
   proto._normalizeTrafficLaneForPlayability = function normalizeTrafficLaneForPlayability(rowIndex, items) {
     if (!Array.isArray(items) || items.length === 0) return items;
 
-    const desiredCount = targetTrafficCount(rowIndex, items.length);
+    const desiredCount = targetTrafficCount(rowIndex, items.length, this);
     let laneItems = items;
 
     if (desiredCount < items.length) {
@@ -185,7 +331,7 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
 
     laneItems.forEach((vehicle, index) => {
       const data = vehicle.userData || {};
-      if (data.playabilityProfileAppliedV4) return;
+      if (data.playabilityProfileAppliedV5) return;
 
       const compact = isCompactVehicle(data);
       const heavy = isHeavyVehicle(data);
@@ -211,7 +357,7 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
         data.width * (compact || superVehicle ? 0.48 : heavy ? 0.6 : 0.54),
         rowIndex <= 12 ? 92 : rowIndex <= 40 ? 84 : 76
       );
-      data.playabilityProfileAppliedV4 = true;
+      data.playabilityProfileAppliedV5 = true;
     });
 
     return laneItems;
@@ -238,14 +384,12 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
 
   proto._setupLights = function setupLightsWithMobileShadowGuard() {
     originalSetupLights.call(this);
+    this._applyMobileQualityProfile();
+  };
 
-    // Mobile WebGL shadow maps are the most expensive part of this scene.
-    // Disabling them on phones keeps movement responsive; desktop keeps the
-    // premium shadowed look.
-    if (this.renderProfile?.name !== 'desktop-premium') {
-      this.renderer.shadowMap.enabled = false;
-      if (this.sunlight) this.sunlight.castShadow = false;
-    }
+  proto._resize = function resizeWithAdaptivePixelRatio() {
+    this._applyMobileQualityProfile();
+    originalResize.call(this);
   };
 
   proto._addRowsAround = function addRowsAroundWithBoundedRuntimeWindow(centerRow, forwardRows = 24, backwardRows = 24) {
@@ -269,12 +413,72 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
   };
 
   proto.reset = function resetWithLightOpeningScene(startImmediately = false) {
-    originalReset.call(this, startImmediately);
-    this._keepRuntimeWindowNearPlayer();
+    this.restartPrepared = false;
+    this.isPlaying = Boolean(startImmediately);
+    this.isUiPaused = false;
+    this.lastPausedRenderAt = 0;
+    this.isGameOver = false;
+    this.isImpacting = false;
+    this.impactStartedAt = 0;
+    this.impactVector.set(0, 0);
+    this.cheatRespawnPending = false;
+    this.cheatRespawnPosition = null;
+    this.invulnerableUntil = 0;
+    this.waterGraceUntil = 0;
+    this.pendingWaterMissUntil = 0;
+    this.moveQueue = [];
+    this.movement = null;
+    this.playerPosition = { row: 0, tile: 0 };
+    this.highestRow = 0;
+    this.score = 0;
+    this.lastMilestone = 0;
+    this.lastNearMissAt = 0;
+    this.runStartingHighScore = this.highScore;
+    this.newRecordThisRun = false;
+    this.newRecordScore = 0;
+    this.activeRidePlankId = null;
+    this.minPlayableRow = 0;
+    this.prunedRowDataBefore = 0;
+
+    disposeDynamicMaterials(this.worldGroup);
+    disposeDynamicMaterials(this.vehicleGroup);
+    disposeDynamicMaterials(this.fxGroup);
+    disposeFxGeometries(this.fxGroup);
+    this.worldGroup.clear();
+    this.vehicleGroup.clear();
+    this.fxGroup.clear();
+    this.vehicles = [];
+    this.planks = [];
+    this.fxItems = [];
+    this.trafficRows.clear();
+    this.waterRows.clear();
+    this.waterFlowRows.clear();
+    this.waterFlowItems = [];
+    this.rowGroups.clear();
+
+    if (this.player) {
+      this.scene.remove(this.player);
+      this.player = null;
+    }
+
+    this._applyMobileQualityProfile();
+    this.rows = createInitialRows(PREGENERATE_ROWS);
+    this.foundation = createFoundation(this.geometries, this.materials);
+    this.worldGroup.add(this.foundation);
+
+    const { forward } = activeWindowFor(this, 0);
+    this._addRowsAround(0, forward, 0);
+
+    this.player = createPlayer(this.geometries, this.materials);
+    this.scene.add(this.player);
+    this._setPlayerWorldPosition(0, 0);
+    this._updateCamera(true);
+    this.callbacks.onScore(0);
   };
 
   proto.loadSaveState = function loadSaveStateWithTrim(state, startImmediately = true) {
     const result = originalLoadSaveState.call(this, state, startImmediately);
+    this._applyMobileQualityProfile();
     this._keepRuntimeWindowNearPlayer();
     return result;
   };
@@ -290,6 +494,7 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
     this.lastPausedRenderAt = 0;
     this.restartPrepared = false;
 
+    this._applyMobileQualityProfile();
     this._keepRuntimeWindowNearPlayer();
     this._clearSpawnAroundPlayer?.(2, 220);
     this.clock.getDelta();
@@ -304,10 +509,16 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
   proto._animate = function animate() {
     this.renderRequested = null;
     if (this.isDestroyed || this.isRuntimeSuspended) return;
-    // Do not cap at 0.035. When mobile FPS briefly drops below ~28 FPS, that cap
-    // makes every obstacle look globally slower, including trains. A 0.05 cap
-    // preserves perceived speed while still preventing huge background-tab jumps.
-    const delta = Math.min(this.clock.getDelta(), 0.05);
+
+    const rawDelta = this.clock.getDelta();
+    this._observeMobileFrameHealth(rawDelta);
+
+    // Avoid global slow-motion on temporary drops while still preventing huge
+    // background-tab jumps. Severe mode receives a slightly wider cap to keep
+    // vehicle speed honest when the browser misses frames.
+    const mode = performanceMode(this);
+    const deltaCap = mode === 'severe' ? 0.06 : 0.05;
+    const delta = Math.min(rawDelta, deltaCap);
 
     if (this.isUiPaused && !this.isImpacting) {
       const nowMs = performance.now();
@@ -334,8 +545,12 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
       // This keeps the PWA light before the first playable frame.
     }
 
-    this._updateWaterFlow(delta);
+    this.__ayamFrameIndex = (this.__ayamFrameIndex || 0) + 1;
+    const flowEvery = mode === 'severe' ? 3 : mode === 'pressure' ? 2 : 1;
+    if (this.__ayamFrameIndex % flowEvery === 0) this._updateWaterFlow(delta * flowEvery);
+
     this._updateFx(delta);
+    this._capFxItemsForMobile();
     this._updateGhostBlink();
     this._updateCamera(false, delta);
     if (this.isImpacting) this._applyCameraShake();
@@ -413,7 +628,6 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
       let targetSpeed = cruise;
 
       if (gap < hardGap) {
-        // Real braking only when the front vehicle is already too close.
         const emergencyFloor = rowIndex <= 24
           ? (compact || superVehicle ? 118 : 92)
           : (compact || superVehicle ? 98 : heavy ? 76 : 86);
@@ -423,8 +637,6 @@ if (!RoadQuestGame.__ayamRuntimeFixesAppliedV4) {
         const followSpeed = frontSpeed * (0.8 + 0.17 * ratio);
         targetSpeed = Math.min(cruise, followSpeed + (compact || superVehicle ? 24 : 13) * ratio);
       } else if ((compact || superVehicle) && gap < chaseGap) {
-        // Small vehicles may speed up to close the distance, then the previous
-        // branches make them brake naturally when they approach the next car.
         const ratio = 1 - clampNumber((gap - comfortGap) / Math.max(1, chaseGap - comfortGap), 0, 1);
         targetSpeed = Math.min(maxSpeed, Math.max(cruise, cruise + (maxSpeed - cruise) * (0.42 + 0.46 * ratio)));
       } else if (!heavy && gap > chaseGap * 1.35) {
