@@ -1,6 +1,6 @@
 {
   "name": "ayam-sd",
-  "version": "3.5.32",
+  "version": "3.5.33",
   "type": "module",
   "description": "Free and open-source Three.js Ayam SD browser game with a voxel chicken, traffic, trains, rivers, rewards, audio, mobile controls, and a learning quiz loop.",
   "license": "Apache-2.0",
@@ -18,32 +18,22 @@
     "threejs",
     "react",
     "vite",
-    "web-game",
-    "voxel-game",
-    "browser-game",
-    "github-pages",
-    "educational-game",
-    "kids-game",
-    "mobile-game",
-    "pwa"
+    "education-game",
+    "pwa",
+    "kids-learning"
   ],
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "clean": "node -e \"import('fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\"",
-    "verify": "node scripts/verify-repo.mjs"
-  },
-  "engines": {
-    "node": ">=20"
+    "preview": "vite preview",
+    "check": "npm run build"
   },
   "dependencies": {
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "three": "^0.184.0"
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "three": "latest"
   },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^6.0.2",
-    "vite": "^8.0.16"
-  }
+  "devDependencies": {}
 }
