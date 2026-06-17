@@ -1,16 +1,31 @@
 import * as THREE from 'three';
 import { RoadQuestGame } from './RoadQuestGame.js';
+import { TILE_SIZE } from './constants.js';
+import { rowToY, tileToX } from './math.js';
 
 const CONTACT_SHADOW_MAX_INSTANCES = 160;
 const CONTACT_SHADOW_Z = 0.72;
 const CONTACT_SHADOW_COLOR = 0x111827;
+const CONTACT_SHADOW_POSITION_SNAP = 0.5;
 const HIGH_MOBILE_SHADOW_MAP_SIZE = 512;
 const MID_MOBILE_SHADOW_MAP_SIZE = 384;
+const REAL_SHADOW_UPGRADE_COOLDOWN_MS = 1800;
+const STABLE_SHADOW_ANCHOR_GRID = TILE_SIZE * 2;
+const STABLE_SHADOW_OFFSET = Object.freeze({ x: -190, y: -235, z: 430 });
 
 const scratchPosition = new THREE.Vector3();
 const scratchQuaternion = new THREE.Quaternion();
 const scratchScale = new THREE.Vector3();
 const scratchMatrix = new THREE.Matrix4();
+
+function nowMs() {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function snapTo(value, step) {
+  if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return value;
+  return Math.round(value / step) * step;
+}
 
 function isMobileProfile(game) {
   const profile = String(game?.renderProfile?.name || '');
@@ -28,6 +43,10 @@ function readNavigatorNumber(name) {
 
 function hasReducedMotion() {
   return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+}
+
+function hasRealShadowActive(game) {
+  return Boolean(game?.renderer?.shadowMap?.enabled && game?.sunlight?.castShadow);
 }
 
 function deviceCanTryRealMobileShadow(game) {
@@ -60,17 +79,86 @@ function configureShadowMapSize(sunlight, size) {
   sunlight.shadow.needsUpdate = true;
 }
 
+function chooseStickyMobileShadowTier(game, desiredTier) {
+  const previousTier = game.__ayamMobileShadowTier;
+  if (!previousTier || previousTier === desiredTier) return desiredTier;
+
+  // Downgrade to contact immediately when the device is under pressure. Upgrade
+  // back to real shadow only after a cooldown so the mode does not flap and cause
+  // visible one-frame shadow glitches.
+  if (desiredTier !== 'real') return desiredTier;
+
+  const changedAt = Number(game.__ayamMobileShadowTierChangedAt || 0);
+  if (changedAt > 0 && nowMs() - changedAt < REAL_SHADOW_UPGRADE_COOLDOWN_MS) {
+    return previousTier;
+  }
+
+  return desiredTier;
+}
+
+function setMobileShadowTier(game, tier) {
+  if (game.__ayamMobileShadowTier === tier) return;
+  game.__ayamMobileShadowTier = tier;
+  game.__ayamMobileShadowTierChangedAt = nowMs();
+}
+
+function stableShadowAnchorFor(game) {
+  const row = Number(game?.playerPosition?.row ?? 0);
+  const tile = Number(game?.playerPosition?.tile ?? 0);
+  const fallbackX = Number(game?.cameraRawTarget?.x ?? game?.cameraTarget?.x ?? 0);
+  const fallbackY = Number(game?.cameraRawTarget?.y ?? game?.cameraTarget?.y ?? 0);
+
+  // Directional-light shadow maps shimmer when the light target tracks the
+  // smoothed camera every frame. Use the logical chicken row/tile and snap the
+  // anchor to a small world grid. The shadow camera is large enough that it does
+  // not need to chase sub-tile motion, and the result is much more stable.
+  const logicalX = Number.isFinite(tile) ? tileToX(tile, TILE_SIZE) * 0.42 : fallbackX;
+  const logicalY = Number.isFinite(row) ? rowToY(row, TILE_SIZE) + 64 : fallbackY;
+
+  return {
+    x: snapTo(logicalX, STABLE_SHADOW_ANCHOR_GRID),
+    y: snapTo(logicalY, STABLE_SHADOW_ANCHOR_GRID),
+    z: 0
+  };
+}
+
+function updateStableRealShadowAnchor(game, force = false) {
+  if (!game?.sunlight || !game?.sunTarget || !hasRealShadowActive(game)) return false;
+
+  const anchor = stableShadowAnchorFor(game);
+  const previous = game.__ayamStableShadowAnchor || {};
+  const changed = force
+    || previous.x !== anchor.x
+    || previous.y !== anchor.y
+    || previous.z !== anchor.z;
+
+  if (!changed) return false;
+
+  game.__ayamStableShadowAnchor = anchor;
+  game.sunTarget.position.set(anchor.x, anchor.y, anchor.z);
+  game.sunlight.position.set(
+    anchor.x + STABLE_SHADOW_OFFSET.x,
+    anchor.y + STABLE_SHADOW_OFFSET.y,
+    anchor.z + STABLE_SHADOW_OFFSET.z
+  );
+  game.sunTarget.updateMatrixWorld();
+  game.sunlight.updateMatrixWorld();
+  if (game.sunlight.shadow) game.sunlight.shadow.needsUpdate = true;
+  return true;
+}
+
 function configureAdaptiveMobileShadow(game) {
   if (!isMobileProfile(game) || !game?.renderer) return;
 
   const mode = mobilePerformanceMode(game);
   const canTryReal = deviceCanTryRealMobileShadow(game);
-  const useRealShadow = canTryReal && mode === 'normal';
+  const desiredTier = canTryReal && mode === 'normal' ? 'real' : 'contact';
+  const tier = chooseStickyMobileShadowTier(game, desiredTier);
 
-  game.__ayamMobileShadowTier = useRealShadow ? 'real' : 'contact';
+  setMobileShadowTier(game, tier);
   game.__ayamMobileShadowCanTryReal = canTryReal;
 
-  if (!useRealShadow) {
+  if (tier !== 'real') {
     game.renderer.shadowMap.enabled = false;
     if (game.sunlight) game.sunlight.castShadow = false;
     return;
@@ -83,6 +171,7 @@ function configureAdaptiveMobileShadow(game) {
   if (game.sunlight) {
     game.sunlight.castShadow = true;
     configureShadowMapSize(game.sunlight, shadowSize);
+    updateStableRealShadowAnchor(game, true);
   }
 }
 
@@ -91,7 +180,7 @@ function shouldUseContactShadows(game) {
 
   // Strong phones can use a small real shadow map in normal mode. When that is
   // active, hide blob shadows to avoid double-dark contact shadows.
-  if (game.__ayamMobileShadowTier === 'real') return false;
+  if (hasRealShadowActive(game) || game.__ayamMobileShadowTier === 'real') return false;
 
   // Low/mid phones, pressure mode, severe mode, and desktop fallback all use the
   // cheap instanced blob-shadow path.
@@ -138,7 +227,9 @@ function applyShadowInstance(mesh, index, x, y, scaleX, scaleY, opacityWeight = 
   // Opacity is shared by the material, so far objects become visually lighter by
   // reducing their scale a little instead of adding a second material/draw call.
   const weight = Math.max(0.52, Math.min(1, opacityWeight));
-  scratchPosition.set(x, y, CONTACT_SHADOW_Z);
+  const snappedX = snapTo(x, CONTACT_SHADOW_POSITION_SNAP);
+  const snappedY = snapTo(y, CONTACT_SHADOW_POSITION_SNAP);
+  scratchPosition.set(snappedX, snappedY, CONTACT_SHADOW_Z);
   scratchScale.set(scaleX * weight, scaleY * weight, 1);
   scratchMatrix.compose(scratchPosition, scratchQuaternion, scratchScale);
   mesh.setMatrixAt(index, scratchMatrix);
@@ -146,6 +237,7 @@ function applyShadowInstance(mesh, index, x, y, scaleX, scaleY, opacityWeight = 
 
 function updateMobileContactShadows(game) {
   configureAdaptiveMobileShadow(game);
+  if (hasRealShadowActive(game)) updateStableRealShadowAnchor(game);
 
   const mesh = ensureContactShadowMesh(game);
   const enabled = shouldUseContactShadows(game);
@@ -198,14 +290,23 @@ function updateMobileContactShadows(game) {
 
 function installMobileContactShadowFixes() {
   const proto = RoadQuestGame?.prototype;
-  if (!proto || proto.__mobileContactShadowFixesInstalledV2) return;
-  proto.__mobileContactShadowFixesInstalledV2 = true;
+  if (!proto || proto.__mobileContactShadowFixesInstalledV3) return;
+  proto.__mobileContactShadowFixesInstalledV3 = true;
 
   const originalApplyQualityProfile = proto._applyMobileQualityProfile;
   proto._applyMobileQualityProfile = function applyQualityProfileWithAdaptiveMobileShadows(...args) {
     const result = originalApplyQualityProfile?.apply(this, args);
     configureAdaptiveMobileShadow(this);
     return result;
+  };
+
+  const originalSunlightUpdate = proto._updateSunlightForCurrentView;
+  proto._updateSunlightForCurrentView = function updateSunlightWithStableShadowAnchor(...args) {
+    if (hasRealShadowActive(this)) {
+      updateStableRealShadowAnchor(this);
+      return;
+    }
+    return originalSunlightUpdate.apply(this, args);
   };
 
   const originalUpdateCamera = proto._updateCamera;
@@ -218,6 +319,7 @@ function installMobileContactShadowFixes() {
   const originalDestroy = proto.destroy;
   proto.destroy = function destroyWithMobileContactShadowCleanup(...args) {
     if (this.__mobileContactShadowMesh) {
+      this.__mobileContactShadowMesh.parent?.remove?.(this.__mobileContactShadowMesh);
       this.__mobileContactShadowMesh.geometry?.dispose?.();
       this.__mobileContactShadowMesh.material?.dispose?.();
       this.__mobileContactShadowMesh = null;
