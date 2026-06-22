@@ -8,8 +8,7 @@ import './game/stageTrainVisibilityFixes.js';
 import './game/midStageReadabilityFixes.js';
 import './game/routePlanFixes.js';
 import './game/routeTrafficMotionFixes.js';
-import './game/desktopShadowFixes.js';
-import './game/mobileContactShadowFixes.js';
+import './game/unifiedShadowEngineFixes.js';
 import App from './App.jsx';
 import './styles.css';
 
