@@ -6,6 +6,7 @@ import './game/smoothTrafficFixes.js';
 import './game/stageBalanceFixes.js';
 import './game/stageTrainVisibilityFixes.js';
 import './game/midStageReadabilityFixes.js';
+import './game/routePlanFixes.js';
 import './game/desktopShadowFixes.js';
 import './game/mobileContactShadowFixes.js';
 import App from './App.jsx';
